@@ -18,6 +18,7 @@ The agent finishes by pushing `card/<ID>` and opening a PR to main — CI (`.git
 every PR and republishes the rolling release tagged `main` on merge (old release overwritten). The lead then:
 dispatches an adversarial review agent on the PR, merges it (`gh pr merge --merge`), and
 `python3 kanban/board.py move S1 done`, `git worktree remove ../scanlist-wt/S1`.
+When a PR touches card files, resolve at merge: keep main's card location (it may have moved), union the Notes.
 
 Tracks: `shared` (S*), `kotlin` (B*), `rn` (A*), `web` (C*), `compare` (X*). The three app tracks are independent
 after the shared foundation, so up to ~6 agents can run at once (one per track lane).

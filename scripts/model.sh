@@ -305,6 +305,11 @@ cmd_push() {
    The app must create it (launch $PKG once, open whatever screen initialises models), so the dir is
    app-owned. Do NOT create it with 'adb shell mkdir' — the app cannot open files in a shell-owned dir."
             fi
+            if ! adb_ shell test -d "$ext_dir" >/dev/null 2>&1; then
+                die 4 "$ext_dir ($MODEL_SUBDIR) does not exist yet — only the app may create it.
+   Launch $PKG once so the app creates $MODEL_SUBDIR (never 'adb shell mkdir'), then re-run push.
+   (An 'adb push' here would create it shell-owned and the app could never open the file.)"
+            fi
             push_file "$ext_dir/$MODEL_NAME"
             [ "$do_verify" -eq 1 ] && { if run_as_works; then verify_remote "$ext_dir/$MODEL_NAME" run-as; else verify_remote "$ext_dir/$MODEL_NAME" shell; fi; }
             ;;

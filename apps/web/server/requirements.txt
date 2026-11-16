@@ -1,0 +1,7 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+httpx>=0.27
+# CI runs `pip install -r requirements.txt && python -m pytest` in a fresh venv,
+# so the test runner must live in runtime requirements (requirements-dev.txt is
+# only a convenience alias for local work).
+pytest>=8

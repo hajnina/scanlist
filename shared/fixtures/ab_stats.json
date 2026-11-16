@@ -1,0 +1,2197 @@
+{
+  "version": 1,
+  "generated": "2026-11-17",
+  "model": {
+    "id": "embeddinggemma-2-740m",
+    "revision": "f9972ac22e696a105c482202646979e33e4b5a1e",
+    "dtype": "float32"
+  },
+  "active": "mnemothera",
+  "prefixSets": {
+    "mnemothera": {
+      "doc": "task: search result | text: ",
+      "query": "task: search query | text: "
+    },
+    "modelcard": {
+      "doc": "title: none | text: ",
+      "query": "task: search result | query: "
+    }
+  },
+  "summary": {
+    "mnemothera": {
+      "text": {
+        "queries": 43,
+        "hitQueries": 31,
+        "nomatchQueries": 12,
+        "top1": 1.0,
+        "top3": 1.0,
+        "hitTop1Min": 0.039765,
+        "hitMarginMedian": 0.118381,
+        "hitMarginMax": 0.173201,
+        "hitsMarginAtLeast005": 0.967741935483871,
+        "nomatchTop1Max": 0.787691,
+        "nomatchTop1Median": 0.749728,
+        "hitTop1MinScore": 0.79906,
+        "hitTop1MedianScore": 0.865785
+      },
+      "image": {
+        "queries": 15,
+        "hitQueries": 13,
+        "nomatchQueries": 2,
+        "top1": 0.9230769230769231,
+        "top3": 1.0,
+        "hitTop1Min": 0.003758,
+        "hitMarginMedian": 0.02815,
+        "hitMarginMax": 0.068301,
+        "hitsMarginAtLeast005": 0.23076923076923078,
+        "nomatchTop1Max": 0.666327,
+        "nomatchTop1Median": 0.6603494999999999,
+        "hitTop1MinScore": 0.68744,
+        "hitTop1MedianScore": 0.732137
+      }
+    },
+    "modelcard": {
+      "text": {
+        "queries": 43,
+        "hitQueries": 31,
+        "nomatchQueries": 12,
+        "top1": 1.0,
+        "top3": 1.0,
+        "hitTop1Min": 0.043374,
+        "hitMarginMedian": 0.113884,
+        "hitMarginMax": 0.171765,
+        "hitsMarginAtLeast005": 0.967741935483871,
+        "nomatchTop1Max": 0.731079,
+        "nomatchTop1Median": 0.7025315,
+        "hitTop1MinScore": 0.738357,
+        "hitTop1MedianScore": 0.81525
+      },
+      "image": {
+        "queries": 15,
+        "hitQueries": 13,
+        "nomatchQueries": 2,
+        "top1": 0.7692307692307693,
+        "top3": 0.9230769230769231,
+        "hitTop1Min": 0.002766,
+        "hitMarginMedian": 0.024224,
+        "hitMarginMax": 0.066378,
+        "hitsMarginAtLeast005": 0.15384615384615385,
+        "nomatchTop1Max": 0.677655,
+        "nomatchTop1Median": 0.674677,
+        "hitTop1MinScore": 0.695485,
+        "hitTop1MedianScore": 0.733
+      }
+    }
+  },
+  "rows": {
+    "mnemothera": [
+      {
+        "id": "t01",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "bananas",
+        "expect": "hit",
+        "top1": "sha1:998e2c1acb80597f39892b85f9dfa8726ead298e",
+        "top1_raw": 0.917276,
+        "top2_raw": 0.789957,
+        "margin": 0.127319,
+        "top3": [
+          "sha1:998e2c1acb80597f39892b85f9dfa8726ead298e",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2",
+          "sha1:801b3e63df7a42974bc5f11b4a342251f8c04ba3"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t02",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "BANANE 1,2KG",
+        "expect": "hit",
+        "top1": "sha1:998e2c1acb80597f39892b85f9dfa8726ead298e",
+        "top1_raw": 0.865785,
+        "top2_raw": 0.758728,
+        "margin": 0.107057,
+        "top3": [
+          "sha1:998e2c1acb80597f39892b85f9dfa8726ead298e",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t03",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "olive oil",
+        "expect": "hit",
+        "top1": "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8",
+        "top1_raw": 0.874611,
+        "top2_raw": 0.773083,
+        "margin": 0.101528,
+        "top3": [
+          "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t04",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "ACEITE DE OLIVA VIRGEN EXTRA 1 L",
+        "expect": "hit",
+        "top1": "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8",
+        "top1_raw": 0.841554,
+        "top2_raw": 0.72565,
+        "margin": 0.115904,
+        "top3": [
+          "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2",
+          "sha1:cc553c1cde65825dada01e7afe324c67c7ce9438"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t05",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "toilet paper",
+        "expect": "hit",
+        "top1": "sha1:d60ce48857419792756d309f45607f41307ced97",
+        "top1_raw": 0.921387,
+        "top2_raw": 0.756821,
+        "margin": 0.164566,
+        "top3": [
+          "sha1:d60ce48857419792756d309f45607f41307ced97",
+          "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t06",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "oat milk 2 l",
+        "expect": "hit",
+        "top1": "sha1:cc553c1cde65825dada01e7afe324c67c7ce9438",
+        "top1_raw": 0.854306,
+        "top2_raw": 0.759077,
+        "margin": 0.095229,
+        "top3": [
+          "sha1:cc553c1cde65825dada01e7afe324c67c7ce9438",
+          "sha1:b39d1da2368bc3e4d2b4240135d9a5faa64b2861",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t07",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "dish soap",
+        "expect": "hit",
+        "top1": "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+        "top1_raw": 0.924379,
+        "top2_raw": 0.757279,
+        "margin": 0.1671,
+        "top3": [
+          "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+          "sha1:d60ce48857419792756d309f45607f41307ced97"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t08",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "CAFÉ EN GRANOS 1 KG",
+        "expect": "hit",
+        "top1": "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+        "top1_raw": 0.825214,
+        "top2_raw": 0.743307,
+        "margin": 0.081907,
+        "top3": [
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+          "sha1:cc553c1cde65825dada01e7afe324c67c7ce9438"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t09",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "sourdough bread 800 g",
+        "expect": "hit",
+        "top1": "sha1:00b7a51944fcf565e7e81de46c9881808bfd1014",
+        "top1_raw": 0.845524,
+        "top2_raw": 0.722689,
+        "margin": 0.122835,
+        "top3": [
+          "sha1:00b7a51944fcf565e7e81de46c9881808bfd1014",
+          "sha1:426383df454b455953b2fc66e606235e24035172",
+          "sha1:6f9d9f1e944fe4ada93f4daa940f3a54a7cfd92a"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t10",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "butter",
+        "expect": "hit",
+        "top1": "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+        "top1_raw": 0.893008,
+        "top2_raw": 0.796207,
+        "margin": 0.096801,
+        "top3": [
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+          "sha1:426383df454b455953b2fc66e606235e24035172"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t11",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "HONEY 500G",
+        "expect": "hit",
+        "top1": "sha1:e47a906ba6f93fb10015f8d5be5486419697d6b1",
+        "top1_raw": 0.820627,
+        "top2_raw": 0.723111,
+        "margin": 0.097516,
+        "top3": [
+          "sha1:e47a906ba6f93fb10015f8d5be5486419697d6b1",
+          "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f",
+          "sha1:00b7a51944fcf565e7e81de46c9881808bfd1014"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t12",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "eggs",
+        "expect": "hit",
+        "top1": "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f",
+        "top1_raw": 0.894253,
+        "top2_raw": 0.754565,
+        "margin": 0.139688,
+        "top3": [
+          "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f",
+          "sha1:fecfae8e3ea074267cf94e618a16abd3a02f8525",
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t13",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "olives",
+        "expect": "hit",
+        "top1": "sha1:a8ef07549e0e65456b112409d6d68fc24c9868f6",
+        "top1_raw": 0.890632,
+        "top2_raw": 0.780046,
+        "margin": 0.110586,
+        "top3": [
+          "sha1:a8ef07549e0e65456b112409d6d68fc24c9868f6",
+          "sha1:fecfae8e3ea074267cf94e618a16abd3a02f8525",
+          "sha1:e47a906ba6f93fb10015f8d5be5486419697d6b1"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t14",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "apples",
+        "expect": "hit",
+        "top1": "sha1:fecfae8e3ea074267cf94e618a16abd3a02f8525",
+        "top1_raw": 0.892853,
+        "top2_raw": 0.763809,
+        "margin": 0.129044,
+        "top3": [
+          "sha1:fecfae8e3ea074267cf94e618a16abd3a02f8525",
+          "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f",
+          "sha1:426383df454b455953b2fc66e606235e24035172"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t15",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "BATERÍAS AA 4 UNIDADES",
+        "expect": "hit",
+        "top1": "sha1:bb03b377abce227e1fd94936188537e154da127d",
+        "top1_raw": 0.825289,
+        "top2_raw": 0.706908,
+        "margin": 0.118381,
+        "top3": [
+          "sha1:bb03b377abce227e1fd94936188537e154da127d",
+          "sha1:fecfae8e3ea074267cf94e618a16abd3a02f8525",
+          "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t16",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "mléko",
+        "expect": "hit",
+        "top1": "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+        "top1_raw": 0.861664,
+        "top2_raw": 0.793879,
+        "margin": 0.067785,
+        "top3": [
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t17",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "MLÉKO POLOTUČNÉ 1,5% TUKU",
+        "expect": "hit",
+        "top1": "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+        "top1_raw": 0.804082,
+        "top2_raw": 0.736336,
+        "margin": 0.067746,
+        "top3": [
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+          "sha1:0e12b92b6bbe9ba4014f86c6fb2754139528567c"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t18",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "leche entera",
+        "expect": "hit",
+        "top1": "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+        "top1_raw": 0.833595,
+        "top2_raw": 0.746639,
+        "margin": 0.086956,
+        "top3": [
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+          "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t19",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "chléb",
+        "expect": "hit",
+        "top1": "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76",
+        "top1_raw": 0.86114,
+        "top2_raw": 0.737444,
+        "margin": 0.123696,
+        "top3": [
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+          "sha1:29297436b6f43f2350547b9ef8c292f1f963b585"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t20",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "hovězí maso 500 g",
+        "expect": "hit",
+        "top1": "sha1:39e552552748ed9238105d4041878e4a96cf4759",
+        "top1_raw": 0.79906,
+        "top2_raw": 0.759295,
+        "margin": 0.039765,
+        "top3": [
+          "sha1:39e552552748ed9238105d4041878e4a96cf4759",
+          "sha1:2483af5325c4ee234201277c58a839da909213f9",
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t21",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "kuřecí stehna",
+        "expect": "hit",
+        "top1": "sha1:2483af5325c4ee234201277c58a839da909213f9",
+        "top1_raw": 0.866546,
+        "top2_raw": 0.70373,
+        "margin": 0.162816,
+        "top3": [
+          "sha1:2483af5325c4ee234201277c58a839da909213f9",
+          "sha1:39e552552748ed9238105d4041878e4a96cf4759",
+          "sha1:7a009450aa986a5ff52338246f177d3314e88cc9"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t22",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "queso curado",
+        "expect": "hit",
+        "top1": "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+        "top1_raw": 0.826979,
+        "top2_raw": 0.710919,
+        "margin": 0.11606,
+        "top3": [
+          "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+          "sha1:39e552552748ed9238105d4041878e4a96cf4759",
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t23",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "jogurt bílý",
+        "expect": "hit",
+        "top1": "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+        "top1_raw": 0.892589,
+        "top2_raw": 0.719388,
+        "margin": 0.173201,
+        "top3": [
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+          "sha1:0e12b92b6bbe9ba4014f86c6fb2754139528567c"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t24",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "papel higiénico",
+        "expect": "hit",
+        "top1": "sha1:519c80505fd0dd126378eb2e9d339bb62caa6f75",
+        "top1_raw": 0.881607,
+        "top2_raw": 0.740418,
+        "margin": 0.141189,
+        "top3": [
+          "sha1:519c80505fd0dd126378eb2e9d339bb62caa6f75",
+          "sha1:29297436b6f43f2350547b9ef8c292f1f963b585",
+          "sha1:0e12b92b6bbe9ba4014f86c6fb2754139528567c"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t25",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "comino molido",
+        "expect": "hit",
+        "top1": "spice-cumin",
+        "top1_raw": 0.881686,
+        "top2_raw": 0.732032,
+        "margin": 0.149654,
+        "top3": [
+          "spice-cumin",
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+          "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t26",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "uzená paprika",
+        "expect": "hit",
+        "top1": "sha1:76fe08061a04c997e805cfdc3e4a0428b33723bf",
+        "top1_raw": 0.857061,
+        "top2_raw": 0.754164,
+        "margin": 0.102897,
+        "top3": [
+          "sha1:76fe08061a04c997e805cfdc3e4a0428b33723bf",
+          "sha1:a59f7785305aff16297dd40b2e96e4431ef9f10b",
+          "spice-cumin"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t27",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "arroz basmati 2 kg",
+        "expect": "hit",
+        "top1": "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818",
+        "top1_raw": 0.841176,
+        "top2_raw": 0.74223,
+        "margin": 0.098946,
+        "top3": [
+          "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818",
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+          "spice-cumin"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t28",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "cuscús",
+        "expect": "hit",
+        "top1": "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+        "top1_raw": 0.884702,
+        "top2_raw": 0.758343,
+        "margin": 0.126359,
+        "top3": [
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+          "spice-cumin",
+          "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t29",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "DIJON MUSTARD 200G",
+        "expect": "hit",
+        "top1": "sha1:a59f7785305aff16297dd40b2e96e4431ef9f10b",
+        "top1_raw": 0.850475,
+        "top2_raw": 0.722947,
+        "margin": 0.127528,
+        "top3": [
+          "sha1:a59f7785305aff16297dd40b2e96e4431ef9f10b",
+          "spice-cumin",
+          "toothpaste"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t30",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "toothpaste",
+        "expect": "hit",
+        "top1": "toothpaste",
+        "top1_raw": 0.898815,
+        "top2_raw": 0.777202,
+        "margin": 0.121613,
+        "top3": [
+          "toothpaste",
+          "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+          "sha1:4bda2b02d59319bbefa2400ccc90f6124dc5ff27"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t31",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "shampoo",
+        "expect": "hit",
+        "top1": "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+        "top1_raw": 0.925746,
+        "top2_raw": 0.788277,
+        "margin": 0.137469,
+        "top3": [
+          "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+          "toothpaste",
+          "sha1:4bda2b02d59319bbefa2400ccc90f6124dc5ff27"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "d01",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "Coca-Cola 1,5 l",
+        "expect": "nomatch",
+        "top1": "sha1:d60ce48857419792756d309f45607f41307ced97",
+        "top1_raw": 0.748961,
+        "top2_raw": 0.735479,
+        "margin": 0.013482,
+        "top3": [
+          "sha1:d60ce48857419792756d309f45607f41307ced97",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+          "sha1:f13fbe8c933821350c868f6700531bc61f470acd"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d02",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "Nutella",
+        "expect": "nomatch",
+        "top1": "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+        "top1_raw": 0.750495,
+        "top2_raw": 0.73831,
+        "margin": 0.012185,
+        "top3": [
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+          "sha1:6f9d9f1e944fe4ada93f4daa940f3a54a7cfd92a"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d03",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "cat food",
+        "expect": "nomatch",
+        "top1": "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+        "top1_raw": 0.772394,
+        "top2_raw": 0.772011,
+        "margin": 0.000383,
+        "top3": [
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+          "sha1:f13fbe8c933821350c868f6700531bc61f470acd"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d04",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "light bulbs",
+        "expect": "nomatch",
+        "top1": "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+        "top1_raw": 0.739601,
+        "top2_raw": 0.7361,
+        "margin": 0.003501,
+        "top3": [
+          "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+          "toothpaste",
+          "sha1:4bda2b02d59319bbefa2400ccc90f6124dc5ff27"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d05",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "beer",
+        "expect": "nomatch",
+        "top1": "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+        "top1_raw": 0.714747,
+        "top2_raw": 0.710777,
+        "margin": 0.00397,
+        "top3": [
+          "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76",
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d06",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "wine",
+        "expect": "nomatch",
+        "top1": "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+        "top1_raw": 0.759626,
+        "top2_raw": 0.75349,
+        "margin": 0.006136,
+        "top3": [
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+          "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d07",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "chocolate",
+        "expect": "nomatch",
+        "top1": "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+        "top1_raw": 0.760771,
+        "top2_raw": 0.739315,
+        "margin": 0.021456,
+        "top3": [
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d08",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "crisps",
+        "expect": "nomatch",
+        "top1": "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+        "top1_raw": 0.737222,
+        "top2_raw": 0.710249,
+        "margin": 0.026973,
+        "top3": [
+          "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+          "sha1:29297436b6f43f2350547b9ef8c292f1f963b585",
+          "sha1:519c80505fd0dd126378eb2e9d339bb62caa6f75"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d09",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "shampoo",
+        "expect": "nomatch",
+        "top1": "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+        "top1_raw": 0.787691,
+        "top2_raw": 0.755937,
+        "margin": 0.031754,
+        "top3": [
+          "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+          "sha1:d60ce48857419792756d309f45607f41307ced97",
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d10",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "dog food",
+        "expect": "nomatch",
+        "top1": "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818",
+        "top1_raw": 0.74785,
+        "top2_raw": 0.720964,
+        "margin": 0.026886,
+        "top3": [
+          "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818",
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+          "sha1:4bda2b02d59319bbefa2400ccc90f6124dc5ff27"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d11",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "Oreo biscuits",
+        "expect": "nomatch",
+        "top1": "sha1:00b7a51944fcf565e7e81de46c9881808bfd1014",
+        "top1_raw": 0.743817,
+        "top2_raw": 0.740481,
+        "margin": 0.003336,
+        "top3": [
+          "sha1:00b7a51944fcf565e7e81de46c9881808bfd1014",
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+          "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d12",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "washing powder",
+        "expect": "nomatch",
+        "top1": "sha1:0e12b92b6bbe9ba4014f86c6fb2754139528567c",
+        "top1_raw": 0.778204,
+        "top2_raw": 0.735223,
+        "margin": 0.042981,
+        "top3": [
+          "sha1:0e12b92b6bbe9ba4014f86c6fb2754139528567c",
+          "sha1:519c80505fd0dd126378eb2e9d339bb62caa6f75",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "imilk",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:e6bdeb74007287e4aef94d5f29c0b99eabd320ca",
+        "top1_raw": 0.7352,
+        "top2_raw": 0.722496,
+        "margin": 0.012704,
+        "top3": [
+          "sha1:e6bdeb74007287e4aef94d5f29c0b99eabd320ca",
+          "sha1:0c978fc83df3fd2da20b1c1f4222aaafc03dbf6d",
+          "sha1:a4ff066793ff053a588ce67ef39e9d5fe7ab1c69"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "ipasta",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:ed4a4f18d90e95f4a946309b123d8c56e7624c47",
+        "top1_raw": 0.735723,
+        "top2_raw": 0.706302,
+        "margin": 0.029421,
+        "top3": [
+          "sha1:ed4a4f18d90e95f4a946309b123d8c56e7624c47",
+          "sha1:5f2c54e2073eee339f2acc4ebad630821ff5a797",
+          "sha1:f08d057d61e5df4b5102bf81775bd89cbce44075"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "iice-cream",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:b51cd5a6477be774b1f583a43b1c03a91658aaff",
+        "top1_raw": 0.68744,
+        "top2_raw": 0.6445,
+        "margin": 0.04294,
+        "top3": [
+          "sha1:b51cd5a6477be774b1f583a43b1c03a91658aaff",
+          "sha1:4802f2854e15ee4375b40fae54beeaa29d060c01",
+          "sha1:9de7f813702022787ae3ae2d61e93a22731cc973"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "iolive-oil",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:7fd013e9350605ebe471e134d9fbec08afed82b5",
+        "top1_raw": 0.732137,
+        "top2_raw": 0.663836,
+        "margin": 0.068301,
+        "top3": [
+          "sha1:7fd013e9350605ebe471e134d9fbec08afed82b5",
+          "sha1:ed4a4f18d90e95f4a946309b123d8c56e7624c47",
+          "sha1:001ccfacecc507090862f05afff8cb010db1d796"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "iolives",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:6a3b25a4b96893577310275533bcb4426fe2cf5c",
+        "top1_raw": 0.739112,
+        "top2_raw": 0.710962,
+        "margin": 0.02815,
+        "top3": [
+          "sha1:6a3b25a4b96893577310275533bcb4426fe2cf5c",
+          "sha1:7fd013e9350605ebe471e134d9fbec08afed82b5",
+          "sha1:6bdf7bc21ca38ca3d2511eb255fe957e15c0b044"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "ibananas",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:71ff982b3dea0057291fc8a76ab46c0bc6a71b63",
+        "top1_raw": 0.808106,
+        "top2_raw": 0.740983,
+        "margin": 0.067123,
+        "top3": [
+          "sha1:71ff982b3dea0057291fc8a76ab46c0bc6a71b63",
+          "sha1:6bdf7bc21ca38ca3d2511eb255fe957e15c0b044",
+          "sha1:966155912447c5c5f20e9cc2ace1bfc00dcab12a"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "icheese",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:a21629314e3a43b9f7405e6ee5faab80a651c50c",
+        "top1_raw": 0.699416,
+        "top2_raw": 0.674395,
+        "margin": 0.025021,
+        "top3": [
+          "sha1:a21629314e3a43b9f7405e6ee5faab80a651c50c",
+          "sha1:a4ff066793ff053a588ce67ef39e9d5fe7ab1c69",
+          "sha1:d120162834061d0bd614f0e0a668d07bee2965e6"
+        ],
+        "hit1": false,
+        "hit3": true
+      },
+      {
+        "id": "ibutter",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:ffa0a88286b8b4e2161ccbf9a2d8546dd41c1d09",
+        "top1_raw": 0.690242,
+        "top2_raw": 0.682859,
+        "margin": 0.007383,
+        "top3": [
+          "sha1:ffa0a88286b8b4e2161ccbf9a2d8546dd41c1d09",
+          "sha1:9de7f813702022787ae3ae2d61e93a22731cc973",
+          "sha1:a21629314e3a43b9f7405e6ee5faab80a651c50c"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "ihoney",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:a998f3e99d733024b6710671bff213ccb44cb491",
+        "top1_raw": 0.752869,
+        "top2_raw": 0.69632,
+        "margin": 0.056549,
+        "top3": [
+          "sha1:a998f3e99d733024b6710671bff213ccb44cb491",
+          "sha1:4e6396e6de30d1a79d026f64c2aa7de9a23505e9",
+          "sha1:7fd013e9350605ebe471e134d9fbec08afed82b5"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "itomatoes",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:6bdf7bc21ca38ca3d2511eb255fe957e15c0b044",
+        "top1_raw": 0.725532,
+        "top2_raw": 0.71038,
+        "margin": 0.015152,
+        "top3": [
+          "sha1:6bdf7bc21ca38ca3d2511eb255fe957e15c0b044",
+          "sha1:353a3de7b3178a3cc99402f63afec3d06b86473c",
+          "sha1:ed4a4f18d90e95f4a946309b123d8c56e7624c47"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "ieggs",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:a331ffe17141603d6e024ac1b362c212d11e6870",
+        "top1_raw": 0.754016,
+        "top2_raw": 0.750258,
+        "margin": 0.003758,
+        "top3": [
+          "sha1:a331ffe17141603d6e024ac1b362c212d11e6870",
+          "sha1:6eaa9673f015a73ca273df0eef946af875b21bd2",
+          "sha1:966155912447c5c5f20e9cc2ace1bfc00dcab12a"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "ibread",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:cf8c67e608aabc77263f54f01844f55a20de8920",
+        "top1_raw": 0.727762,
+        "top2_raw": 0.723886,
+        "margin": 0.003876,
+        "top3": [
+          "sha1:cf8c67e608aabc77263f54f01844f55a20de8920",
+          "sha1:b05bd8ed6bf8902d8b1ff65509c1df7562db002f",
+          "sha1:353a3de7b3178a3cc99402f63afec3d06b86473c"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "icoffee",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:c1d7834c05ed6d091d898a0cbf8a8a4a8d49019b",
+        "top1_raw": 0.722282,
+        "top2_raw": 0.691717,
+        "margin": 0.030565,
+        "top3": [
+          "sha1:c1d7834c05ed6d091d898a0cbf8a8a4a8d49019b",
+          "sha1:4b5cd7610267aeea698bf3c2a5fe2e51d82186b7",
+          "sha1:ed4a4f18d90e95f4a946309b123d8c56e7624c47"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "inutella",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "nomatch",
+        "top1": "sha1:4b5cd7610267aeea698bf3c2a5fe2e51d82186b7",
+        "top1_raw": 0.666327,
+        "top2_raw": 0.666017,
+        "margin": 0.00031,
+        "top3": [
+          "sha1:4b5cd7610267aeea698bf3c2a5fe2e51d82186b7",
+          "sha1:ed4a4f18d90e95f4a946309b123d8c56e7624c47",
+          "sha1:4e6396e6de30d1a79d026f64c2aa7de9a23505e9"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "icoca-cola",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "nomatch",
+        "top1": "sha1:d2173ff8f56884e500cd71ef0ddee8f55e113afc",
+        "top1_raw": 0.654372,
+        "top2_raw": 0.65343,
+        "margin": 0.000942,
+        "top3": [
+          "sha1:d2173ff8f56884e500cd71ef0ddee8f55e113afc",
+          "sha1:9de7f813702022787ae3ae2d61e93a22731cc973",
+          "toothpaste"
+        ],
+        "hit1": false,
+        "hit3": false
+      }
+    ],
+    "modelcard": [
+      {
+        "id": "t01",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "bananas",
+        "expect": "hit",
+        "top1": "sha1:998e2c1acb80597f39892b85f9dfa8726ead298e",
+        "top1_raw": 0.883229,
+        "top2_raw": 0.746868,
+        "margin": 0.136361,
+        "top3": [
+          "sha1:998e2c1acb80597f39892b85f9dfa8726ead298e",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2",
+          "sha1:801b3e63df7a42974bc5f11b4a342251f8c04ba3"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t02",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "BANANE 1,2KG",
+        "expect": "hit",
+        "top1": "sha1:998e2c1acb80597f39892b85f9dfa8726ead298e",
+        "top1_raw": 0.815524,
+        "top2_raw": 0.706136,
+        "margin": 0.109388,
+        "top3": [
+          "sha1:998e2c1acb80597f39892b85f9dfa8726ead298e",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t03",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "olive oil",
+        "expect": "hit",
+        "top1": "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8",
+        "top1_raw": 0.811273,
+        "top2_raw": 0.72469,
+        "margin": 0.086583,
+        "top3": [
+          "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t04",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "ACEITE DE OLIVA VIRGEN EXTRA 1 L",
+        "expect": "hit",
+        "top1": "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8",
+        "top1_raw": 0.758583,
+        "top2_raw": 0.646718,
+        "margin": 0.111865,
+        "top3": [
+          "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2",
+          "sha1:cc553c1cde65825dada01e7afe324c67c7ce9438"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t05",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "toilet paper",
+        "expect": "hit",
+        "top1": "sha1:d60ce48857419792756d309f45607f41307ced97",
+        "top1_raw": 0.854888,
+        "top2_raw": 0.683123,
+        "margin": 0.171765,
+        "top3": [
+          "sha1:d60ce48857419792756d309f45607f41307ced97",
+          "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t06",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "oat milk 2 l",
+        "expect": "hit",
+        "top1": "sha1:cc553c1cde65825dada01e7afe324c67c7ce9438",
+        "top1_raw": 0.808691,
+        "top2_raw": 0.710807,
+        "margin": 0.097884,
+        "top3": [
+          "sha1:cc553c1cde65825dada01e7afe324c67c7ce9438",
+          "sha1:b39d1da2368bc3e4d2b4240135d9a5faa64b2861",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t07",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "dish soap",
+        "expect": "hit",
+        "top1": "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+        "top1_raw": 0.876381,
+        "top2_raw": 0.713844,
+        "margin": 0.162537,
+        "top3": [
+          "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+          "sha1:d60ce48857419792756d309f45607f41307ced97"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t08",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "CAFÉ EN GRANOS 1 KG",
+        "expect": "hit",
+        "top1": "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+        "top1_raw": 0.774308,
+        "top2_raw": 0.682141,
+        "margin": 0.092167,
+        "top3": [
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+          "sha1:cc553c1cde65825dada01e7afe324c67c7ce9438"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t09",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "sourdough bread 800 g",
+        "expect": "hit",
+        "top1": "sha1:00b7a51944fcf565e7e81de46c9881808bfd1014",
+        "top1_raw": 0.798275,
+        "top2_raw": 0.684391,
+        "margin": 0.113884,
+        "top3": [
+          "sha1:00b7a51944fcf565e7e81de46c9881808bfd1014",
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:426383df454b455953b2fc66e606235e24035172"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t10",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "butter",
+        "expect": "hit",
+        "top1": "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+        "top1_raw": 0.873949,
+        "top2_raw": 0.766862,
+        "margin": 0.107087,
+        "top3": [
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+          "sha1:426383df454b455953b2fc66e606235e24035172"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t11",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "HONEY 500G",
+        "expect": "hit",
+        "top1": "sha1:e47a906ba6f93fb10015f8d5be5486419697d6b1",
+        "top1_raw": 0.780609,
+        "top2_raw": 0.680722,
+        "margin": 0.099887,
+        "top3": [
+          "sha1:e47a906ba6f93fb10015f8d5be5486419697d6b1",
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t12",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "eggs",
+        "expect": "hit",
+        "top1": "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f",
+        "top1_raw": 0.855762,
+        "top2_raw": 0.703842,
+        "margin": 0.15192,
+        "top3": [
+          "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f",
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:fecfae8e3ea074267cf94e618a16abd3a02f8525"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t13",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "olives",
+        "expect": "hit",
+        "top1": "sha1:a8ef07549e0e65456b112409d6d68fc24c9868f6",
+        "top1_raw": 0.848034,
+        "top2_raw": 0.735431,
+        "margin": 0.112603,
+        "top3": [
+          "sha1:a8ef07549e0e65456b112409d6d68fc24c9868f6",
+          "sha1:fecfae8e3ea074267cf94e618a16abd3a02f8525",
+          "sha1:e47a906ba6f93fb10015f8d5be5486419697d6b1"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t14",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "apples",
+        "expect": "hit",
+        "top1": "sha1:fecfae8e3ea074267cf94e618a16abd3a02f8525",
+        "top1_raw": 0.852317,
+        "top2_raw": 0.719274,
+        "margin": 0.133043,
+        "top3": [
+          "sha1:fecfae8e3ea074267cf94e618a16abd3a02f8525",
+          "sha1:4dbc0ffb986d26fb0bb0a4f1d5187243adf3987f",
+          "sha1:e47a906ba6f93fb10015f8d5be5486419697d6b1"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t15",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "BATERÍAS AA 4 UNIDADES",
+        "expect": "hit",
+        "top1": "sha1:bb03b377abce227e1fd94936188537e154da127d",
+        "top1_raw": 0.776508,
+        "top2_raw": 0.636462,
+        "margin": 0.140046,
+        "top3": [
+          "sha1:bb03b377abce227e1fd94936188537e154da127d",
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+          "sha1:6f9d9f1e944fe4ada93f4daa940f3a54a7cfd92a"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t16",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "mléko",
+        "expect": "hit",
+        "top1": "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+        "top1_raw": 0.827224,
+        "top2_raw": 0.770931,
+        "margin": 0.056293,
+        "top3": [
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t17",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "MLÉKO POLOTUČNÉ 1,5% TUKU",
+        "expect": "hit",
+        "top1": "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+        "top1_raw": 0.765203,
+        "top2_raw": 0.71117,
+        "margin": 0.054033,
+        "top3": [
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t18",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "leche entera",
+        "expect": "hit",
+        "top1": "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+        "top1_raw": 0.799883,
+        "top2_raw": 0.708798,
+        "margin": 0.091085,
+        "top3": [
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+          "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t19",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "chléb",
+        "expect": "hit",
+        "top1": "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76",
+        "top1_raw": 0.841968,
+        "top2_raw": 0.72164,
+        "margin": 0.120328,
+        "top3": [
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+          "sha1:35b80b2b744c500c4dabdfd936942b8fc98586b4"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t20",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "hovězí maso 500 g",
+        "expect": "hit",
+        "top1": "sha1:39e552552748ed9238105d4041878e4a96cf4759",
+        "top1_raw": 0.738357,
+        "top2_raw": 0.694983,
+        "margin": 0.043374,
+        "top3": [
+          "sha1:39e552552748ed9238105d4041878e4a96cf4759",
+          "sha1:2483af5325c4ee234201277c58a839da909213f9",
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t21",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "kuřecí stehna",
+        "expect": "hit",
+        "top1": "sha1:2483af5325c4ee234201277c58a839da909213f9",
+        "top1_raw": 0.821387,
+        "top2_raw": 0.677134,
+        "margin": 0.144253,
+        "top3": [
+          "sha1:2483af5325c4ee234201277c58a839da909213f9",
+          "sha1:7a009450aa986a5ff52338246f177d3314e88cc9",
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t22",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "queso curado",
+        "expect": "hit",
+        "top1": "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+        "top1_raw": 0.783895,
+        "top2_raw": 0.667517,
+        "margin": 0.116378,
+        "top3": [
+          "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+          "sha1:39e552552748ed9238105d4041878e4a96cf4759",
+          "sha1:2483af5325c4ee234201277c58a839da909213f9"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t23",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "jogurt bílý",
+        "expect": "hit",
+        "top1": "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+        "top1_raw": 0.822675,
+        "top2_raw": 0.68007,
+        "margin": 0.142605,
+        "top3": [
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371",
+          "sha1:35b80b2b744c500c4dabdfd936942b8fc98586b4"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t24",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "papel higiénico",
+        "expect": "hit",
+        "top1": "sha1:519c80505fd0dd126378eb2e9d339bb62caa6f75",
+        "top1_raw": 0.793915,
+        "top2_raw": 0.673041,
+        "margin": 0.120874,
+        "top3": [
+          "sha1:519c80505fd0dd126378eb2e9d339bb62caa6f75",
+          "sha1:0e12b92b6bbe9ba4014f86c6fb2754139528567c",
+          "sha1:29297436b6f43f2350547b9ef8c292f1f963b585"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t25",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "comino molido",
+        "expect": "hit",
+        "top1": "spice-cumin",
+        "top1_raw": 0.81525,
+        "top2_raw": 0.699964,
+        "margin": 0.115286,
+        "top3": [
+          "spice-cumin",
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+          "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t26",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "uzená paprika",
+        "expect": "hit",
+        "top1": "sha1:76fe08061a04c997e805cfdc3e4a0428b33723bf",
+        "top1_raw": 0.801177,
+        "top2_raw": 0.721309,
+        "margin": 0.079868,
+        "top3": [
+          "sha1:76fe08061a04c997e805cfdc3e4a0428b33723bf",
+          "sha1:a59f7785305aff16297dd40b2e96e4431ef9f10b",
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t27",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "arroz basmati 2 kg",
+        "expect": "hit",
+        "top1": "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818",
+        "top1_raw": 0.766403,
+        "top2_raw": 0.669461,
+        "margin": 0.096942,
+        "top3": [
+          "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818",
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+          "spice-cumin"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t28",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "cuscús",
+        "expect": "hit",
+        "top1": "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+        "top1_raw": 0.854692,
+        "top2_raw": 0.712262,
+        "margin": 0.14243,
+        "top3": [
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+          "spice-cumin",
+          "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t29",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "DIJON MUSTARD 200G",
+        "expect": "hit",
+        "top1": "sha1:a59f7785305aff16297dd40b2e96e4431ef9f10b",
+        "top1_raw": 0.792541,
+        "top2_raw": 0.657893,
+        "margin": 0.134648,
+        "top3": [
+          "sha1:a59f7785305aff16297dd40b2e96e4431ef9f10b",
+          "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818",
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t30",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "toothpaste",
+        "expect": "hit",
+        "top1": "toothpaste",
+        "top1_raw": 0.831885,
+        "top2_raw": 0.733524,
+        "margin": 0.098361,
+        "top3": [
+          "toothpaste",
+          "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+          "sha1:4bda2b02d59319bbefa2400ccc90f6124dc5ff27"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "t31",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "shampoo",
+        "expect": "hit",
+        "top1": "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+        "top1_raw": 0.888155,
+        "top2_raw": 0.73897,
+        "margin": 0.149185,
+        "top3": [
+          "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+          "toothpaste",
+          "sha1:4bda2b02d59319bbefa2400ccc90f6124dc5ff27"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "d01",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "Coca-Cola 1,5 l",
+        "expect": "nomatch",
+        "top1": "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+        "top1_raw": 0.678756,
+        "top2_raw": 0.675309,
+        "margin": 0.003447,
+        "top3": [
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+          "sha1:d60ce48857419792756d309f45607f41307ced97",
+          "sha1:f13fbe8c933821350c868f6700531bc61f470acd"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d02",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "Nutella",
+        "expect": "nomatch",
+        "top1": "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+        "top1_raw": 0.717044,
+        "top2_raw": 0.704428,
+        "margin": 0.012616,
+        "top3": [
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+          "sha1:6f9d9f1e944fe4ada93f4daa940f3a54a7cfd92a"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d03",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "cat food",
+        "expect": "nomatch",
+        "top1": "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+        "top1_raw": 0.731079,
+        "top2_raw": 0.72064,
+        "margin": 0.010439,
+        "top3": [
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d04",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "light bulbs",
+        "expect": "nomatch",
+        "top1": "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+        "top1_raw": 0.701071,
+        "top2_raw": 0.686976,
+        "margin": 0.014095,
+        "top3": [
+          "sha1:908269ffed472f08e35c24a8d28353e63fd6f376",
+          "toothpaste",
+          "sha1:4bda2b02d59319bbefa2400ccc90f6124dc5ff27"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d05",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "beer",
+        "expect": "nomatch",
+        "top1": "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76",
+        "top1_raw": 0.68549,
+        "top2_raw": 0.675784,
+        "margin": 0.009706,
+        "top3": [
+          "sha1:339d5804eecd5d41b31d7cb258c76a5df03a6b76",
+          "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d06",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "wine",
+        "expect": "nomatch",
+        "top1": "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+        "top1_raw": 0.721625,
+        "top2_raw": 0.716012,
+        "margin": 0.005613,
+        "top3": [
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28",
+          "sha1:32708555f656d694af4289e13b1ea6c7b3e0dd99",
+          "sha1:2e3fccbbdc84e3a73ce122589769cb450478dfb8"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d07",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "chocolate",
+        "expect": "nomatch",
+        "top1": "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+        "top1_raw": 0.728901,
+        "top2_raw": 0.715689,
+        "margin": 0.013212,
+        "top3": [
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:e47a906ba6f93fb10015f8d5be5486419697d6b1"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d08",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "crisps",
+        "expect": "nomatch",
+        "top1": "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+        "top1_raw": 0.687645,
+        "top2_raw": 0.668362,
+        "margin": 0.019283,
+        "top3": [
+          "sha1:326204a5e9cce0bbb4c678e26ef75b36e80842fe",
+          "sha1:7a009450aa986a5ff52338246f177d3314e88cc9",
+          "sha1:10de1c4492516655cd2019393ed5314fd1910f4a"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d09",
+        "kind": "text",
+        "list": "van-weekly",
+        "text": "shampoo",
+        "expect": "nomatch",
+        "top1": "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+        "top1_raw": 0.727177,
+        "top2_raw": 0.683968,
+        "margin": 0.043209,
+        "top3": [
+          "sha1:f13fbe8c933821350c868f6700531bc61f470acd",
+          "sha1:8a761445c565e64e3b6f2b41de85e78d870572c2",
+          "sha1:19d895a3b978a4e00caccc2f20ce35044c83cd28"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d10",
+        "kind": "text",
+        "list": "deep-nesting",
+        "text": "dog food",
+        "expect": "nomatch",
+        "top1": "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818",
+        "top1_raw": 0.696665,
+        "top2_raw": 0.672196,
+        "margin": 0.024469,
+        "top3": [
+          "sha1:20f68cd753cdf1a9c708032eac0f0487e1c97818",
+          "sha1:dd7964ab1621b1a39877af3841dd166c223a34c0",
+          "sha1:4bda2b02d59319bbefa2400ccc90f6124dc5ff27"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d11",
+        "kind": "text",
+        "list": "string-amounts",
+        "text": "Oreo biscuits",
+        "expect": "nomatch",
+        "top1": "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+        "top1_raw": 0.685869,
+        "top2_raw": 0.68087,
+        "margin": 0.004999,
+        "top3": [
+          "sha1:338700949097053c8ff3f6a33c44c107c117fa92",
+          "sha1:4c5b5f61482a1c2daf788f32ab4065a03c20828e",
+          "sha1:00b7a51944fcf565e7e81de46c9881808bfd1014"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "d12",
+        "kind": "text",
+        "list": "aliases-es-cz",
+        "text": "washing powder",
+        "expect": "nomatch",
+        "top1": "sha1:0e12b92b6bbe9ba4014f86c6fb2754139528567c",
+        "top1_raw": 0.703992,
+        "top2_raw": 0.662158,
+        "margin": 0.041834,
+        "top3": [
+          "sha1:0e12b92b6bbe9ba4014f86c6fb2754139528567c",
+          "sha1:505bfe356e40adf546aae91a354d22d887f652fe",
+          "sha1:5785e48299a1b8c56291cd8ac1d033d0a0c5d371"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "imilk",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:a4ff066793ff053a588ce67ef39e9d5fe7ab1c69",
+        "top1_raw": 0.752467,
+        "top2_raw": 0.748623,
+        "margin": 0.003844,
+        "top3": [
+          "sha1:a4ff066793ff053a588ce67ef39e9d5fe7ab1c69",
+          "sha1:e6bdeb74007287e4aef94d5f29c0b99eabd320ca",
+          "sha1:0c978fc83df3fd2da20b1c1f4222aaafc03dbf6d"
+        ],
+        "hit1": false,
+        "hit3": true
+      },
+      {
+        "id": "ipasta",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:ed4a4f18d90e95f4a946309b123d8c56e7624c47",
+        "top1_raw": 0.733,
+        "top2_raw": 0.708149,
+        "margin": 0.024851,
+        "top3": [
+          "sha1:ed4a4f18d90e95f4a946309b123d8c56e7624c47",
+          "sha1:5f2c54e2073eee339f2acc4ebad630821ff5a797",
+          "toothpaste"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "iice-cream",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:b51cd5a6477be774b1f583a43b1c03a91658aaff",
+        "top1_raw": 0.695485,
+        "top2_raw": 0.655334,
+        "margin": 0.040151,
+        "top3": [
+          "sha1:b51cd5a6477be774b1f583a43b1c03a91658aaff",
+          "sha1:9de7f813702022787ae3ae2d61e93a22731cc973",
+          "sha1:4802f2854e15ee4375b40fae54beeaa29d060c01"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "iolive-oil",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:7fd013e9350605ebe471e134d9fbec08afed82b5",
+        "top1_raw": 0.742326,
+        "top2_raw": 0.680745,
+        "margin": 0.061581,
+        "top3": [
+          "sha1:7fd013e9350605ebe471e134d9fbec08afed82b5",
+          "sha1:4e6396e6de30d1a79d026f64c2aa7de9a23505e9",
+          "sha1:6bdf7bc21ca38ca3d2511eb255fe957e15c0b044"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "iolives",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:6a3b25a4b96893577310275533bcb4426fe2cf5c",
+        "top1_raw": 0.741639,
+        "top2_raw": 0.725535,
+        "margin": 0.016104,
+        "top3": [
+          "sha1:6a3b25a4b96893577310275533bcb4426fe2cf5c",
+          "sha1:7fd013e9350605ebe471e134d9fbec08afed82b5",
+          "sha1:4e6396e6de30d1a79d026f64c2aa7de9a23505e9"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "ibananas",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:71ff982b3dea0057291fc8a76ab46c0bc6a71b63",
+        "top1_raw": 0.813175,
+        "top2_raw": 0.746797,
+        "margin": 0.066378,
+        "top3": [
+          "sha1:71ff982b3dea0057291fc8a76ab46c0bc6a71b63",
+          "sha1:966155912447c5c5f20e9cc2ace1bfc00dcab12a",
+          "sha1:6bdf7bc21ca38ca3d2511eb255fe957e15c0b044"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "icheese",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:a21629314e3a43b9f7405e6ee5faab80a651c50c",
+        "top1_raw": 0.719104,
+        "top2_raw": 0.69488,
+        "margin": 0.024224,
+        "top3": [
+          "sha1:a21629314e3a43b9f7405e6ee5faab80a651c50c",
+          "sha1:a4ff066793ff053a588ce67ef39e9d5fe7ab1c69",
+          "sha1:d120162834061d0bd614f0e0a668d07bee2965e6"
+        ],
+        "hit1": false,
+        "hit3": true
+      },
+      {
+        "id": "ibutter",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:9de7f813702022787ae3ae2d61e93a22731cc973",
+        "top1_raw": 0.698927,
+        "top2_raw": 0.696161,
+        "margin": 0.002766,
+        "top3": [
+          "sha1:9de7f813702022787ae3ae2d61e93a22731cc973",
+          "sha1:a21629314e3a43b9f7405e6ee5faab80a651c50c",
+          "sha1:a4ff066793ff053a588ce67ef39e9d5fe7ab1c69"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "ihoney",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:a998f3e99d733024b6710671bff213ccb44cb491",
+        "top1_raw": 0.730799,
+        "top2_raw": 0.714078,
+        "margin": 0.016721,
+        "top3": [
+          "sha1:a998f3e99d733024b6710671bff213ccb44cb491",
+          "sha1:4e6396e6de30d1a79d026f64c2aa7de9a23505e9",
+          "sha1:7fd013e9350605ebe471e134d9fbec08afed82b5"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "itomatoes",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:6bdf7bc21ca38ca3d2511eb255fe957e15c0b044",
+        "top1_raw": 0.730493,
+        "top2_raw": 0.688485,
+        "margin": 0.042008,
+        "top3": [
+          "sha1:6bdf7bc21ca38ca3d2511eb255fe957e15c0b044",
+          "toothpaste",
+          "sha1:353a3de7b3178a3cc99402f63afec3d06b86473c"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "ieggs",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:6eaa9673f015a73ca273df0eef946af875b21bd2",
+        "top1_raw": 0.754674,
+        "top2_raw": 0.743083,
+        "margin": 0.011591,
+        "top3": [
+          "sha1:6eaa9673f015a73ca273df0eef946af875b21bd2",
+          "sha1:a331ffe17141603d6e024ac1b362c212d11e6870",
+          "sha1:966155912447c5c5f20e9cc2ace1bfc00dcab12a"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "ibread",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:b05bd8ed6bf8902d8b1ff65509c1df7562db002f",
+        "top1_raw": 0.748577,
+        "top2_raw": 0.745568,
+        "margin": 0.003009,
+        "top3": [
+          "sha1:b05bd8ed6bf8902d8b1ff65509c1df7562db002f",
+          "sha1:cf8c67e608aabc77263f54f01844f55a20de8920",
+          "sha1:353a3de7b3178a3cc99402f63afec3d06b86473c"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "icoffee",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "hit",
+        "top1": "sha1:c1d7834c05ed6d091d898a0cbf8a8a4a8d49019b",
+        "top1_raw": 0.725116,
+        "top2_raw": 0.694834,
+        "margin": 0.030282,
+        "top3": [
+          "sha1:c1d7834c05ed6d091d898a0cbf8a8a4a8d49019b",
+          "sha1:4b5cd7610267aeea698bf3c2a5fe2e51d82186b7",
+          "toothpaste"
+        ],
+        "hit1": true,
+        "hit3": true
+      },
+      {
+        "id": "inutella",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "nomatch",
+        "top1": "sha1:4e6396e6de30d1a79d026f64c2aa7de9a23505e9",
+        "top1_raw": 0.677655,
+        "top2_raw": 0.677199,
+        "margin": 0.000456,
+        "top3": [
+          "sha1:4e6396e6de30d1a79d026f64c2aa7de9a23505e9",
+          "toothpaste",
+          "sha1:4b5cd7610267aeea698bf3c2a5fe2e51d82186b7"
+        ],
+        "hit1": false,
+        "hit3": false
+      },
+      {
+        "id": "icoca-cola",
+        "kind": "image",
+        "list": "photo-corpus",
+        "text": null,
+        "expect": "nomatch",
+        "top1": "sha1:d2173ff8f56884e500cd71ef0ddee8f55e113afc",
+        "top1_raw": 0.671699,
+        "top2_raw": 0.671508,
+        "margin": 0.000191,
+        "top3": [
+          "sha1:d2173ff8f56884e500cd71ef0ddee8f55e113afc",
+          "toothpaste",
+          "sha1:a998f3e99d733024b6710671bff213ccb44cb491"
+        ],
+        "hit1": false,
+        "hit3": false
+      }
+    ]
+  },
+  "photoSet": [
+    "shared/fixtures/photos/milk.jpg",
+    "shared/fixtures/photos/pasta.jpg",
+    "shared/fixtures/photos/ice-cream.jpg",
+    "shared/fixtures/photos/olive-oil.jpg",
+    "shared/fixtures/photos/olives.jpg",
+    "shared/fixtures/photos/bananas.jpg",
+    "shared/fixtures/photos/cheese.jpg",
+    "shared/fixtures/photos/butter.jpg",
+    "shared/fixtures/photos/honey.jpg",
+    "shared/fixtures/photos/tomatoes.jpg",
+    "shared/fixtures/photos/eggs.jpg",
+    "shared/fixtures/photos/bread.jpg",
+    "shared/fixtures/photos/coffee.jpg",
+    "shared/fixtures/photos/nutella.jpg",
+    "shared/fixtures/photos/coca-cola.jpg"
+  ]
+}

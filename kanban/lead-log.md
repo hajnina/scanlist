@@ -32,6 +32,13 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Lead notes added to C3 (llama.cpp #30054 recipe + /embedding trap + TEI dead end + sentence-transformers shape), C4 (BarcodeDetector status + zxing-wasm + dual-target frame sampler), A4 (VisionCamera v5 + mlkit plugin + throttle + frame→JPEG routes). New card C7 (browser WebGPU embedding spike, depends C2).
 - Full notes (outside repo): /home/martin/projects/scanlist-research/research_notes/ScanList prior art and parallels/
 
+## 2026-11-16 — S9/S6/C1 build round (lead actions)
+- PR #4 (S9) flags applied by lead before B1 dispatch: CI kotlin job now builds via root wrapper `./gradlew :scanlistKotlin:assembleDebug` (module id + projectDir apps/kotlin/app is now a cross-card contract; B1 must not pin plugin versions or add its own settings.gradle).
+- S7-reviewer's predicted RISK materialized: build-tools auto-pick grabbed x86_64 build-tools/37.0.0. FIXED arch-aware in scripts/android-env.sh (newest dir whose aapt2 ELF is aarch64; SCANLIST_BUILD_TOOLS override warns if non-aarch64). Verified: resolves 35.0.1, CI-sim exit 0.
+- C1 flag applied: CI web job split — frontend build (skip when no package.json, hard-fail if src/ exists without it) + new "Server tests" step (pytest from requirements.txt/pyproject.toml; hard-fail if server code exists without declared deps).
+- GitHub quirk learned: `gh run rerun` reuses the OLD workflow snapshot from the merge ref — to re-run a PR against a NEW workflow, close+reopen the PR (done for PR #5).
+- android-env.sh remains S7-owned but patched by lead post-done (same as reviewer-recommended lead fix); recorded here for provenance.
+
 ## 2026-11-16 — camera→list prior art digest applied
 - S3 Done-when rewritten: TEXT top-1 ≥ 0.80 hard bar; IMAGE top-1 measured (external R@1 evidence 35–44, arXiv 2603.17186) + recommended top1/top2 margin rule; ≥8 distractor "not on list" queries.
 - Lead notes on B5/A5/C5: manual-tick consensus, margin rule, sticky scan-mode, one-decision-per-pass patterns.

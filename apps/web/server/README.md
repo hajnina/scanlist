@@ -81,9 +81,10 @@ Same response shape, one vector in `embeddings`. `415` for a non-image content t
 
 ### `GET /off/{barcode}`
 
-Proxies Open Food Facts v2 (`fields=product_name,brands,generic_name,categories`,
-`User-Agent: ScanList/0.1`, no personal data) and caches in-process: **30 days** for a
-hit, **1 day** for a miss. Barcodes are 8-14 digits (EAN-8/UPC-A/EAN-13).
+Proxies Open Food Facts v2 (`fields=code,product_name,brands,generic_name,categories`,
+`User-Agent: ScanList/0.1`, 3 s connect / 10 s total, no personal data) and caches
+in-process: **30 days** for a hit, **1 day** for a miss. Barcodes are 8-14 digits
+(EAN-8/UPC-A/EAN-13).
 
 ```json
 {
@@ -96,19 +97,30 @@ hit, **1 day** for a miss. Barcodes are 8-14 digits (EAN-8/UPC-A/EAN-13).
     "generic_name": "Hazelnut spread with cocoa",
     "categories": "Spreads, Sweet spreads, Chocolate spreads"
   },
-  "query_text": "Nutella, Hazelnut spread with cocoa, Ferrero, Spreads, Sweet spreads, Chocolate spreads",
+  "query_text": "Nutella",
   "source": "network",
   "ttl_seconds": 2592000
 }
 ```
 
-`found: false` (unknown barcode, `status: 0`, empty product or upstream 404) is still a
-`200` and is negative-cached. `502` means OFF was unreachable/broken (not cached).
+`query_text` is the OFF.md §3 derived text: **one** field wins (`product_name` →
+`generic_name` → comma-joined `brands`), NFC composed, whitespace runs collapsed,
+hard-capped at 160 code points, `null` when all three are empty. `categories` is
+returned for provenance only and never contributes to the text. It is the **raw**
+text — the `prompts.json` query prefix is added by the client.
 
-**Spec ownership:** `shared/off/` (card S4) is the source of truth for the derived
-query text and caching rules. Until it merges, `derive_query_text()` in `app/off.py`
-implements the generic rule above; alignment with S4 should touch only that function
-(and the fixtures test).
+`found: false` (unknown barcode, `status: 0`, upstream 404) is still a `200` and is
+negative-cached for 1 day. A `200 status: 1` hit with no usable name is a *positive*
+30-day hit with `query_text: null`. `502` means OFF was unreachable/broken: nothing is
+cached, 5xx/timeouts are retried with backoff (1 s, 2 s; max 3 attempts), `429` honours
+`Retry-After`, and an expired entry is still served as `"source": "stale"` without
+extending its `fetchedAt` (stale-while-revalidate).
+
+**Spec ownership:** `shared/off/OFF.md` (card S4) is normative for the derived query
+text, request contract and cache rules; `shared/off/check_fixtures.py` is the executable
+contract. `tests/test_off_parity.py` imports that checker and compares it with
+`app/off.py` over every recorded fixture and a set of synthetic edge cases, so server
+and spec cannot drift silently.
 
 ## Tests
 

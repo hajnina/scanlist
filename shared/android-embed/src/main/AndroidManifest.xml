@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ScanList shared/android-embed (card S5).
+
+  The GPU backend of LiteRT-LM is OpenCL through the platform's native library. Copied from
+  references/embeddinggemma/src/AndroidManifest.xml (MnemoThera, RECIPE.md §1): `uses-native-library`
+  lives inside <application> (API 31+) and both entries are required="false", so the library still
+  installs on a device without OpenCL (the CPU backend works).
+
+  The experimental NPU path also needs libcdsprpc.so (and the Qualcomm QNN AARs, which this module
+  deliberately does not ship: APK +63 MB, RECIPE.md §4/§7). An app that turns on EmbedderConfig.allowNpu
+  adds those dependencies and their manifest entries itself.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libvndksupport.so"
+            android:required="false" />
+
+        <!-- Opt-in separate-process host for the embedder (ProcessMode.ISOLATED). A driver crash kills
+             ":embed", not the app; see RemoteEmbedder/EmbedService. Bound only, not exported. -->
+        <service
+            android:name="dev.hajnina.scanlist.embed.EmbedService"
+            android:exported="false"
+            android:process=":embed" />
+    </application>
+
+</manifest>

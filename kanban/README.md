@@ -14,7 +14,9 @@ git worktree add ../scanlist-wt/S1 -b card/S1
 cd ../scanlist-wt/S1 && opencode --prompt "You are agent ds-1. Do kanban card S1 (kanban/doing/S1.md). Follow AGENTS.md."
 ```
 Pick `deepseek-v4.1-flash-free` in the TUI model picker (this opencode build has no `-m` flag).
-When the agent finishes: review the diff, then on main `git merge --no-ff card/S1`,
+The agent finishes by pushing `card/<ID>` and opening a PR to main — CI (`.github/workflows/`) builds APKs for
+every PR and republishes the rolling release tagged `main` on merge (old release overwritten). The lead then:
+dispatches an adversarial review agent on the PR, merges it (`gh pr merge --merge`), and
 `python3 kanban/board.py move S1 done`, `git worktree remove ../scanlist-wt/S1`.
 
 Tracks: `shared` (S*), `kotlin` (B*), `rn` (A*), `web` (C*), `compare` (X*). The three app tracks are independent

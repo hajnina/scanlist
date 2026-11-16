@@ -32,6 +32,13 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Lead notes added to C3 (llama.cpp #30054 recipe + /embedding trap + TEI dead end + sentence-transformers shape), C4 (BarcodeDetector status + zxing-wasm + dual-target frame sampler), A4 (VisionCamera v5 + mlkit plugin + throttle + frame→JPEG routes). New card C7 (browser WebGPU embedding spike, depends C2).
 - Full notes (outside repo): /home/martin/projects/scanlist-research/research_notes/ScanList prior art and parallels/
 
+## 2026-11-17 — A1 review verdict (PR #8): REQUEST-CHANGES → fix round dispatched
+- Reviewer confirmed the lead CI fix works (rn job green 5m5s, APK artifact uploaded, literal rename path correct at pr.yml:117).
+- Builder-side findings (fix round dispatched to ag-a1): (1) VERIFIED haptics.ts Android waveform `[12]` starts ON = silence — confirm/toggleOn/toggleOff/longPress never vibrate; fix = lead-off patterns. (2) VERIFIED src/list/types.ts contradicts docs/list.schema.json (name vs title, no version, amount {value,unit} vs number|string+unit/note) — A2 would inherit a wrong contract; align or loudly mark placeholder.
+- NOISE noted for later cards: HomeSkeleton hard-coded rgba track (dark-mode contrast), ScanButton longPress for primary action (guide says Confirm), release signs with debug keystore (template default — needs a real signing story card later), default launcher icons (guide wants adaptive).
+- Device-side: nothing ran on hardware (adb x86_64, no phone) — haptics/spring-feel/dark-mode unverified until first device install; build/type/lint/test evidence only.
+- Fleet-caught builder bugs tally: 6 (S6 push, C1 pytest+barcode, B1 manifest perms, A1 haptics, A1 types-vs-schema, card-glob).
+
 ## 2026-11-17 — B1 merged; free-usage-limit interruption handled
 - PR #9 (B1) merged on APPROVE-WITH-NITS: S9 contract clean (no second root, no plugin pins), theme fidelity verified line-by-line vs STYLE_GUIDE, build re-run green in a fresh clone, CI green on exact head. Nits applied: CAMERA/INTERNET removed from the stub manifest (least privilege; B4 card now carries the re-add note + module-dep-pin guidance); screens-split refactor deferred to B2/B4/B5/B6 as opportunistic.
 - Five agents (S3, C8, C6, S5 builders + A1 reviewer) died on the free-usage limit mid-card; all five restarted with re-orientation prompts (verify-what-exists, never redo downloads, resume to PR-open → stop). Worktrees retained partial work — no conflicts observed.

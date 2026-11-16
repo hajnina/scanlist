@@ -32,6 +32,12 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Lead notes added to C3 (llama.cpp #30054 recipe + /embedding trap + TEI dead end + sentence-transformers shape), C4 (BarcodeDetector status + zxing-wasm + dual-target frame sampler), A4 (VisionCamera v5 + mlkit plugin + throttle + frame→JPEG routes). New card C7 (browser WebGPU embedding spike, depends C2).
 - Full notes (outside repo): /home/martin/projects/scanlist-research/research_notes/ScanList prior art and parallels/
 
+## 2026-11-16 — PR #7 (S2 ref ranker) merged
+- Review: APPROVE-WITH-NITS. Reviewer re-ran the suite (74 green, pinned versions), mutation-tested it (EMA flip → 8 red, hysteresis → 1 red, boost removal → 3 red — suite live), differential-tested vs a literal §9 transcription: 4000/4000 ticks, 0 divergences; flatten ids/docTexts/cache keys all independently reproduced; determinism sha1-stable across 3 processes.
+- Lead fixes applied: (1) requirements.txt pinned numpy==2.5.5/pytest==9.2.0 (with a regen-note), (2) dead EMA_ALPHA constant now actually used (`q6(EMA_ALPHA*raw + (1-EMA_ALPHA)*prev)`, bit-identical at 0.5 — X1 can retune one constant), (3) `flatten()` no longer emits `vec: None` — reviewer's cross-track hazard; contract clarified: vec lives on rank() INPUT items only, per RANK.md §1 (docstring updated, suite re-run 74 green).
+- vec contract written into S3's card notes (golden.json serialization must not add vec to flattened arrays).
+- 74/74 green after fixes (fresh venv, pinned versions).
+
 ## 2026-11-16 — S9/S6/C1 build round (lead actions)
 - PR #4 (S9) flags applied by lead before B1 dispatch: CI kotlin job now builds via root wrapper `./gradlew :scanlistKotlin:assembleDebug` (module id + projectDir apps/kotlin/app is now a cross-card contract; B1 must not pin plugin versions or add its own settings.gradle).
 - S7-reviewer's predicted RISK materialized: build-tools auto-pick grabbed x86_64 build-tools/37.0.0. FIXED arch-aware in scripts/android-env.sh (newest dir whose aapt2 ELF is aarch64; SCANLIST_BUILD_TOOLS override warns if non-aarch64). Verified: resolves 35.0.1, CI-sim exit 0.

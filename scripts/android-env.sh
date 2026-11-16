@@ -26,7 +26,8 @@
 # Overridable (set before sourcing, all optional):
 #   ANDROID_TOOLCHAIN     toolchain root          (default ~/projects/martins-whisper/android-toolchain)
 #   JAVA_HOME             JDK to use              (default $ANDROID_TOOLCHAIN/jdk)
-#   SCANLIST_BUILD_TOOLS  build-tools version dir (default: newest installed, usually 35.0.1)
+#   SCANLIST_BUILD_TOOLS  build-tools version dir (default: newest dir whose aapt2 runs on
+#                         aarch64 — newer dirs can ship an x86_64 aapt2; e.g. 35.0.1 works, 37.0.0 doesn't)
 #   SCANLIST_NDK_VERSION  NDK version dir         (default 27.0.12077973 — AGP 8.7's default — else newest)
 #   GRADLE_USER_HOME      Gradle home             (default $ANDROID_TOOLCHAIN/gradle-home)
 #   GRADLE_SLOT_SH        shared build lock       (default ~/projects/martins-whisper/owner/tools/gradle-slot.sh)
@@ -45,6 +46,17 @@ _scanlist_latest_dir() {
     # newest version-named subdirectory of $1 (sort -V), empty when none
     [ -d "$1" ] || return 0
     { find "$1" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort -V | tail -n 1; } || true
+}
+
+_scanlist_dirs_newest_first() {
+    # all version-named subdirs of $1, newest (sort -Vr) first
+    [ -d "$1" ] || return 0
+    { find "$1" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort -Vr; } || true
+}
+
+_scanlist_aapt2_is_aarch64() {
+    # true when the given aapt2 ELF actually runs on this aarch64 host
+    file "$1" 2>/dev/null | grep -qi 'aarch64\|arm64'
 }
 
 _scanlist_android_env() {
@@ -83,10 +95,26 @@ _scanlist_android_env() {
     _scanlist_path_add "$ANDROID_HOME/platform-tools"
     _scanlist_path_add "$ANDROID_HOME/cmdline-tools/latest/bin"
 
-    # build-tools dir (aapt2/apksigner/adb helpers) — newest, or SCANLIST_BUILD_TOOLS
+    # build-tools dir (aapt2/apksigner/adb helpers) — newest dir whose aapt2 actually
+    # runs on this aarch64 host (newer dirs can ship an x86_64 aapt2 → Exec format error),
+    # or SCANLIST_BUILD_TOOLS override.
     local bt="${SCANLIST_BUILD_TOOLS:-}"
     if [ -z "$bt" ]; then
-        bt="$(_scanlist_latest_dir "$ANDROID_HOME/build-tools")"
+        local d
+        for d in $(_scanlist_dirs_newest_first "$ANDROID_HOME/build-tools"); do
+            if [ -x "$ANDROID_HOME/build-tools/$d/aapt2" ] && _scanlist_aapt2_is_aarch64 "$ANDROID_HOME/build-tools/$d/aapt2"; then
+                bt="$d"
+                break
+            fi
+        done
+        if [ -z "$bt" ]; then
+            bt="$(_scanlist_latest_dir "$ANDROID_HOME/build-tools")"
+            if [ -n "$bt" ]; then
+                printf 'android-env: warning: no aarch64 aapt2 found in build-tools; falling back to newest dir %s\n' "$bt" >&2
+            fi
+        fi
+    elif [ -x "$ANDROID_HOME/build-tools/$bt/aapt2" ] && ! _scanlist_aapt2_is_aarch64 "$ANDROID_HOME/build-tools/$bt/aapt2"; then
+        printf 'android-env: warning: SCANLIST_BUILD_TOOLS=%s aapt2 is not aarch64 (x86_64?) — builds may fail with Exec format error\n' "$bt" >&2
     fi
     if [ -n "$bt" ] && [ -d "$ANDROID_HOME/build-tools/$bt" ]; then
         export SCANLIST_BUILD_TOOLS="$bt"

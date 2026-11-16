@@ -77,11 +77,11 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
       - name: Build APK
-        working-directory: apps/kotlin
         run: |
-          if [ ! -f gradlew ]; then echo "::error::apps/kotlin changed but has no gradle wrapper - card not done"; exit 1; fi
+          if [ ! -f gradlew ] || [ ! -f settings.gradle.kts ]; then echo "::error::no root gradle build yet (card S9) - cannot build apps/kotlin"; exit 1; fi
+          if [ ! -f apps/kotlin/app/build.gradle.kts ] && [ ! -f apps/kotlin/build.gradle.kts ]; then echo "::error::apps/kotlin changed but has no module build file - card not done"; exit 1; fi
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+          ./gradlew --no-daemon :scanlistKotlin:assembleDebug
       - name: Rename APK
         if: hashFiles('apps/kotlin/app/build/outputs/apk/debug/*.apk') != ''
         run: mv apps/kotlin/app/build/outputs/apk/debug/*.apk ScanList-kotlin-debug.apk
@@ -132,12 +132,38 @@ jobs:
         with:
           node-version: '22'
       - name: Build frontend
-        working-directory: apps/web/frontend
         run: |
-          if [ ! -f package.json ]; then echo "::error::apps/web/frontend changed but has no package.json - card not done"; exit 1; fi
-          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-          npm test --if-present
-          npm run build --if-present
+          if [ -f apps/web/frontend/package.json ]; then
+            cd apps/web/frontend
+            npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+            npm test --if-present
+            npm run build --if-present
+          elif [ -d apps/web/frontend/src ]; then
+            echo "::error::apps/web/frontend has sources but no package.json - card not done"; exit 1
+          else
+            echo "::notice::no apps/web/frontend yet - skipping frontend build"
+          fi
+      - name: Server tests
+        run: |
+          if [ -f apps/web/server/requirements.txt ]; then
+            cd apps/web/server
+            python3 -m venv .venv-ci
+            . .venv-ci/bin/activate
+            pip install -q --upgrade pip
+            pip install -q -r requirements.txt
+            python -m pytest -q
+          elif [ -f apps/web/server/pyproject.toml ]; then
+            cd apps/web/server
+            python3 -m venv .venv-ci
+            . .venv-ci/bin/activate
+            pip install -q --upgrade pip
+            pip install -q -e .
+            python -m pytest -q
+          elif [ -f apps/web/server/main.py ] || [ -f apps/web/server/app.py ] || [ -d apps/web/server/tests ]; then
+            echo "::error::apps/web/server has code but no declared dependencies - card not done"; exit 1
+          else
+            echo "::notice::no apps/web/server yet - skipping server tests"
+          fi
       - name: Zip dist
         if: hashFiles('apps/web/frontend/dist/**') != ''
         run: |

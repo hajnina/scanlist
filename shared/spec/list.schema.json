@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scanlist/list.schema.json",
+  "title": "ScanList shopping list",
+  "type": "object",
+  "required": ["title", "sections"],
+  "properties": {
+    "title": {"type": "string"},
+    "version": {"type": "integer", "default": 1},
+    "sections": {"type": "array", "items": {"$ref": "#/$defs/section"}}
+  },
+  "$defs": {
+    "section": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string"},
+        "items": {"type": "array", "items": {"$ref": "#/$defs/item"}, "default": []},
+        "sections": {"type": "array", "items": {"$ref": "#/$defs/section"}, "default": [],
+                     "description": "Nested sub-sections, any depth"}
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "id": {"type": "string", "description": "Optional stable id; app derives sha1(path) if absent"},
+        "name": {"type": "string"},
+        "amount": {"type": ["number", "string"], "description": "2, 0.5 or free text like '2 packs'"},
+        "unit": {"type": "string"},
+        "note": {"type": "string"},
+        "aliases": {"type": "array", "items": {"type": "string"},
+                    "description": "Extra words embedded with the item (brand, other language)"},
+        "done": {"type": "boolean", "default": false}
+      }
+    }
+  }
+}

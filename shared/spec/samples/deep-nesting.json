@@ -1,0 +1,58 @@
+{
+  "title": "Deep pantry audit",
+  "version": 1,
+  "sections": [
+    {
+      "name": "Home",
+      "sections": [
+        {
+          "name": "Kitchen",
+          "sections": [
+            {
+              "name": "Pantry",
+              "sections": [
+                {
+                  "name": "Spices",
+                  "items": [
+                    {"id": "spice-cumin", "name": "Cumin", "amount": 1, "unit": "jar", "aliases": ["comino", "kmín"]},
+                    {"name": "Smoked paprika", "amount": "a pinch", "aliases": ["pimentón ahumado", "uzená paprika"], "note": "top up before the chili"},
+                    {"name": "Bay leaves", "amount": 1, "unit": "pack", "done": true}
+                  ]
+                },
+                {
+                  "name": "Dry goods",
+                  "items": [
+                    {"name": "Basmati rice", "amount": 2, "unit": "kg", "note": "the big bag"},
+                    {"name": "Red lentils", "amount": 500, "unit": "g", "done": true},
+                    {"name": "Couscous", "amount": "2 boxes", "aliases": ["kuskus", "cuscús"]}
+                  ]
+                }
+              ]
+            },
+            {"name": "Empty shelf", "items": [], "sections": []},
+            {
+              "name": "Fridge door",
+              "items": [
+                {"name": "Dijon mustard", "amount": 1, "unit": "jar", "aliases": ["mostaza de Dijon", "dijonská hořčice"]}
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Bathroom",
+          "items": [
+            {"id": "toothpaste", "name": "Toothpaste", "amount": 2, "unit": "tubes", "aliases": ["pasta de dientes", "zubní pasta"]},
+            {"name": "Shampoo", "amount": "1 bottle", "note": "no conditioner this time"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Shed",
+      "items": [
+        {"name": "WD-40", "amount": 1, "note": "blue can, not the spray trigger"}
+      ],
+      "sections": []
+    }
+  ]
+}

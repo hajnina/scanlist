@@ -1,0 +1,26 @@
+{
+  "title": "Van weekly shop",
+  "version": 1,
+  "sections": [
+    {"name": "Fresh", "sections": [
+      {"name": "Fruit & veg", "items": [
+        {"name": "Bananas", "amount": 6},
+        {"name": "Tomatoes", "amount": 1, "unit": "kg", "aliases": ["tomates"]},
+        {"name": "Avocado", "amount": 3}
+      ]},
+      {"name": "Dairy", "items": [
+        {"name": "Oat milk", "amount": 2, "unit": "l", "aliases": ["bebida de avena"]},
+        {"name": "Greek yoghurt", "amount": 1}
+      ]}
+    ]},
+    {"name": "Pantry", "items": [
+      {"name": "Pasta", "amount": "2 packs"},
+      {"name": "Olive oil", "amount": 1, "unit": "l", "aliases": ["aceite de oliva"]},
+      {"name": "Coffee beans", "amount": 500, "unit": "g"}
+    ]},
+    {"name": "Household", "items": [
+      {"name": "Dish soap", "amount": 1},
+      {"name": "Toilet paper", "amount": "1 pack"}
+    ]}
+  ]
+}

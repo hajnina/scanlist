@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "model": "embeddinggemma-2-740m",
+  "dims": {
+    "native": 768,
+    "active": 256,
+    "matryoshka": [512, 256, 128]
+  },
+  "imagePrefix": "",
+  "active": "modelcard",
+  "mnemothera": {
+    "doc": "task: search result | text: ",
+    "query": "task: search query | text: "
+  },
+  "modelcard": {
+    "doc": "title: none | text: ",
+    "query": "task: search result | query: "
+  },
+  "rules": {
+    "apply": "prefix + trim(text)",
+    "trim": "leading/trailing Unicode whitespace only; no case folding, no punctuation stripping",
+    "doc": "active set .doc + FLATTEN.md docText (name; aliases; section path)",
+    "query": "active set .query + query text (OFF product name or one OCR line)",
+    "image": "raw image, no prefix (see imagePrefix, always empty)",
+    "prefixIsPartOfCacheKey": true
+  },
+  "provenance": {
+    "mnemothera": "references/embeddinggemma/RECIPE.md §5 (Therapy_local config/AppConfig.kt, litertlm path)",
+    "modelcard": "EmbeddingGemma 2 model card (ai.google.dev/gemma/docs/embeddinggemma/model_card_2); title: none when absent; the one Google trains with"
+  },
+  "decision": "Both sets are candidates. Card S3 runs the golden retrieval A/B and sets 'active' to the winner; until then 'active' is 'modelcard'. Consumers MUST read the prefixes from this file at runtime (or bundle it as an asset) and MUST NOT hard-code them."
+}

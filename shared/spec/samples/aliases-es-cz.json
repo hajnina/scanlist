@@ -1,0 +1,29 @@
+{
+  "title": "Semana checa — Spanish & Czech aliases",
+  "version": 1,
+  "sections": [
+    {
+      "name": "Mercado",
+      "items": [
+        {"name": "Milk", "amount": 2, "unit": "l", "aliases": ["leche", "mléko", "mléko polotučné"]},
+        {"name": "Bread", "amount": 1, "unit": "loaf", "aliases": ["pan", "chléb", "chleba"]},
+        {"name": "Beef", "amount": 500, "unit": "g", "aliases": ["carne de res", "hovězí maso", "hovězí"]},
+        {"name": "Chicken thighs", "amount": 1, "unit": "kg", "aliases": ["muslos de pollo", "kuřecí stehna"]},
+        {"name": "Cheese", "amount": 250, "unit": "g", "aliases": ["queso", "sýr", "eidam"]},
+        {"name": "Eggs", "amount": 10, "aliases": ["huevos", "vejce", "vajíčka"]}
+      ]
+    },
+    {
+      "name": "Drogerie",
+      "items": [
+        {"name": "Yoghurt", "amount": "4 cups", "aliases": ["yogur", "jogurt", "bílý jogurt"]},
+        {"name": "Rice", "amount": 1, "unit": "kg", "aliases": ["arroz", "rýže", "jasmínová rýže"]},
+        {"name": "Onions", "amount": 2, "unit": "kg", "aliases": ["cebollas", "cibule"]},
+        {"name": "Tomatoes", "amount": "1 box", "aliases": ["tomates", "rajčata"], "done": true},
+        {"name": "Paprika", "amount": 2, "aliases": ["pimentón", "paprika sladká"]},
+        {"name": "Dish soap", "amount": "1 bottle", "aliases": ["lavavajillas", "prostředek na nádobí"]},
+        {"name": "Toilet paper", "amount": "8 rolls", "aliases": ["papel higiénico", "toaletní papír"]}
+      ]
+    }
+  ]
+}

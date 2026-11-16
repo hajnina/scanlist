@@ -1,0 +1,27 @@
+{
+  "title": "Market run (free-text amounts)",
+  "version": 1,
+  "sections": [
+    {
+      "name": "Market",
+      "items": [
+        {"name": "Sourdough loaf", "amount": "1 large"},
+        {"name": "Cheese", "amount": "a thick slice", "note": "ask for the aged one"},
+        {"name": "Olives", "amount": "250 g tub", "aliases": ["aceitunas", "olivy"]},
+        {"name": "Eggs", "amount": "half a dozen"},
+        {"name": "Honey", "amount": "1/2", "unit": "jar", "aliases": ["miel", "med"]},
+        {"name": "Apples", "amount": "a handful", "note": "the green ones"}
+      ]
+    },
+    {
+      "name": "Corner shop",
+      "items": [
+        {"name": "Milk", "amount": 2, "unit": "l"},
+        {"name": "Butter", "amount": 250, "unit": "g"},
+        {"name": "Kitchen roll", "amount": "2 packs"},
+        {"name": "Batteries", "amount": "pack of 4", "unit": "AA"},
+        {"name": "Ice cream", "amount": 0.5, "unit": "l", "done": true}
+      ]
+    }
+  ]
+}

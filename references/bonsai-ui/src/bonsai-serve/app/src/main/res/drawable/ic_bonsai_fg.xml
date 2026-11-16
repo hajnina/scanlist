@@ -1,0 +1,6 @@
+<!-- Official Bonsai mark (PrismML, prismml.com bonsai-icon.svg, 640x640 viewBox), scaled into the adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <group android:translateX="25" android:translateY="25" android:scaleX="0.0906" android:scaleY="0.0906">
+    <path android:fillColor="#A68C8C" android:pathData="M278.261,125h194.783v55.6522h-194.783z M139.13,208.478h417.391v55.6522h-417.391z M0,291.956H288.985L316.812,347.608H0V291.956Z M447.536,291.956H640V347.608H517.391L447.536,291.956Z M403.478,291.956H320L375.652,403.26L180.87,514.565H431.304L542.609,403.26L403.478,291.956Z"/>
+  </group>
+</vector>

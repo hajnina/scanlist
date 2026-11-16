@@ -1,0 +1,13 @@
+node_modules/
+.venv/
+**/build/
+.gradle/
+dist/
+*.jks
+*.keystore
+*.litertlm
+*.gguf
+*.safetensors
+local.properties
+.env
+kanban/.lock

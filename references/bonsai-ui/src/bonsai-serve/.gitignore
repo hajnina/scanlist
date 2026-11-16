@@ -1,0 +1,10 @@
+build/
+.gradle/
+.kotlin/
+local.properties
+*.apk
+*.jks
+# 209 MB of llama.cpp b11869 binaries (MIT, third party): fetch with scripts/fetch-native-libs.sh
+app/src/main/jniLibs/
+# empty stray file created by a shell slip (kept out of git)
+app/

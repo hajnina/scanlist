@@ -14,7 +14,7 @@ def cards():
         for f in sorted(os.listdir(os.path.join(K, s))):
             if f.endswith(".md"):
                 t = open(os.path.join(K, s, f)).read()
-                m = lambda k: (re.search(rf"^{k}:\s*(.*)$", t, re.M) or [None, ""])[1].strip()
+                m = lambda k: (re.search(rf"^{k}:[ \t]*(.*)$", t, re.M) or [None, ""])[1].strip()
                 deps = [d.strip() for d in m("depends").strip("[]").split(",") if d.strip()]
                 out[f[:-3]] = dict(status=s, title=m("title"), track=m("track"), diff=m("difficulty"), deps=deps, who=m("claimed_by"), path=os.path.join(K, s, f))
     return out

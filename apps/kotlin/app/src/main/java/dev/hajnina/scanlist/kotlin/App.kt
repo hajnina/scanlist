@@ -1,0 +1,61 @@
+package dev.hajnina.scanlist.kotlin
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+/** Top-level destinations. List is pushed from Lists (see [ScanListApp]). */
+enum class Tab(val label: String) {
+    Lists("Lists"),
+    Scan("Scan"),
+    Settings("Settings"),
+}
+
+/**
+ * Root shell: one scrolling screen body + an expressive pill tab bar, edge-to-edge like Bonsai
+ * (root background = surface, windowInsetsPadding(safeDrawing) — STYLE_GUIDE.md §5/§6).
+ * No navigation library for a four-screen skeleton; the List screen is a simple back-stack of one.
+ */
+@Composable
+fun ScanListApp() {
+    val cs = MaterialTheme.colorScheme
+    var tab by remember { mutableStateOf(Tab.Lists) }
+    var openList by remember { mutableStateOf<StubList?>(null) }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(cs.surface)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            val list = openList
+            when {
+                list != null -> ListScreen(list, onBack = { openList = null })
+                tab == Tab.Lists -> ListsScreen(onOpen = { openList = it })
+                tab == Tab.Scan -> ScanScreen()
+                else -> SettingsScreen()
+            }
+        }
+        TabBar(
+            selected = tab,
+            onSelect = { selected ->
+                openList = null
+                tab = selected
+            },
+        )
+    }
+}

@@ -115,7 +115,7 @@ jobs:
           ./gradlew --no-daemon assembleDebug
       - name: Rename APK
         if: hashFiles('apps/rn/android/**/outputs/apk/debug/*.apk') != ''
-        run: mv apps/rn/android/**/outputs/apk/debug/*.apk ScanList-rn-debug.apk
+        run: mv apps/rn/android/app/build/outputs/apk/debug/*.apk ScanList-rn-debug.apk
       - uses: actions/upload-artifact@v4
         if: hashFiles('ScanList-rn-debug.apk') != ''
         with:

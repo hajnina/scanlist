@@ -11,9 +11,9 @@ cd ~/projects/scanlist
 python3 kanban/board.py ready              # e.g. S1 S7
 python3 kanban/board.py claim S1 ds-1      # locked + committed on main
 git worktree add ../scanlist-wt/S1 -b card/S1
-cd ../scanlist-wt/S1 && opencode -m opencode/deepseek-v4.1-flash-free \
-   --prompt "You are agent ds-1. Do kanban card S1 (kanban/doing/S1.md). Follow AGENTS.md."
+cd ../scanlist-wt/S1 && opencode --prompt "You are agent ds-1. Do kanban card S1 (kanban/doing/S1.md). Follow AGENTS.md."
 ```
+Pick `deepseek-v4.1-flash-free` in the TUI model picker (this opencode build has no `-m` flag).
 When the agent finishes: review the diff, then on main `git merge --no-ff card/S1`,
 `python3 kanban/board.py move S1 done`, `git worktree remove ../scanlist-wt/S1`.
 

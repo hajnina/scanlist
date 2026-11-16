@@ -1,0 +1,2 @@
+# Throwaway local debug signing key (scripts/make-debug-keystore.sh); never commit keystores.
+.signing/

@@ -1,0 +1,4 @@
+<!-- Solid launcher-icon background, same pattern as Bonsai Serve's adaptive icon. -->
+<resources>
+    <color name="ic_launcher_background">#10261C</color>
+</resources>

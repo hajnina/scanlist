@@ -1,44 +1,43 @@
 /**
- * Nested shopping-list JSON model (see docs/ARCHITECTURE.md and docs/list.schema.json).
- *
- * Card A1 only needs the shape so the directory exists and later cards (A2 list import,
- * A4 ranking) have a home; parsing/flattening is NOT implemented here.
+ * Nested shopping-list JSON model — TypeScript mirror of docs/list.schema.json, field for field
+ * (`title`/`version`/`sections` at the root, recursive sections, items with optional
+ * amount/unit/note/aliases/done). Card A2 (import/persist) and A4 (ranking) build against this
+ * contract; card A1 only needs the shape, parsing/flattening is NOT implemented here.
  */
 
-/** Amount may be absent, a number ("2") or a number + unit ("500 g"). */
-export type ScanListAmount =
-  | number
-  | {
-      value: number;
-      unit?: string;
-    }
-  | null;
+/** `amount` may be absent, a number (2, 0.5) or free text ("2 packs"); `unit` and `note` are their own fields. */
+export type ScanListAmount = number | string;
 
+/** Item: `name` is the only required field; `id` is optional — the app derives sha1(path) when absent. */
 export interface ScanListItem {
-  id: string;
+  id?: string;
   name: string;
   amount?: ScanListAmount;
-  /** Alternate names used for embedding ("coke" -> "Coca-Cola"). */
+  unit?: string;
+  note?: string;
+  /** Extra words embedded with the item (brand, other language), e.g. "coke" -> "Coca-Cola". */
   aliases?: string[];
   /** `done: true` items sink into the collapsed "Done" group. */
   done?: boolean;
 }
 
+/** Section: only `name` is required; sub-sections nest recursively, any depth. */
 export interface ScanListSection {
-  id: string;
   name: string;
-  sections?: ScanListSection[];
   items?: ScanListItem[];
+  sections?: ScanListSection[];
 }
 
+/** List document root: `title` + `sections` required, `version` optional (schema default 1). */
 export interface ScanList {
-  id: string;
-  name: string;
+  title: string;
+  version?: number;
   sections: ScanListSection[];
 }
 
 /** One item flattened out of the tree, with its section path for the embedding document. */
 export interface FlatItem {
+  /** Derived id — sha1(sectionPath) when the item has no `id` (docs/list.schema.json). */
   itemId: string;
   /** Section names from the root to the item's parent. */
   path: string[];

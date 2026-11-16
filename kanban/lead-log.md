@@ -32,6 +32,12 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Lead notes added to C3 (llama.cpp #30054 recipe + /embedding trap + TEI dead end + sentence-transformers shape), C4 (BarcodeDetector status + zxing-wasm + dual-target frame sampler), A4 (VisionCamera v5 + mlkit plugin + throttle + frame→JPEG routes). New card C7 (browser WebGPU embedding spike, depends C2).
 - Full notes (outside repo): /home/martin/projects/scanlist-research/research_notes/ScanList prior art and parallels/
 
+## 2026-11-17 — C6 + C8 done; first rolling release published
+- PR #11 (C6) merged on APPROVE-WITH-NITS: every load-bearing claim reproduced live by the reviewer (LE cert notAfter Jan 6 2027, per-checkout run dirs proven worktree-safe, foreign-port refusal proven, --stop kills only own mapping). Nits applied by lead: (1) DEPLOY.md broken openssl one-liner fixed (-connect host:port + -servername host, path removed); (2) PID-reuse hardening — pid validation expect is now the per-checkout absolute venv path + app string (UVICORN_EXPECT), closing the theoretical cross-checkout kill hole; cosmetic nits (--stop label port, --status mkdir) noted, not applied. Builder's dev server left running on :8000/:8444 (documented; run.sh --stop).
+- **The main.yml release job fired on this merge and re-published the rolling `main` release + tag** — the overwrite pipeline is now proven in production (web dist asset).
+- PR #12 (C8) open, CI green, parity 19/19 fixtures byte-identical with shared/off checker, 108 tests pass; reviewer dispatched. Two deliberate non-changes recorded in Notes (httpx redirect ≤3, no client-level rate limiting yet).
+- Ready queue: B2, B4 (both unblocked by B1). Dispatching B2 now (B3 depends on it); B4 held one slot to stay ≤5 active.
+
 ## 2026-11-17 — A1 review verdict (PR #8): REQUEST-CHANGES → fix round dispatched
 - Reviewer confirmed the lead CI fix works (rn job green 5m5s, APK artifact uploaded, literal rename path correct at pr.yml:117).
 - Builder-side findings (fix round dispatched to ag-a1): (1) VERIFIED haptics.ts Android waveform `[12]` starts ON = silence — confirm/toggleOn/toggleOff/longPress never vibrate; fix = lead-off patterns. (2) VERIFIED src/list/types.ts contradicts docs/list.schema.json (name vs title, no version, amount {value,unit} vs number|string+unit/note) — A2 would inherit a wrong contract; align or loudly mark placeholder.

@@ -32,6 +32,12 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Lead notes added to C3 (llama.cpp #30054 recipe + /embedding trap + TEI dead end + sentence-transformers shape), C4 (BarcodeDetector status + zxing-wasm + dual-target frame sampler), A4 (VisionCamera v5 + mlkit plugin + throttle + frame→JPEG routes). New card C7 (browser WebGPU embedding spike, depends C2).
 - Full notes (outside repo): /home/martin/projects/scanlist-research/research_notes/ScanList prior art and parallels/
 
+## 2026-11-17 — B1 merged; free-usage-limit interruption handled
+- PR #9 (B1) merged on APPROVE-WITH-NITS: S9 contract clean (no second root, no plugin pins), theme fidelity verified line-by-line vs STYLE_GUIDE, build re-run green in a fresh clone, CI green on exact head. Nits applied: CAMERA/INTERNET removed from the stub manifest (least privilege; B4 card now carries the re-add note + module-dep-pin guidance); screens-split refactor deferred to B2/B4/B5/B6 as opportunistic.
+- Five agents (S3, C8, C6, S5 builders + A1 reviewer) died on the free-usage limit mid-card; all five restarted with re-orientation prompts (verify-what-exists, never redo downloads, resume to PR-open → stop). Worktrees retained partial work — no conflicts observed.
+- B2/B4 became READY on B1 done; dispatch HELD deliberately until ≥1 restarted agent completes, to not exceed the concurrency that just exhausted the free budget (5-6 active).
+- Fleet-caught lead CI bugs: still 3. Fleet-caught builder bugs: 4 across 10 reviews (S6 push path, C1 pytest+barcode, card-text glob, manifest perms) + 2 REQUEST-CHANGES-free rounds saved by nit-fix-at-merge.
+
 ## 2026-11-16 — A1/B1 build round (lead actions)
 - PR #8 (A1, RN skeleton) builder-flagged the third lead-authored CI bug: RN "Rename APK" step used `apps/rn/android/**/outputs/...` in a shell `mv` — `**` is not globstar in Actions bash → run red even though the APK build succeeded (4m48s, all ABIs). FIXED with the literal `apps/rn/android/app/build/outputs/apk/debug/*.apk` in pr.yml + main.yml; PR #8 close+reopened to pick up the new snapshot (rerun-reuses-old-snapshot quirk).
 - Builder also asked for arch-aware build-tools pick in android-env.sh — already implemented earlier (S9 round); noted so nobody re-does it.

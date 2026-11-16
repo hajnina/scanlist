@@ -1,2 +1,4 @@
-numpy>=2.0
-pytest>=8.0
+# Pinned (adversarial review of PR #7): golden fixtures are generated with these
+# exact versions; bumping numpy/pytest requires regenerating shared/fixtures/golden.json.
+numpy==2.5.5
+pytest==9.2.0

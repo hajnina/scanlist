@@ -18,9 +18,11 @@ Typical use::
                {"smoothed": {}, "topId": None}, barcode_name=None)
     out["entries"][0]["id"]  # highlighted item
 
-``vec`` on a FlattenedItem is its already-truncated, L2-normalised 256-d vector
-(``truncate_and_normalize`` builds it from model output), or ``None`` while it
-is still being embedded.
+``vec`` (already-truncated, L2-normalised 256-d; ``null`` while not yet embedded)
+lives on the **input** items passed to ``rank()`` (RANK.md §1). Neither
+``flatten()`` output nor ``rank()``'s ``entries`` carry a ``vec`` key — FLATTEN.md
+§1 and RANK.md §1 are exact, and cross-track equality depends on it. Attach
+vectors to the flattened items before calling ``rank()``.
 """
 
 from __future__ import annotations
@@ -282,8 +284,6 @@ def flatten(list_obj: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "pathText": " > ".join(path),
                 "index": i,
                 "order": len(out),
-                # `vec` is filled in later by the embedder/cache; None = not embedded yet.
-                "vec": None,
             })
         for child in section.get("sections") or ():
             walk(child, path + [child["name"]])
@@ -560,7 +560,7 @@ def rank(
         ) else 0.0
         raw = q6(float(base[row]) + boost)
         prev_score = prev_smoothed.get(item["id"])
-        smoothed = raw if prev_score is None else q6(0.5 * raw + 0.5 * prev_score)
+        smoothed = raw if prev_score is None else q6(EMA_ALPHA * raw + (1 - EMA_ALPHA) * prev_score)
         smoothed_by_id[item["id"]] = smoothed
         candidates.append({
             "id": item["id"],

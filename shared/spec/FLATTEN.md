@@ -124,7 +124,7 @@ docText  = name'
 - How many sections: **all** ancestor section names, root first.
 - An item always has a non-empty `docText` (its `name` is required non-empty).
 
-Worked examples (from `samples/van-weekly.json`):
+Worked examples (from `samples/van-weekly.json` + one synthetic root-item example):
 
 | item | docText |
 |---|---|

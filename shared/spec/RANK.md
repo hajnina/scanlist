@@ -1,6 +1,9 @@
 # RANK — scoring, smoothing, ordering (normative)
 
 Status: **normative spec v1**, owned by card S1. This is the algorithm every track and the golden fixtures use.
+The constants — 400 ms cadence, EMA α = 0.5, the 0.02 hysteresis — are **v1 defaults, not calibrated values**;
+bench card X1 revises them against real devices (kanban/lead-log.md, 2026-11-16). The top-item HIGHLIGHT decision
+also gains a margin + no-match threshold via card S10 once S3's data lands.
 Given the same list, vectors and frames, two implementations MUST produce the same `entries` array, including
 order, `topId` and the stored `smoothed` values.
 

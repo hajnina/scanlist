@@ -170,6 +170,21 @@ def test_invalid_barcode_is_422(api, off_factory, barcode: str) -> None:
     assert recorder.requests == []
 
 
+@pytest.mark.parametrize(
+    "path", ["/off/12345678%0A", "/off/12345678%0D%0A", "/off/%2012345678", "/off/12345678%20"]
+)
+def test_barcode_with_trailing_newline_is_rejected_not_500(api, off_factory, path: str) -> None:
+    """Regression (PR #5 review): `BARCODE_RE.match` accepted "12345678\\n" because `$`
+    matches before a trailing newline; the barcode then reached httpx, whose InvalidURL
+    is *not* an httpx.HTTPError, escaping the handlers as an uncaught 500."""
+    recorder = Recorder({})
+    client = api(off_factory(recorder))
+
+    response = client.get(path)
+    assert response.status_code in (400, 422), response.text
+    assert recorder.requests == []
+
+
 def test_derive_query_text_dedupes_and_skips_empty_parts() -> None:
     product = {
         "product_name": "Nutella",

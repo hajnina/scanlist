@@ -42,7 +42,10 @@ class _CacheEntry:
 
 
 def is_valid_barcode(barcode: str) -> bool:
-    return bool(BARCODE_RE.match(barcode))
+    # fullmatch, not match: `$` also matches before a trailing newline, so
+    # "12345678\n" would pass `.match()` and then blow up inside httpx
+    # (InvalidURL is not an httpx.HTTPError) -> uncaught 500.
+    return BARCODE_RE.fullmatch(barcode) is not None
 
 
 def derive_query_text(product: dict[str, Any] | None) -> str | None:

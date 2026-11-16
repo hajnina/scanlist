@@ -12,6 +12,7 @@ from pathlib import Path
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+import httpx
 from pydantic import BaseModel, Field
 
 from .embedder import DEFAULT_DIMS, Embedder, build_embedder
@@ -92,6 +93,8 @@ def create_app(
 
     @app.post("/embed/text", response_model=EmbedResponse)
     async def embed_text(request: TextEmbedRequest) -> EmbedResponse:
+        # TODO(C3): real embedder calls must run via anyio.to_thread (sync CPU work
+        # inside `async def` stalls the event loop), and each text needs a length cap.
         if request.kind == "query":
             vectors = embedder.embed_queries(request.texts)
         else:
@@ -143,6 +146,11 @@ def create_app(
             payload = await off_client.lookup(barcode)
         except OffUpstreamError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+        except (ValueError, httpx.InvalidURL) as exc:
+            # Belt for the barcode validator: whatever still reaches httpx is bad
+            # input (400), not a server fault. httpx.InvalidURL is NOT an
+            # httpx.HTTPError subclass, so it would otherwise escape as a 500.
+            raise HTTPException(status_code=400, detail="invalid barcode") from exc
         # found=false is a real answer (negative-cached), so it is a 200.
         return JSONResponse(payload)
 

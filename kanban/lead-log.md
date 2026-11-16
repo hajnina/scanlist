@@ -32,6 +32,12 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Lead notes added to C3 (llama.cpp #30054 recipe + /embedding trap + TEI dead end + sentence-transformers shape), C4 (BarcodeDetector status + zxing-wasm + dual-target frame sampler), A4 (VisionCamera v5 + mlkit plugin + throttle + frame→JPEG routes). New card C7 (browser WebGPU embedding spike, depends C2).
 - Full notes (outside repo): /home/martin/projects/scanlist-research/research_notes/ScanList prior art and parallels/
 
+## 2026-11-16 — A1/B1 build round (lead actions)
+- PR #8 (A1, RN skeleton) builder-flagged the third lead-authored CI bug: RN "Rename APK" step used `apps/rn/android/**/outputs/...` in a shell `mv` — `**` is not globstar in Actions bash → run red even though the APK build succeeded (4m48s, all ABIs). FIXED with the literal `apps/rn/android/app/build/outputs/apk/debug/*.apk` in pr.yml + main.yml; PR #8 close+reopened to pick up the new snapshot (rerun-reuses-old-snapshot quirk).
+- Builder also asked for arch-aware build-tools pick in android-env.sh — already implemented earlier (S9 round); noted so nobody re-does it.
+- Score: fleet-caught lead bugs = 3 (web zip path, vacuous-green semantics, `**` glob) — the adversarial-review loop is paying for itself.
+- B1 (PR #9) + A1 (PR #8) both green locally with CI evidence; RN 0.88.1 and Compose/M3 1.4.0 both proven buildable on the aarch64 laptop via android-env.sh + on x86_64 CI.
+
 ## 2026-11-16 — PR #7 (S2 ref ranker) merged
 - Review: APPROVE-WITH-NITS. Reviewer re-ran the suite (74 green, pinned versions), mutation-tested it (EMA flip → 8 red, hysteresis → 1 red, boost removal → 3 red — suite live), differential-tested vs a literal §9 transcription: 4000/4000 ticks, 0 divergences; flatten ids/docTexts/cache keys all independently reproduced; determinism sha1-stable across 3 processes.
 - Lead fixes applied: (1) requirements.txt pinned numpy==2.5.5/pytest==9.2.0 (with a regen-note), (2) dead EMA_ALPHA constant now actually used (`q6(EMA_ALPHA*raw + (1-EMA_ALPHA)*prev)`, bit-identical at 0.5 — X1 can retune one constant), (3) `flatten()` no longer emits `vec: None` — reviewer's cross-track hazard; contract clarified: vec lives on rank() INPUT items only, per RANK.md §1 (docstring updated, suite re-run 74 green).

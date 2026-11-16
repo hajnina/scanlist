@@ -1,0 +1,33 @@
+# ScanList Track A (React Native) — Android-only app, no iOS project.
+
+# OS
+.DS_Store
+
+# Android / IntelliJ
+build/
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+.cxx/
+.kotlin/
+
+# Signing: keystores are NEVER committed (AGENTS.md). android/app/debug.keystore is generated
+# on demand by scripts/make-debug-keystore.sh; the repo root .gitignore also ignores *.jks.
+*.keystore
+*.jks
+
+# node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Metro
+.metro-health-check*
+
+# testing
+/coverage
+
+# Bundle artifact
+*.jsbundle

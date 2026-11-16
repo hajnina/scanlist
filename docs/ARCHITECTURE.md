@@ -23,8 +23,10 @@ Three implementations are built **in parallel** to compare them: **A) React Nati
 ```
 
 - **Model**: **EmbeddingGemma 2 (740M)**: text + image (+audio) in ONE 768-dim space, Matryoshka 512/256/128.
-  On-device bundle `litert-community/embeddinggemma-2-740m-litert-lm` (`embeddinggemma-2-740m.litertlm`, 484,622,336 B).
-  Images take no prefix (~280 tokens each). See `references/embeddinggemma/RECIPE.md`.
+  on-device bundle `litert-community/embeddinggemma-2-740m-litert-lm` (`embeddinggemma-2-740m.litertlm`, 484,622,336 B;
+  text+vision selective load ≈ 440M params). Images take no prefix; per-image token cost: the on-device LiteRT bundle is
+  provisioned for **70 or 140** vision tokens (`visionTokensPerImage`), ~280 is the HF/ONNX default — use 70/140 on
+  device. See `references/embeddinggemma/RECIPE.md`.
 - **Item document text**: `{DOC_PREFIX}{name}; {aliases joined by ', '}; {section path joined by ' > '}`
 - **Query text** (barcode name / OCR words): `{QUERY_PREFIX}{text}`. Image queries: raw image, no prefix.
 - **Prefixes are UNDECIDED**: MnemoThera uses `task: search result | text: ` / `task: search query | text: `, the model
@@ -44,7 +46,8 @@ ladder **NPU → GPU → CPU**, separate process, self-test vs CPU golden vector
 Measured text embed: POCO F8 Pro GPU ~35 ms / CPU ~72 ms; Pixel 8 GPU ~110 ms / CPU ~250 ms.
 **NPU is experimental** (SM8750 bundle fails on 0.18.1/0.19.1; JIT compile 140–236 s on load) → ship GPU + CPU, NPU behind a flag.
 **Image embedding is unverified on device**: first card (B0) probes `inputModalities()` and embeds one JPEG on GPU and CPU.
-If images disappoint: SigLIP 2 LiteRT (`litert-community/SigLIP2-base-patch16-224`) as a separate image↔text model.
+If images disappoint: MediaPipe `tasks-retrieval` **UniversalEmbedder** (same .litertlm, embedText/embedImage in the
+768-d space) is the fallback — NOT SigLIP 2 LiteRT, whose LiteRT build is image-tower-only in a separate space.
 
 | Track | Embedding | Notes |
 |---|---|---|

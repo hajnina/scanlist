@@ -241,7 +241,7 @@ Behaviour:
 1. Fresh entry → use it, **no network request**.
 2. Expired or absent entry → request OFF. On hit/miss, overwrite the entry with the new outcome and
    `fetchedAt = now`.
-3. **Transient failure** (table in §2.1) → write **nothing**. If an expired entry exists, its `text` may
+3. **Transient failure** (table in §2.1) → write **nothing**. If an expired entry exists, its `text` MUST
    still be used for this tick (**stale-while-revalidate**) but `fetchedAt` is **not** extended; the next
    scan retries. A failed first lookup simply yields `null` for that tick.
 4. **429**: wait at least `Retry-After` (seconds or HTTP-date; if absent, 60 s) before the next attempt at
@@ -296,6 +296,10 @@ normalisation so B5/A5/C5 cannot drift.
   - **`casefold()`**, not `lower()`: `"Weißbier"` → `"weissbier"`, so it matches `"WEISSBIER"`.
     Consequence: `"İçecek".casefold()` is `"i\u0307çecek"`, which does **not** equal `"içecek"` — that is
     correct, do not "fix" it with locale-specific lowercasing.
+    Portability (lead note 2026-11-16): Kotlin and JS/TS have no `casefold()` — implementations MUST do
+    Unicode full case folding (per CaseFolding.txt, C+S+F mappings), e.g. TS: `s.normalize('NFC').toUpperCase()
+    .toLowerCase()` per char is NOT sufficient; use a full-fold helper (or a tiny generated mapping table).
+    RANK.md §3.1 carries the same requirement (card S10 adds the explicit sentence there).
   - **Whitespace**: runs collapse to one space, so `"Dulce   de leche"` matches `"Dulce de leche"`.
     U+200B and U+FEFF are not whitespace (same set as §3.1).
   - **Everything else is significant**: punctuation, hyphens, apostrophes, accents, digits, `º`/`№`,

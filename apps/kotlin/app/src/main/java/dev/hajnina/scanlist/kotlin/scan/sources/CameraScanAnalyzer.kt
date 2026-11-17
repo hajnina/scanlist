@@ -108,9 +108,11 @@ object AndroidJpegEncoder : JpegEncoder {
     override fun encode(nv21: ByteArray, width: Int, height: Int, quality: Int): ByteArray? =
         runCatching {
             ByteArrayOutputStream().use { out ->
-                YuvImage(nv21, ImageFormat.NV21, width, height, null)
+                val encoded = YuvImage(nv21, ImageFormat.NV21, width, height, null)
                     .compressToJpeg(Rect(0, 0, width, height), quality, out)
-                out.toByteArray()
+                // B4 review nit: the boolean is false when the YUV buffer produced no JPEG; handing
+                // those bytes on would give the embedder a broken image instead of "no frame".
+                if (encoded) out.toByteArray() else null
             }
         }.getOrNull()
 }
@@ -124,7 +126,16 @@ class CameraScanAnalyzer(
     private val onSignal: (ScanSignal) -> Unit = {},
 ) : ImageAnalysis.Analyzer {
 
+    /** Frames between analyze() and both ML Kit callbacks finishing (see close()). */
+    private val inFlight = AtomicInteger(0)
+    private val closed = AtomicBoolean(false)
+    private val readersClosed = AtomicBoolean(false)
+
     override fun analyze(image: ImageProxy) {
+        if (closed.get()) {
+            image.close()
+            return
+        }
         val media = image.image
         if (media == null) {
             image.close()
@@ -136,40 +147,62 @@ class CameraScanAnalyzer(
         val pending = AtomicInteger(2)
         val closedOnce = AtomicBoolean(false)
         val finish = {
-            if (pending.decrementAndGet() == 0 && closedOnce.compareAndSet(false, true)) image.close()
+            if (pending.decrementAndGet() == 0 && closedOnce.compareAndSet(false, true)) {
+                image.close()
+                if (inFlight.decrementAndGet() == 0) closeReadersIfClosed()
+            }
         }
+        inFlight.incrementAndGet()
 
-        val input = InputImage.fromMediaImage(media, image.imageInfo.rotationDegrees)
-
-        // Image path is synchronous; the core gates it to ≤ 2.5 fps BEFORE the plane copy runs.
-        // NOTE (B4 review): the JPEG is SENSOR-oriented — rotationDegrees goes to ML Kit only,
-        // not into the JPEG bytes. IMAGE signals are therefore sideways (usually 90°) relative
-        // to what the user sees; B5 must rotate before embedding (or we wire rotation into the
-        // encoder once a device can verify the result).
-        core.onFrame(clock.nowMs()) {
-            runCatching { ImageProxyFrames.toYuv420(image) }.getOrNull()
-        }?.let(onSignal)
-
+        // B4 review nit: fromMediaImage/onFrame used to sit OUTSIDE the try, so a throw there left the
+        // ImageProxy open forever (camera stalls after a few frames). Everything is inside now, and the
+        // `finish` calls in the catch blocks remain balanced (2 decrements either way).
         try {
-            barcodeReader.read(input) { hits ->
-                runCatching { core.onBarcodeHits(hits, clock.nowMs()).forEach(onSignal) }
+            val input = InputImage.fromMediaImage(media, image.imageInfo.rotationDegrees)
+
+            // Image path is synchronous; the core gates it to ≤ 2.5 fps BEFORE the plane copy runs.
+            // The JPEG is SENSOR-oriented: rotationDegrees is carried on the signal (card B5 rotates
+            // the frame upright before embedding) as well as handed to ML Kit.
+            core.onFrame(clock.nowMs(), image.imageInfo.rotationDegrees) {
+                runCatching { ImageProxyFrames.toYuv420(image) }.getOrNull()
+            }?.let(onSignal)
+
+            try {
+                barcodeReader.read(input) { hits ->
+                    runCatching { core.onBarcodeHits(hits, clock.nowMs()).forEach(onSignal) }
+                    finish()
+                }
+            } catch (t: Throwable) {
+                finish()
+            }
+
+            try {
+                textReader.read(input) { lines ->
+                    runCatching { core.onOcrLines(lines, clock.nowMs()).forEach(onSignal) }
+                    finish()
+                }
+            } catch (t: Throwable) {
                 finish()
             }
         } catch (t: Throwable) {
+            // Neither ML Kit client was asked, so both pending slots are released here.
             finish()
-        }
-
-        try {
-            textReader.read(input) { lines ->
-                runCatching { core.onOcrLines(lines, clock.nowMs()).forEach(onSignal) }
-                finish()
-            }
-        } catch (t: Throwable) {
             finish()
         }
     }
 
+    /**
+     * Close the ML Kit clients once no frame is in flight (B4 review nit: `close()` used to close
+     * clients under running tasks). `analyze` refuses new frames after this call.
+     */
     fun close() {
+        closed.set(true)
+        closeReadersIfClosed()
+    }
+
+    private fun closeReadersIfClosed() {
+        if (!closed.get() || inFlight.get() > 0) return
+        if (!readersClosed.compareAndSet(false, true)) return
         barcodeReader.close()
         textReader.close()
     }

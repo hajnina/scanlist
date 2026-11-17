@@ -18,26 +18,32 @@ done
 
 echo "== lane branch tips (card/*) =="
 TIPS=/tmp/opencode/watchdog-tips.txt
-NEW=$(mktemp)
-git ls-remote --heads origin 'card/*' | sort >"$NEW" 2>/dev/null
-if [ -s "$NEW" ]; then
-  if [ -f "$TIPS" ]; then
-    CHANGED=$(comm -13 "$TIPS" "$NEW")
-    if [ -n "$CHANGED" ]; then
-      echo "CHANGED since last heartbeat:"
-      echo "$CHANGED"
+RAW=$(mktemp)
+if git ls-remote --heads origin 'card/*' >"$RAW" 2>/dev/null; then
+  NEW=$(mktemp)
+  sort "$RAW" >"$NEW"
+  if [ -s "$NEW" ]; then
+    if [ -f "$TIPS" ]; then
+      CHANGED=$(comm -13 "$TIPS" "$NEW")
+      if [ -n "$CHANGED" ]; then
+        echo "CHANGED since last heartbeat:"
+        echo "$CHANGED"
+      else
+        echo "(no new pushes since last heartbeat)"
+      fi
     else
-      echo "(no new pushes since last heartbeat)"
+      echo "first snapshot:"
+      cat "$NEW"
     fi
+    cp "$NEW" "$TIPS"
   else
-    echo "first snapshot:"
-    cat "$NEW"
+    echo "(no card/* branches on origin)"
   fi
-  cp "$NEW" "$TIPS"
+  rm -f "$NEW"
 else
-  echo "(no card/* branches on origin)"
+  echo "(TRANSIENT: ls-remote failed — network flap; tips file preserved, no snapshot taken)"
 fi
-rm -f "$NEW"
+rm -f "$RAW"
 
 echo "== closed-unmerged audit (lead incident lesson: a closeout isn't a closeout until mergedAt != null) =="
 # WAIVED: #34 closed-unmerged — superseded AND completed by re-land PR #37 (MERGED 13:13:41Z, mergedAt-verified).

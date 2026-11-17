@@ -1,22 +1,20 @@
 package dev.hajnina.scanlist.kotlin.rank
 
 import java.text.Normalizer
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 
-// Kotlin port of `shared/spec/RANK.md` (normative v1): cosine scoring, max fusion, barcode boost,
-// EMA smoothing, q6 rounding, hysteresis, output order and the §8 degraded states.
+// Kotlin port of `shared/spec/RANK.md` (normative v1 + card S10's highlight amendment): cosine
+// scoring, max fusion, barcode boost, EMA smoothing, q6 rounding, the per-source highlight gates,
+// output order and the §8 degraded states.
 // The reference implementation is `shared/ref/scanlist_ref.py` (card S2) — this file mirrors its
 // `rank()` / `q6()` / `decide_top()` / `unranked()` one for one, with the same float64 arithmetic.
 //
-// Deliberate scope: this is the STABLE v1 contract (card B3). Card S10 (in flight) amends RANK.md
-// with a margin + no-match highlight decision (`decide_top()`) and full Unicode case folding for the
-// barcode `norm()`; neither changes ranking order, scores or state, so the golden top-3 contract is
-// unaffected. When S10 lands, the sync is: the hysteresis block in [decideTop] gains the M/T guard,
-// and [normBarcodeText] moves from `lowercase()` to a full CaseFolding table. Both are called from
-// exactly one place each, on purpose.
+// Card S10 separates `topId` (the HIGHLIGHT, nullable) from the ranking: [decideTop] runs hysteresis
+// (§6.1), the per-source evidence gate (§6.2) and the image accept-list guard (§6.3), in that order,
+// while `entries` always stays the full ranked order. Ranking order, scores and EMA state are
+// unaffected. Full Unicode case folding for the barcode `norm()` lives in [fullCasefold] (CaseFold.kt).
 //
 // No Android, no model, no I/O: the whole file is pure Kotlin so the JVM golden test can replay
 // `shared/fixtures/golden.json` without a device (card B3 Done-when).
@@ -27,8 +25,20 @@ const val RANK_DIMS_ACTIVE: Int = 256
 /** RANK.md §4: EMA weight (v1 default, uncalibrated — card X1 revises). */
 const val RANK_EMA_ALPHA: Double = 0.5
 
-/** RANK.md §5/§6: the top switches only when a challenger is ahead by **strictly more** than this. */
+/** RANK.md §6.1: the top switches only when a challenger is ahead by **strictly more** than this. */
 const val RANK_HYSTERESIS: Double = 0.02
+
+/** RANK.md §6.2: text-driven hero needs `q6(top1 − top2) >= MARGIN_TEXT` (inclusive). */
+const val RANK_MARGIN_TEXT: Double = 0.05
+
+/** RANK.md §6.2: text-driven hero needs `q6(hero) >= NO_MATCH_TEXT` (inclusive). */
+const val RANK_NO_MATCH_TEXT: Double = 0.79
+
+/** RANK.md §6.2: image-driven hero needs `q6(top1 − top2) >= MARGIN_IMAGE` (inclusive). */
+const val RANK_MARGIN_IMAGE: Double = 0.005
+
+/** RANK.md §6.2: image-driven hero needs `q6(hero) >= NO_MATCH_IMAGE` (inclusive). */
+const val RANK_NO_MATCH_IMAGE: Double = 0.68
 
 /** RANK.md §7: at most one evaluation per 400 ms (v1 default, uncalibrated — card X1 revises). */
 const val RANK_MIN_INTERVAL_MS: Long = 400L
@@ -86,17 +96,15 @@ fun truncateAndNormalize(vec: DoubleArray, dims: Int = RANK_DIMS_ACTIVE): Double
 }
 
 /**
- * RANK.md §3.1 `norm(s)`: NFC, case fold, trim, every run of Unicode whitespace collapsed to one
- * space.
+ * RANK.md §3.1 `norm(s)`: NFC, **full Unicode case folding**, trim, every run of Unicode whitespace
+ * collapsed to one space.
  *
- * Kotlin has no `str.casefold()`; `lowercase(Locale.ROOT)` is the closest stdlib call (B2 uses the
- * same approximation for alias dedupe). Card S10 is amending RANK.md to require **full** Unicode case
- * folding (the C+S+F mappings of CaseFolding.txt) so all three tracks agree; that amendment lands
- * here, in this one function, and only affects barcode-boost matching — the golden replay never
- * supplies a barcode name, so the ranking contract is unaffected.
+ * The fold is [fullCasefold] (CaseFold.kt), not `lowercase(Locale.ROOT)`: Kotlin has no
+ * `str.casefold()`, and simple lowercasing leaves `ß`, `ﬁ`, `ς` and Cherokee wrong. Only barcode
+ * matching uses this; the ranking contract is unaffected.
  */
 fun normBarcodeText(text: String): String {
-    val folded = Normalizer.normalize(text, Normalizer.Form.NFC).lowercase(Locale.ROOT)
+    val folded = fullCasefold(Normalizer.normalize(text, Normalizer.Form.NFC))
     val out = StringBuilder(folded.length)
     var pendingSpace = false
     for (ch in folded) {
@@ -232,33 +240,36 @@ fun rank(
     val barcodeTarget = if (barcodeName == null) "" else normBarcodeText(barcodeName)
     val scored = ArrayList<RankCandidate>(evaluated.size)
     val smoothedById = LinkedHashMap<String, Double>(evaluated.size)
+    val confirmedIds = HashSet<String>()
     for (item in evaluated) {
         val vec = item.vec!!
         // §3: per source the MAX over its queries (never a mean), then the max across the sources
-        // present. Each cosine is q6-rounded after clamping to [-1, 1].
-        var base = Double.NEGATIVE_INFINITY
+        // present. Each cosine is q6-rounded after clamping to [-1, 1]. The per-source maxima are
+        // kept too: §6.2 needs to know which source drove the winner (the text gate is stricter).
+        var textMax = Double.NEGATIVE_INFINITY
         if (textQueries.isNotEmpty()) {
             var best = -1.0
             for (q in textQueries) {
                 val cosine = q6(dot(vec, q).coerceIn(-1.0, 1.0))
                 if (cosine > best) best = cosine
             }
-            base = max(base, best)
+            textMax = best
         }
+        var imageMax = Double.NEGATIVE_INFINITY
         if (imageQueries.isNotEmpty()) {
             var best = -1.0
             for (q in imageQueries) {
                 val cosine = q6(dot(vec, q).coerceIn(-1.0, 1.0))
                 if (cosine > best) best = cosine
             }
-            base = max(base, best)
+            imageMax = best
         }
-        // §3.1: the boost is part of `raw` (so it smooths) and is never clipped afterwards.
-        val boost = if (barcodeTarget.isNotEmpty() && barcodeMatches(item.name, item.aliases, barcodeTarget)) {
-            RANK_BARCODE_BOOST
-        } else {
-            0.0
-        }
+        val base = max(textMax, imageMax)
+        // §3.1: the boost is part of `raw` (so it smooths) and is never clipped afterwards. A
+        // confirmed item also joins the accept-list that §6.3 requires for an image-driven hero.
+        val confirmed = barcodeTarget.isNotEmpty() && barcodeMatches(item.name, item.aliases, barcodeTarget)
+        if (confirmed) confirmedIds += item.id
+        val boost = if (confirmed) RANK_BARCODE_BOOST else 0.0
         val raw = q6(base + boost)
         val prevScore = prevSmoothed[item.id]
         // §4: alpha = 0.5, once per tick; the first observation equals `raw`. No time decay.
@@ -268,12 +279,14 @@ fun rank(
             q6(RANK_EMA_ALPHA * raw + (1.0 - RANK_EMA_ALPHA) * prevScore)
         }
         smoothedById[item.id] = smoothed
-        scored += RankCandidate(item.id, item.order, raw, smoothed)
+        // §6.2: a tie between the sources counts as text, i.e. the stricter gate (fail-safe).
+        val source = if (imageMax > textMax) RankSource.IMAGE else RankSource.TEXT
+        scored += RankCandidate(item.id, item.order, raw, smoothed, source)
     }
 
     // §6: smoothed desc, then flatten order asc.
     scored.sortWith(compareByDescending<RankCandidate> { it.smoothed }.thenBy { it.order })
-    val top = decideTop(scored, prevTopId)
+    val top = decideTop(scored, prevTopId, confirmedIds)
 
     val ordered = ArrayList<RankEntry>(scored.size)
     if (top != null) ordered += top.toEntry()
@@ -293,25 +306,50 @@ fun unranked(items: List<RankItem>): RankResult = RankResult(
 )
 
 /**
- * RANK.md §6 / §9 `decide_top`: the sticky highlight.
+ * RANK.md §6 / §9 `decide_top`: hysteresis (§6.1) → evidence gate (§6.2) → image guard (§6.3).
  *
- * `candidates` must already be sorted. If the previous top is gone (ticked, removed, unscored) the
- * first candidate wins immediately; otherwise it stays until a challenger is ahead by strictly more
- * than [RANK_HYSTERESIS] (q6, so exactly `0.02` keeps the current top).
+ * `candidates` must already be sorted (`smoothed` desc, `order` asc). Hysteresis makes the previous
+ * hero sticky inside the 0.02 band; a vanished/unticked hero hands over to `candidates[0]`. The gate
+ * then asks whether the hero is *decisive* against the sorted runner-up (margin M on the top pair,
+ * inclusive; vacuous with fewer than two candidates) and *plausible* on its own (floor T on the hero,
+ * inclusive). `(M, T)` come from the hero's driving source; a tie counts as text (stricter). Finally
+ * an image-driven hero must be confirmed by an exact barcode/OFF-name match; an unconfirmed image
+ * winner is rendered in ranked order with no hero.
  *
- * Card S10 adds the margin (M) + no-match threshold (T) here and nowhere else: the highlight becomes
- * `null` when the gate fails while `entries`/`state` keep the ranked order below.
+ * @return the highlighted candidate, or `null` for "no highlight" (a normal state — `entries` stays
+ *   the full ranked order and `state.topId` is `null`).
  */
-fun decideTop(candidates: List<RankCandidate>, currentTopId: String?): RankCandidate? {
+fun decideTop(
+    candidates: List<RankCandidate>,
+    currentTopId: String?,
+    barcodeConfirmedIds: Set<String> = emptySet(),
+): RankCandidate? {
     if (candidates.isEmpty()) return null
     val best = candidates[0]
-    if (currentTopId == null) return best
-    val current = candidates.firstOrNull { it.id == currentTopId } ?: return best
-    if (best.id != current.id && q6(best.smoothed - current.smoothed) > RANK_HYSTERESIS) {
-        return best
+    val runnerUp = candidates.getOrNull(1)
+
+    // 1. §6.1 hysteresis: the previous hero stays while it is inside the dead band.
+    val current = if (currentTopId == null) null else candidates.firstOrNull { it.id == currentTopId }
+    val hero = if (current != null && !(best.id != current.id && q6(best.smoothed - current.smoothed) > RANK_HYSTERESIS)) {
+        current
+    } else {
+        best
     }
-    return current
+
+    // 2. §6.2 evidence gate: decisive against the runner-up and plausible on its own.
+    val imageDriven = hero.source == RankSource.IMAGE
+    val marginRequired = if (imageDriven) RANK_MARGIN_IMAGE else RANK_MARGIN_TEXT
+    val floorRequired = if (imageDriven) RANK_NO_MATCH_IMAGE else RANK_NO_MATCH_TEXT
+    if (runnerUp != null && q6(best.smoothed - runnerUp.smoothed) < marginRequired) return null
+    if (q6(hero.smoothed) < floorRequired) return null
+
+    // 3. §6.3 image guard: an image-driven hero needs accept-list confirmation.
+    if (imageDriven && hero.id !in barcodeConfirmedIds) return null
+    return hero
 }
+
+/** Which source produced a candidate's `base` score (RANK.md §3/§6.2); a tie is [TEXT]. */
+enum class RankSource { TEXT, IMAGE }
 
 /** One scored candidate as seen by [decideTop] — the stored (q6) values plus the flatten order tie-break. */
 data class RankCandidate(
@@ -319,6 +357,7 @@ data class RankCandidate(
     val order: Int,
     val raw: Double,
     val smoothed: Double,
+    val source: RankSource = RankSource.TEXT,
 ) {
     fun toEntry(): RankEntry = RankEntry(id, raw, smoothed, done = false)
 }

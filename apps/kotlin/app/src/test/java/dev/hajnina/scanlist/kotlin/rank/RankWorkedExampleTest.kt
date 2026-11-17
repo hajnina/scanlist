@@ -38,13 +38,15 @@ class RankWorkedExampleTest {
         assertEquals(0.78, tick2.state.smoothed["b"]!!, 0.0)
         assertEquals("a", tick2.topId)
 
-        // Tick 3: a 0.825... no — a (0.8+0.9)/2 = 0.85, b (0.96+0.78)/2 = 0.87. b leads by exactly
-        // 0.02, which is NOT more than 0.02 → the top STAYS a, and a is still rendered first.
+        // Tick 3: a (0.8+0.9)/2 = 0.85, b (0.96+0.78)/2 = 0.87. b leads by exactly 0.02, which is
+        // NOT more than 0.02 → hysteresis keeps a as the hero candidate, but §6.2 needs a 0.05 margin
+        // and 0.02 < 0.05 → NO hero this tick. Entries are the plain ranked order b, a, c.
         val tick3 = rank(items, RankQueries(text = listOf(q2)), tick2.state, previous = tick2, dims = 4)
         assertEquals(0.85, tick3.state.smoothed["a"]!!, 0.0)
         assertEquals(0.87, tick3.state.smoothed["b"]!!, 0.0)
-        assertEquals("a", tick3.topId)
-        assertEquals(listOf("a", "b", "c"), tick3.entries.map { it.id })
+        assertNull("closed §6.2 gate hides the hero", tick3.topId)
+        assertNull("state.topId mirrors the highlight", tick3.state.topId)
+        assertEquals(listOf("b", "a", "c"), tick3.entries.map { it.id })
 
         // Tick 4: a 0.825, b 0.915 → ahead by 0.09 → b becomes the top and is rendered first.
         val tick4 = rank(items, RankQueries(text = listOf(q2)), tick3.state, previous = tick3, dims = 4)
@@ -116,25 +118,38 @@ class RankWorkedExampleTest {
     }
 
     @Test
-    fun `hysteresis is strictly greater than 0_02 and ties go to flatten order`() {
-        assertEquals(
-            "exactly 0.02 keeps the current top",
-            "cur",
-            decideTop(listOf(RankCandidate("best", 1, 0.9, 0.87), RankCandidate("cur", 0, 0.8, 0.85)), "cur")!!.id,
+    fun `hysteresis is strictly greater than 0_02 and the text gate closes inside the band`() {
+        // §6.1 would keep `cur` (the challenger is 0.02 ahead, not > 0.02), but §6.2 closes the text
+        // gate because the margin (0.02) is below M_text = 0.05: no hero rather than a flicker.
+        assertNull(
+            decideTop(
+                listOf(
+                    RankCandidate("best", 1, 0.87, 0.87),
+                    RankCandidate("cur", 0, 0.85, 0.85),
+                ),
+                "cur",
+            ),
         )
+        // A challenger ahead by > 0.02 and a margin >= 0.05 switches.
         assertEquals(
-            "0.021 switches",
+            "0.051 switches and clears the text gate",
             "best",
-            decideTop(listOf(RankCandidate("best", 1, 0.9, 0.871), RankCandidate("cur", 0, 0.8, 0.85)), "cur")!!.id,
+            decideTop(
+                listOf(
+                    RankCandidate("best", 1, 0.871, 0.871),
+                    RankCandidate("cur", 0, 0.82, 0.82),
+                ),
+                "cur",
+            )!!.id,
         )
         assertEquals(
             "a vanished current top hands over immediately",
             "best",
-            decideTop(listOf(RankCandidate("best", 1, 0.9, 0.5)), "cur")!!.id,
+            decideTop(listOf(RankCandidate("best", 1, 0.9, 0.9)), "cur")!!.id,
         )
         assertNull(decideTop(emptyList(), "cur"))
 
-        // Equal smoothed scores: order decides, and the top is the lower order.
+        // Equal smoothed scores: order decides, but the 0.0 margin fails §6.2 → no hero.
         val tie = rank(
             listOf(
                 RankItem("second", "Second", vec = v(0.6, -0.8, 0.0, 0.0), order = 1),
@@ -147,8 +162,76 @@ class RankWorkedExampleTest {
         val byId = tie.entries.associateBy { it.id }
         assertEquals(0.6, byId["first"]!!.smoothed!!, 0.0)
         assertEquals(0.6, byId["second"]!!.smoothed!!, 0.0)
-        assertEquals("first", tie.topId)
+        assertNull("flat list: decisive margin is 0.0", tie.topId)
         assertEquals(listOf("first", "second"), tie.entries.map { it.id })
+    }
+
+    @Test
+    fun `per-source gate boundaries are inclusive and q6-rounded`() {
+        fun text(id: String, score: Double) = RankCandidate(id, 0, score, score, RankSource.TEXT)
+        fun image(id: String, score: Double) = RankCandidate(id, 0, score, score, RankSource.IMAGE)
+
+        // Text margin: exactly 0.05 clears, anything below does not (inclusive, q6).
+        assertEquals(
+            "exactly 0.05 clears",
+            "a",
+            decideTop(listOf(text("a", 0.85), text("b", 0.80)), null)!!.id,
+        )
+        assertNull(decideTop(listOf(text("a", 0.8500004), text("b", 0.800001)), null))
+        assertNull(decideTop(listOf(text("a", 0.8499), text("b", 0.80)), null))
+        // q6 rounds the 0.0500004 margin to 0.05.
+        assertEquals("q6(0.85 - 0.7999996) == 0.05", "a", decideTop(listOf(text("a", 0.85), text("b", 0.7999996)), null)!!.id)
+
+        // Text floor: exactly 0.79 clears; below it does not (single candidate → margin vacuous).
+        assertEquals("0.79 clears", "a", decideTop(listOf(text("a", RANK_NO_MATCH_TEXT)), null)!!.id)
+        assertNull(decideTop(listOf(text("a", 0.789999)), null))
+
+        // Image gate: M_image 0.005 / T_image 0.68, plus the §6.3 accept-list guard.
+        assertEquals(
+            "exactly 0.005 clears for a confirmed image hero",
+            "a",
+            decideTop(listOf(image("a", 0.68), image("b", 0.675)), null, setOf("a"))!!.id,
+        )
+        assertNull(decideTop(listOf(image("a", 0.680001), image("b", 0.675002)), null, setOf("a")))
+        assertNull(decideTop(listOf(image("a", 0.679999), image("b", 0.60)), null, setOf("a")))
+        assertNull(decideTop(listOf(image("a", 0.9), image("b", 0.60)), null, emptySet()))
+        assertEquals(
+            "a single confirmed image candidate has a vacuous margin, not a closed gate",
+            "a",
+            decideTop(listOf(image("a", 0.68)), null, setOf("a"))!!.id,
+        )
+    }
+
+    @Test
+    fun `image path applies hysteresis and the accept list together`() {
+        // RANK.md §10's image tick: M_image = 0.005 < the 0.02 hysteresis band, so both rules apply.
+        val x = RankItem("x", "Milk", vec = v(0.700, 0.0, 0.0, 0.0), order = 0)
+        val y = RankItem("y", "Oats", aliases = listOf("milk"), vec = v(0.705, 0.0, 0.0, 0.0), order = 1)
+        val prev = RankState(mapOf("x" to 0.850, "y" to 0.855), "x")
+        val confirmed = rank(
+            listOf(x, y),
+            RankQueries(image = listOf(v(1.0, 0.0, 0.0, 0.0))),
+            prev = prev,
+            barcodeName = "milk",
+            dims = 4,
+        )
+        assertEquals(0.850, confirmed.state.smoothed["x"]!!, 0.0)
+        assertEquals(0.855, confirmed.state.smoothed["y"]!!, 0.0)
+        assertEquals("y leads by exactly M_image, but hysteresis keeps x", "x", confirmed.topId)
+        assertEquals(listOf("x", "y"), confirmed.entries.map { it.id })
+
+        // Same vectors and no OFF name: neither item is confirmed, so §6.3 hides the hero (§10).
+        val unconfirmed = rank(
+            listOf(x, y),
+            RankQueries(image = listOf(v(1.0, 0.0, 0.0, 0.0))),
+            prev = null,
+            barcodeName = null,
+            dims = 4,
+        )
+        assertEquals(0.700, unconfirmed.state.smoothed["x"]!!, 0.0)
+        assertEquals(0.705, unconfirmed.state.smoothed["y"]!!, 0.0)
+        assertNull("unconfirmed image winner has no hero", unconfirmed.topId)
+        assertEquals("entries stay the full ranked order", listOf("y", "x"), unconfirmed.entries.map { it.id })
     }
 
     @Test

@@ -26,12 +26,16 @@ jobs:
           filters: |
             shared:
               - 'shared/**'
+              - '.github/workflows/**'
             kotlin:
               - 'apps/kotlin/**'
+              - '.github/workflows/**'
             rn:
               - 'apps/rn/**'
+              - '.github/workflows/**'
             web:
               - 'apps/web/**'
+              - '.github/workflows/**'
 
   shared:
     needs: changes

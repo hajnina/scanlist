@@ -96,8 +96,10 @@ class EmbedModule(reactContext: ReactApplicationContext) :
             if (input.isEmpty()) {
                 throw BadInputException("embedDocs needs at least one text")
             }
+            // Open first, so `latencyMs` is the inference alone and `openMs` carries the model load.
+            val embedder = engine()
             val started = SystemClock.elapsedRealtime()
-            val vectors = engine().embedDocs(input)
+            val vectors = embedder.embedDocs(input)
             val latency = (SystemClock.elapsedRealtime() - started).toDouble()
             Arguments.createMap().apply {
                 putArray("vectors", vectorArray(vectors))
@@ -116,8 +118,9 @@ class EmbedModule(reactContext: ReactApplicationContext) :
             if (text.isBlank()) {
                 throw BadInputException("embedQuery needs a non-blank text")
             }
+            val embedder = engine()
             val started = SystemClock.elapsedRealtime()
-            val vector = engine().embedQuery(text)
+            val vector = embedder.embedQuery(text)
             val latency = (SystemClock.elapsedRealtime() - started).toDouble()
             singleResult(vector, latency)
         }
@@ -131,8 +134,9 @@ class EmbedModule(reactContext: ReactApplicationContext) :
     fun embedImage(base64: String?, uri: String?, promise: Promise) {
         run(promise) {
             val jpeg = readImage(base64, uri)
+            val embedder = engine()
             val started = SystemClock.elapsedRealtime()
-            val vector = engine().embedImage(jpeg)
+            val vector = embedder.embedImage(jpeg)
             val latency = (SystemClock.elapsedRealtime() - started).toDouble()
             singleResult(vector, latency)
         }

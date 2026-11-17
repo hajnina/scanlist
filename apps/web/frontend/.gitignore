@@ -1,0 +1,4 @@
+# Local build output; the repo root .gitignore already covers node_modules/ and dist/ globally.
+node_modules/
+dist/
+*.local

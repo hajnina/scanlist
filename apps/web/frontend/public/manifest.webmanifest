@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "ScanList — shopping lists",
+  "short_name": "ScanList",
+  "description": "Import a nested shopping list from JSON, tick items off, export it back. Works offline once loaded.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#fbfdfb",
+  "theme_color": "#006b5f",
+  "categories": ["shopping", "productivity"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

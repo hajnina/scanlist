@@ -1,0 +1,196 @@
+/**
+ * localStorage persistence + corrupt-data recovery (card C2).
+ *
+ * The contract: the stored document IS the export document, so reload re-imports it with the same
+ * `parseList`; and a corrupt index/document must never throw into the UI — it is moved aside, the
+ * caller gets an error string (shown as a toast) and the import screen is what the user sees.
+ */
+
+import { describe, expect, it } from "vitest";
+import { flatten, parseList } from "@scanlist/ts-core";
+import type { ScanList } from "@scanlist/ts-core";
+
+import {
+  STORAGE_KEYS,
+  createListId,
+  docKey,
+  emptyIndex,
+  isValidId,
+  memoryStorage,
+  readDoc,
+  readIndex,
+  writeDoc,
+  writeIndex,
+} from "../src/core/storage";
+import type { LibraryIndex, ListIndexEntry, StorageLike } from "../src/core/storage";
+import { samples } from "./samples";
+
+const sample = samples.find((entry) => entry.name === "van-weekly");
+if (sample === undefined) throw new Error("van-weekly sample missing");
+const sampleText: string = sample.text;
+
+function parsedSample(): ScanList {
+  const parsed = parseList(sampleText);
+  if (!parsed.ok) throw new Error(parsed.errors.join("; "));
+  return parsed.list;
+}
+
+function entry(overrides: Partial<ListIndexEntry> = {}): ListIndexEntry {
+  return {
+    id: "list-1",
+    title: "Van weekly shop",
+    itemCount: 10,
+    doneCount: 0,
+    importedAt: "2026-11-17T00:00:00.000Z",
+    updatedAt: "2026-11-17T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function throwingStorage(): StorageLike {
+  return {
+    getItem: () => {
+      throw new Error("blocked");
+    },
+    setItem: () => {
+      throw new Error("quota exceeded");
+    },
+    removeItem: () => {
+      throw new Error("blocked");
+    },
+  };
+}
+
+describe("index", () => {
+  it("starts empty on a fresh browser", () => {
+    const storage = memoryStorage();
+    expect(readIndex(storage)).toEqual({ index: emptyIndex(), error: null });
+  });
+
+  it("round-trips a written index", () => {
+    const storage = memoryStorage();
+    const index: LibraryIndex = { version: 1, lists: [entry()] };
+    expect(writeIndex(storage, index)).toBe(true);
+    expect(readIndex(storage).index).toEqual(index);
+  });
+
+  it("moves a corrupt index aside instead of throwing", () => {
+    const storage = memoryStorage({ [STORAGE_KEYS.index]: "{not json" });
+    const result = readIndex(storage);
+
+    expect(result.index.lists).toEqual([]);
+    expect(result.error).toContain("not valid JSON");
+    expect(storage.getItem(STORAGE_KEYS.index)).toBeNull();
+
+    const quarantined = JSON.parse(storage.getItem(STORAGE_KEYS.corrupt) ?? "{}") as {
+      origin?: string;
+      raw?: string;
+    };
+    expect(quarantined.origin).toBe(STORAGE_KEYS.index);
+    expect(quarantined.raw).toBe("{not json");
+  });
+
+  it("rejects an unknown index shape", () => {
+    const storage = memoryStorage({
+      [STORAGE_KEYS.index]: JSON.stringify({ version: 99, lists: [] }),
+    });
+    const result = readIndex(storage);
+    expect(result.index.lists).toEqual([]);
+    expect(result.error).toContain("unknown shape");
+  });
+
+  it("drops only the invalid entries and rewrites the index", () => {
+    const storage = memoryStorage({
+      [STORAGE_KEYS.index]: JSON.stringify({
+        version: 1,
+        lists: [entry(), { id: "../etc/passwd", title: "bad", itemCount: 1, doneCount: 0, importedAt: "", updatedAt: "" }, entry({ id: "list-2", title: "Corner shop" })],
+      }),
+    });
+    const result = readIndex(storage);
+
+    expect(result.index.lists.map((list) => list.id)).toEqual(["list-1", "list-2"]);
+    expect(result.error).toContain("1 saved list entry");
+    // The corrected index was persisted, so the next read is clean.
+    expect(readIndex(storage)).toEqual({ index: result.index, error: null });
+  });
+});
+
+describe("documents — the persisted format is the export document", () => {
+  it("stores and reloads a list through parseList with identical flattening", () => {
+    const storage = memoryStorage();
+    const list = parsedSample();
+    expect(writeDoc(storage, "list-1", list)).toBe(true);
+
+    const result = readDoc(storage, "list-1");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(flatten(result.list)).toEqual(flatten(list));
+    // The stored bytes are exactly what Export downloads.
+    expect(storage.getItem(docKey("list-1"))).toContain('"title": "Van weekly shop"');
+  });
+
+  it("reports a missing document", () => {
+    const result = readDoc(memoryStorage(), "list-1");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain("missing");
+  });
+
+  it("recovers from a corrupt document by removing it and reporting why", () => {
+    const storage = memoryStorage({ [docKey("list-1")]: '{"title": "Broken"' });
+    const result = readDoc(storage, "list-1");
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain("corrupt");
+    expect(storage.getItem(docKey("list-1"))).toBeNull();
+    expect(JSON.parse(storage.getItem(STORAGE_KEYS.corrupt) ?? "{}")).toMatchObject({
+      origin: docKey("list-1"),
+    });
+  });
+
+  it("recovers from a document that is JSON but not a list", () => {
+    const storage = memoryStorage({
+      [docKey("list-1")]: JSON.stringify({ title: "x", sections: {} }),
+    });
+    const result = readDoc(storage, "list-1");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain("/sections");
+  });
+
+  it("refuses ids that are not safe storage keys", () => {
+    expect(isValidId("list-1")).toBe(true);
+    expect(isValidId("../x")).toBe(false);
+    expect(isValidId("")).toBe(false);
+    expect(readDoc(memoryStorage(), "../../x").ok).toBe(false);
+  });
+});
+
+describe("degraded storage (private mode / quota)", () => {
+  it("never throws when the browser refuses to read or write", () => {
+    const storage = throwingStorage();
+    expect(readIndex(storage).index.lists).toEqual([]);
+    expect(readIndex(storage).error).not.toBeNull();
+    expect(readDoc(storage, "list-1").ok).toBe(false);
+    expect(writeDoc(storage, "list-1", parsedSample())).toBe(false);
+    expect(writeIndex(storage, emptyIndex())).toBe(false);
+  });
+});
+
+describe("ids + memory storage", () => {
+  it("generates url-safe, unique ids", () => {
+    const ids = new Set(Array.from({ length: 25 }, () => createListId()));
+    expect(ids.size).toBe(25);
+    for (const id of ids) expect(isValidId(id)).toBe(true);
+  });
+
+  it("implements the three Storage methods", () => {
+    const storage = memoryStorage({ a: "1" });
+    expect(storage.getItem("a")).toBe("1");
+    storage.setItem("b", "2");
+    expect(storage.getItem("b")).toBe("2");
+    storage.removeItem("a");
+    expect(storage.getItem("a")).toBeNull();
+  });
+});

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ScanList — EmbeddingGemma 2 WebGPU spike (C7, dev only)</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fbfdfb;
+        --fg: #191c1b;
+        --muted: #4a635f;
+        --card: #ffffff;
+        --primary: #006b5f;
+        --container: #e6f4f1;
+        --line: #c9dcd8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #191c1b;
+          --fg: #e1e3e1;
+          --muted: #b2ccc7;
+          --card: #202423;
+          --primary: #5eead4;
+          --container: #05201c;
+          --line: #34413f;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 960px; margin: 0 auto; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      p.lede { margin: 0 0 20px; color: var(--muted); }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+      label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+      button {
+        border: none;
+        border-radius: 999px;
+        padding: 10px 20px;
+        font: inherit;
+        font-weight: 600;
+        background: var(--primary);
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.5; cursor: progress; }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { width: 42%; color: var(--muted); font-weight: 500; }
+      pre {
+        background: var(--container);
+        border-radius: 12px;
+        padding: 12px;
+        overflow: auto;
+        font-size: 12px;
+        max-height: 340px;
+      }
+      summary { cursor: pointer; color: var(--muted); margin-top: 12px; }
+      code { font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>EmbeddingGemma 2 in the browser — spike (card C7)</h1>
+      <p class="lede">
+        Dev-only page, not part of the production bundle. Weights stream from the Hugging Face Hub at
+        runtime into the browser cache; nothing (and no weight file) is written into this repo.
+        Numbers from this page belong in <code>EMBED_SPIKE.md</code> with the exact device named.
+      </p>
+
+      <section class="card">
+        <div class="row">
+          <button id="run" type="button">Load model &amp; run measurements</button>
+          <label>
+            device
+            <select id="device">
+              <option value="webgpu" selected>webgpu (q4 — the only supported path)</option>
+              <option value="wasm">wasm (expected to fail on q4: read the error)</option>
+            </select>
+          </label>
+          <label>
+            dtype
+            <select id="dtype">
+              <option value="q4" selected>q4</option>
+              <option value="q8">q8</option>
+              <option value="q4f16">q4f16</option>
+              <option value="fp16">fp16 (≈1.4 GB — do not chase)</option>
+            </select>
+          </label>
+          <label><input id="textOnly" type="checkbox" /> text-only (175 MB, no vision encoder)</label>
+          <span id="status">idle</span>
+        </div>
+        <p class="lede" style="margin: 12px 0 0">
+          Full run: downloads q4 + loads WebGPU → embeds the golden list's item docs, the golden text
+          queries and three product photos → reports latency and cosine agreement against
+          <code>shared/fixtures/golden.json</code>. First run is a cold download.
+        </p>
+      </section>
+
+      <section class="card">
+        <div id="result"></div>
+      </section>
+
+      <section class="card">
+        <strong>Log</strong>
+        <pre id="log"></pre>
+      </section>
+    </main>
+    <script type="module" src="./page.ts"></script>
+  </body>
+</html>

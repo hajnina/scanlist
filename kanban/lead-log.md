@@ -44,6 +44,9 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Reviewer dispatched (fresh session ses_e180f8ff0ffekQw04k0F2lfM2l): strict scope mapping, §83-88 line-by-line (cap DROPS in detection order — not confidence-sort), 0.75-default judgment, 4 mutations (cap 3, rejoin, global-dedupe, reversed order), RN-twin symmetry table (A4-sync branch), consumers-unbroken grep.
 - Fleet: A2-review, B4-sync-review, C3? no — building: C2, A4-sync; reviewing: PR #24 (B3-sync), PR #26 (B4-sync), PR #22 (A2) = 5.
 
+## 2026-11-17 — C7 nits closed (ae72143): single-run 600 s wording, ~3x batch framing, tag-note + real createFrameUploader seam
+- Micro-delegate pushed ae72143 direct-to-main (2 files: EMBED_SPIKE.md + kanban/doing/C7.md). PR #35 fully settled — no remaining nits. The C4-seam citation now names the real `createFrameUploader({ embed })` seam.
+
 ## 2026-11-17 — Heartbeat cycle 1: A6 delivered (PR #36, review overlapping rn CI); rolling release born; C5-sync nudged
 - Watchdog found: **PR #36 (A6) OPEN** (mergeable, rn CI pending — APK build ~12-17 min) → reviewer dispatched NOW so review overlaps the CI window (parallelism-max per user). Also: **rolling release pipeline WORKS** — "ScanList (rolling)" Latest created at 12:58:07 by the C7-merge push with real artifacts; refs/tags/main still 0; release job green on the last runs. Incident stays closed.
 - A6 reviewer (fresh session ses_e16678bb2ffeCnF8KCi9z8eOOu): scope + disclosed out-of-owns (a)-(h) dispositions, B6-semantics mirror (BackendChoice/SettingsStore/SelfTestRunner/model status), the run-mutex lesson mutation (cancel mid-run → no stuck RUNNING), POLISH.md realness (device-gated honesty), A5-backend-name compatibility, jest re-run vs 21/225 baseline, CI head.

@@ -62,3 +62,39 @@ describe('createFrameCapturer', () => {
     expect((await capture()).capturedAt).toBe(4242);
   });
 });
+
+describe('temp-file lifecycle (card A6)', () => {
+  test('carries a release() that deletes exactly the captured temp file', async () => {
+    const photo = fakePhoto();
+    const deleteFile = jest.fn();
+    const capture = createFrameCapturer(fakeOutput(photo), {deleteFile});
+
+    const frame = await capture();
+
+    expect(typeof frame.release).toBe('function');
+    await frame.release?.();
+    expect(deleteFile).toHaveBeenCalledWith(
+      '/data/user/0/dev.hajnina.scanlist.rn/cache/photo-1.jpg',
+    );
+    expect(deleteFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('no deleteFile means no release hook (synthetic/test capturers keep working)', async () => {
+    const capture = createFrameCapturer(fakeOutput(fakePhoto()));
+    expect((await capture()).release).toBeUndefined();
+  });
+
+  test('disposes the photo when saving to a temp file fails (nothing to release)', async () => {
+    const photo = fakePhoto({
+      saveToTemporaryFileAsync: async () => {
+        throw new Error('cache full');
+      },
+    });
+    const deleteFile = jest.fn();
+    const capture = createFrameCapturer(fakeOutput(photo), {deleteFile});
+
+    await expect(capture()).rejects.toThrow('cache full');
+    expect(photo.dispose).toHaveBeenCalledTimes(1);
+    expect(deleteFile).not.toHaveBeenCalled();
+  });
+});

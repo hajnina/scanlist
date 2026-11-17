@@ -44,6 +44,7 @@ import dev.hajnina.scanlist.kotlin.Pressable
 import dev.hajnina.scanlist.kotlin.ScreenHeader
 import dev.hajnina.scanlist.kotlin.SectionLabel
 import dev.hajnina.scanlist.kotlin.Shapes
+import dev.hajnina.scanlist.kotlin.rank.rememberListEmbedding
 import dev.hajnina.scanlist.kotlin.springIn
 
 // List screen of card B2: the nested, collapsible sections of the imported JSON, tick/untick with
@@ -70,6 +71,10 @@ fun ListDetailScreen(state: ListState, listId: String, onBack: () -> Unit) {
     val list = stored.list
     // One id map per list version: the UI ticks by the same ids the flattener produced.
     val index = remember(list) { list.flatIndex() }
+    // Card B3: warm this list's item-vector cache in the background on open (rank package). The
+    // vectors are not rendered yet — the scan/hero UI (card B5) consumes them; this keeps the
+    // 400 ms scan path free of first-open embedding stalls. A missing model bundle is non-fatal.
+    rememberListEmbedding(context, stored.id, index.items)
     val total = index.items.size
     val left = index.items.count { !it.done }
     val progress by animateFloatAsState(

@@ -26,9 +26,9 @@ fun interface JpegEncoder {
  *
  * The CameraX/ML Kit glue (CameraScanAnalyzer.kt) only copies planes, calls the two ML Kit clients
  * and forwards the results here. Everything that can be wrong — fps gate, 384 px scaling, YUV→NV21,
- * barcode dedupe, OCR batching, signal shape — is in this class and unit-tested with fake frames
- * and a fake clock. Methods take `nowMs` explicitly (defaulting to the injected clock) so tests can
- * drive a synthetic timeline.
+ * barcode dedupe, OCR per-line filtering/repeat suppression, signal shape — is in this class and
+ * unit-tested with fake frames and a fake clock. Methods take `nowMs` explicitly (defaulting to the
+ * injected clock) so tests can drive a synthetic timeline.
  *
  * Not thread-safe in the sense that callers arrive from more than one thread: the analysis
  * executor drives onFrame, but ML Kit's barcode/OCR callbacks land on the MAIN thread, so
@@ -51,9 +51,15 @@ class ScanFrameCore(
             ScanSignal.barcode(hit.value.trim(), nowMs)
         }
 
-    /** One batched TEXT signal for this frame, or null when the OCR lines add nothing new. */
-    fun onOcrLines(lines: List<String>, nowMs: Long = clock.nowMs()): ScanSignal? =
-        ocrBatcher.batch(lines, nowMs)?.let { ScanSignal.text(it, nowMs) }
+    /**
+     * One TEXT signal per OCR line due this frame, in detection order (empty when the lines add
+     * nothing new). RANK.md §2.2: each OCR line is its own query vector; batching never joins lines
+     * and never averages confidences. At most [OcrLineBatcher.MAX_LINES_PER_FRAME] lines are emitted;
+     * the final barcode+OCR pool cap of 16 per tick is enforced by the ranker
+     * (`dev.hajnina.scanlist.kotlin.rank.RANK_MAX_TEXT_QUERIES`).
+     */
+    fun onOcrLines(lines: List<OcrLine>, nowMs: Long = clock.nowMs()): List<ScanSignal> =
+        ocrBatcher.batch(lines, nowMs).map { line -> ScanSignal.text(line.text, nowMs, line.confidence) }
 
     /**
      * One IMAGE signal for this frame, or null when the ≤ 2.5 fps gate says skip (or the encoder

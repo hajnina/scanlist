@@ -53,6 +53,8 @@ internal interface DownloadTransport {
         val body: InputStream?,
         /** Body length as announced by the server, or -1 when unknown. */
         val contentLength: Long,
+        /** `Content-Range` header verbatim (`bytes 4000-9999/10000`), or null. */
+        val contentRange: String? = null,
     ) : Closeable {
         override fun close() {
             body?.close()
@@ -75,7 +77,12 @@ internal class HttpDownloadTransport(
         }
         val code = connection.responseCode
         val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-        return DownloadTransport.Response(code, stream, connection.contentLengthLong)
+        return DownloadTransport.Response(
+            code,
+            stream,
+            connection.contentLengthLong,
+            connection.getHeaderField("Content-Range"),
+        )
     }
 }
 
@@ -103,6 +110,11 @@ internal class ModelDownload(
 
     private val running = AtomicBoolean(false)
 
+    /** A bundle already on disk (any EmbedModel layout): report READY without downloading. */
+    fun adoptExisting() {
+        publish(DownloadStatus(DownloadState.READY, target.length(), expectedBytes, 100))
+    }
+
     /** Starts [run] at most once; repeated calls are no-ops (the second `status()` must not restart). */
     fun start(): Boolean {
         if (target.isFile) {
@@ -110,6 +122,8 @@ internal class ModelDownload(
             return false
         }
         if (!running.compareAndSet(false, true)) return false
+        shaRestarts = 0
+        rangeRestarts = 0
         Thread({
             try {
                 run()
@@ -122,7 +136,9 @@ internal class ModelDownload(
 
     /** Visible for the JVM state-machine tests. Blocks until READY/FAILED. */
     internal fun run() {
-        var zeroRestarts = 0
+        // Both restart counters are per-run: a fresh start() gets its own budget.
+        shaRestarts = 0
+        rangeRestarts = 0
         while (true) {
             try {
                 downloadOnce()
@@ -159,7 +175,11 @@ internal class ModelDownload(
         return minOf(30_000L, 1_000L shl shift)
     }
 
+    /** Mismatch budget: one cold re-download, then terminal. */
     private var shaRestarts = 0
+
+    /** Wrong/absent Content-Range budget: one restart from zero, then terminal. */
+    private var rangeRestarts = 0
 
     private fun downloadOnce() {
         target.parentFile?.mkdirs()
@@ -183,10 +203,17 @@ internal class ModelDownload(
                         part.delete()
                         offset = 0
                         if (body == null) throw IOException("HTTP 200 with no body")
+                        // A full body must be exactly the bundle when the server says how big it is.
+                        if (response.contentLength >= 0 && response.contentLength != expectedBytes) {
+                            throw IOException(
+                                "HTTP 200 body is ${response.contentLength}B, expected ${expectedBytes}B",
+                            )
+                        }
                         copyToPart(body, offset)
                     }
                     206 -> {
                         if (body == null) throw IOException("HTTP 206 with no body")
+                        validatePartial(response, offset)
                         copyToPart(body, offset)
                     }
                     403, 404 -> throw TerminalDownloadException(
@@ -237,6 +264,54 @@ internal class ModelDownload(
         publish(DownloadStatus(DownloadState.READY, expectedBytes, expectedBytes, 100))
     }
 
+    /**
+     * A `206` is only trustworthy when it says it starts exactly where our `.part` ends and carries
+     * the remaining bytes. A proxy/CDN that ignores `Range` or answers from another offset would
+     * otherwise splice two different byte ranges into one corrupt 484 MB file.
+     */
+    private fun validatePartial(response: DownloadTransport.Response, offset: Long) {
+        val range = parseContentRange(response.contentRange)
+        val wrong =
+            range == null ||
+                range.start != offset ||
+                (range.total >= 0 && range.total != expectedBytes) ||
+                (response.contentLength >= 0 &&
+                    response.contentLength != expectedBytes - offset)
+        if (!wrong) return
+
+        part.delete()
+        rangeRestarts += 1
+        publish(
+            DownloadStatus(
+                DownloadState.DOWNLOADING,
+                0,
+                expectedBytes,
+                0,
+                "server answered 206 for the wrong range (${response.contentRange ?: "no Content-Range"})" +
+                    " — restarting from zero",
+            ),
+        )
+        if (rangeRestarts >= 2) {
+            throw TerminalDownloadException(
+                "server keeps answering 206 for the wrong range " +
+                    "(${response.contentRange ?: "no Content-Range"}); expected bytes $offset-${expectedBytes - 1}",
+            )
+        }
+        throw IOException("206 Content-Range mismatch — restarting from zero once")
+    }
+
+    /** `bytes <start>-<end>/<total>`; total is -1 for `*`. */
+    private data class ContentRange(val start: Long, val end: Long, val total: Long)
+
+    private fun parseContentRange(header: String?): ContentRange? {
+        val match = RANGE_PATTERN.matchEntire(header?.trim() ?: return null) ?: return null
+        val start = match.groupValues[1].toLongOrNull() ?: return null
+        val end = match.groupValues[2].toLongOrNull() ?: return null
+        val total = if (match.groupValues[3] == "*") -1L else match.groupValues[3].toLongOrNull() ?: return null
+        if (start < 0 || end < start) return null
+        return ContentRange(start, end, total)
+    }
+
     private fun copyToPart(body: InputStream, offset: Long) {
         // Append for a resumed transfer; truncate when the server restarted us at zero.
         java.io.FileOutputStream(part, offset > 0).use { out ->
@@ -284,6 +359,8 @@ internal class ModelDownload(
 
         private const val BUFFER_BYTES = 256 * 1024
 
+        private val RANGE_PATTERN = Regex("""bytes (\d+)-(\d+)/(\d+|\*)""")
+
         fun sha256(file: File): String {
             val digest = MessageDigest.getInstance("SHA-256")
             file.inputStream().use { input ->
@@ -306,14 +383,24 @@ internal object ModelDownloads {
     fun get(context: android.content.Context): ModelDownload {
         current?.let { return it }
         return synchronized(this) {
-            current ?: ModelDownload(
-                target = EmbedModel.candidates(context).first(),
-                url = ModelDownload.MODEL_URL,
-                expectedBytes = ModelDownload.MODEL_BYTES,
-                expectedSha256 = ModelDownload.MODEL_SHA256,
-            ).also {
-                current = it
-                it.start()
+            current ?: run {
+                // A device provisioned with `scripts/model.sh push` may hold the bundle in ANY of
+                // EmbedModel's layouts (internal or external files dir). Adopt it: never burn a
+                // second 484 MB download just because the first candidate is empty.
+                val existing = EmbedModel.find(context)
+                ModelDownload(
+                    target = existing ?: EmbedModel.candidates(context).first(),
+                    url = ModelDownload.MODEL_URL,
+                    expectedBytes = ModelDownload.MODEL_BYTES,
+                    expectedSha256 = ModelDownload.MODEL_SHA256,
+                ).also {
+                    current = it
+                    if (existing != null) {
+                        it.adoptExisting()
+                    } else {
+                        it.start()
+                    }
+                }
             }
         }
     }

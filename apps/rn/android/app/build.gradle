@@ -160,7 +160,6 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
-
 /*
  * Card A6 (nit a): LiteRT-LM 0.18.1 is built with Kotlin 2.4 metadata while RN 0.88 compiles this app
  * with Kotlin 2.2 (shared/android-embed/README.md §"LiteRT-LM version decision"). The library passes

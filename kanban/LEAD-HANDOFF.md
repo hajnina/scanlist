@@ -22,6 +22,9 @@ newest are anchor-inserted near the TOP, use grep for headings).
   `bash scripts/lead-watchdog.sh`. Watchdog gh probes already have `timeout 60` (transient-hang hardening).
 - Disk quota: /tmp is a 16 GB tmpfs that hit EDQUOT twice — reviewers should clone into /dev/shm when tight.
 - ALWAYS `source scripts/android-env.sh` before gradle; `--tests` filter broken locally (run full suite for mutations).
+- BEFORE every commit in the MAIN checkout, verify `git branch --show-current` == main — parallel actors
+  create/checkout branches here (checkout race bit once: a log commit landed on the owner's PR branch).
+  Worktree lanes for anything else; the main checkout is the board's coordination surface and must stay on main.
 - `gh pr edit` is BROKEN on this gh version (projects-classic GraphQL deprecation) — update PR bodies via REST:
   `gh api repos/hajnina/scanlist/pulls/<n> -X PATCH -f body="$(cat body.md)"`.
 - Martin merges his own lanes WITHOUT reviews sometimes (mergedBy hajnina, #42/#43) — accepted; adversarial

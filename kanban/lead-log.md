@@ -630,3 +630,10 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
   `adb logcat -d | grep -q ...` fail/miss on SIGPIPE because `grep -q` exits at the first match.
   Capture to a file first. This false-failed a green build ("no JS bundle" with a 1.5 MB bundle
   present) and would have hidden a real `FATAL EXCEPTION`.
+- **Install caveat + doc erratum**: `scripts/make-debug-keystore.sh` *generates* a fresh random
+  key per CI run (public debug credentials, not the canonical AOSP key). Every rolling build is
+  therefore a new signing identity: installing over a previous rolling APK fails with
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE` unless the old app is uninstalled first.
+  `apps/rn/docs/RELEASE.md:75` says "identity is the public Android debug key" — inaccurate.
+  Follow-up: correct that line. Deliberately not pushed now because any `apps/rn/**` change
+  rebuilds and re-signs the release; the verified asset (`da159260…`) must stay put until then.

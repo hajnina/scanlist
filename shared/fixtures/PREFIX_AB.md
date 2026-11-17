@@ -121,9 +121,14 @@ otherwise       →  no highlight
 
 Evidence: image margins are structurally tiny — median 0.028, max 0.068, only **3/13** correct
 matches reach 0.05. Applying the text rule to images would throw away 10 of 13 correct matches.
-The two image distractors have margins 0.000 / 0.001, so a 0.005 slack is enough to drop them
-while keeping 11/13 hits; combined with the 0.68 floor (hit min 0.687, distractor max 0.666) the
-rule makes **0 false highlights on 15 photos and keeps 11/13 correct ones**.
+The two image distractors have margins 0.000 / 0.001, so a 0.005 slack is enough to drop them.
+Combined with the 0.68 floor (hit min 0.687, distractor max 0.666), the rule keeps **10/13**
+correct, suppresses 2 correct (fail-safe: eggs margin 0.0038, bread margin 0.0039) and produces
+**1 false highlight — cheese.jpg → Greek yoghurt (raw 0.699, margin 0.025 > slack, > butter's
+0.0074)**. Corrected during adversarial review (PR #13): the earlier "0 false highlights, keeps
+11/13" claim was wrong under every reading of the fixture — cheese dominates butter in both
+dimensions, so margin alone cannot separate this confusion; the highlight decision for images
+needs a guard BEYOND this gate (accept-list / second stage), tracked in card S10.
 
 **Mixed tick (text + image together).** The ranker already takes the max across sources
 (RANK.md §3), so treat the rule as a property of the winning entry, not of the source: a

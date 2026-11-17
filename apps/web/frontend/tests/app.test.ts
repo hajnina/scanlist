@@ -17,13 +17,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { flatten, parseList } from "@scanlist/ts-core";
 
-import { App } from "../src/app";
+import { App, scanTarget } from "../src/app";
 import { STORAGE_KEYS, docKey } from "../src/core/storage";
+import type { ListIndexEntry } from "../src/core/storage";
 import { exportJson } from "../src/core/exportDoc";
 import { samples } from "./samples";
 
 const vanWeekly = samples.find((sample) => sample.name === "van-weekly");
 if (vanWeekly === undefined) throw new Error("van-weekly sample missing");
+
+const marketRun = samples.find((sample) => sample.name === "string-amounts");
+if (marketRun === undefined) throw new Error("string-amounts sample missing");
 
 /**
  * happy-dom has no `ElementInternals`, and @material/web's form-associated elements call
@@ -118,6 +122,36 @@ function readIndex(): { lists: Array<Record<string, unknown>> } {
   };
 }
 
+interface SeedList {
+  id: string;
+  text: string;
+  updatedAt: string;
+}
+
+/**
+ * Seed a library the way imports + reloads leave it: one stored export document per list, plus the
+ * metadata index. Index order is taken as given (the app prepends new imports, so index[0] is the
+ * most recently *imported* list — deliberately independent of `updatedAt` in these fixtures).
+ */
+function seedLibrary(lists: SeedList[]): void {
+  const entries: ListIndexEntry[] = lists.map(({ id, text, updatedAt }) => {
+    const parsed = parseList(text);
+    if (!parsed.ok) throw new Error(`fixture ${id} does not parse`);
+    localStorage.setItem(docKey(id), exportJson(parsed.list));
+    return {
+      id,
+      title: parsed.list.title,
+      itemCount: flatten(parsed.list).length,
+      doneCount: 0,
+      importedAt: updatedAt,
+      updatedAt,
+    };
+  });
+  localStorage.setItem(STORAGE_KEYS.index, JSON.stringify({ version: 1, lists: entries }));
+}
+
+const marketRunTitle = "Market run (free-text amounts)";
+
 beforeEach(() => {
   localStorage.clear();
   document.body.innerHTML = "";
@@ -132,7 +166,7 @@ afterEach(() => {
 });
 
 describe("fresh start", () => {
-  it("shows the import screen with an empty library and the disabled C5 scan placeholder", async () => {
+  it("shows the import screen and an enabled Scan entry that asks for a list first", async () => {
     mount();
     await flush();
 
@@ -140,11 +174,97 @@ describe("fresh start", () => {
     expect(screenText()).toContain("SAVED LISTS");
     expect(screenText()).toContain("Nothing imported yet");
 
-    // Card C5 owns ranking; the nav shape is fixed now but the entry must not be clickable.
+    // Card C5 replaced the placeholder with the real entry: with no lists it is honest, not dead.
     const scan = find("button.nav-item", "Scan") as HTMLButtonElement;
-    expect(scan.disabled).toBe(true);
-    expect(scan.textContent).toContain("C5");
+    expect(scan.disabled).toBe(false);
+    expect(scan.textContent).not.toContain("C5");
+
+    scan.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    expect(screenText()).toContain("NO LIST OPEN");
+
+    click("md-filled-button", "Back to lists");
+    await flush();
+    expect(screenText()).toContain("IMPORT A LIST");
     expect(localStorage.getItem(STORAGE_KEYS.index)).toBeNull();
+  });
+});
+
+describe("Scan opens the most recently updated list (C5 review bug 1)", () => {
+  it("picks max(updatedAt), not index order", async () => {
+    // Index order deliberately disagrees with recency: the newest import is the stalest list.
+    seedLibrary([
+      { id: "list-newer-import", text: vanWeekly.text, updatedAt: "2026-11-16T09:00:00.000Z" },
+      { id: "list-older-import", text: marketRun.text, updatedAt: "2026-11-17T09:00:00.000Z" },
+    ]);
+
+    mount();
+    await flush();
+    click("button.nav-item", "Scan");
+    await flush();
+
+    expect(screenText()).toContain("MAGIC SCAN");
+    expect(screenText()).toContain(marketRunTitle);
+    expect(screenText()).not.toContain("Van weekly shop");
+  });
+
+  it("switches to a list as soon as a tick bumps its updatedAt", async () => {
+    seedLibrary([
+      { id: "list-a", text: marketRun.text, updatedAt: "2026-11-16T09:00:00.000Z" },
+      { id: "list-b", text: vanWeekly.text, updatedAt: "2026-11-17T09:30:00.000Z" },
+    ]);
+
+    mount();
+    await flush();
+
+    // B is the most recent at first.
+    click("button.nav-item", "Scan");
+    await flush();
+    expect(screenText()).toContain("Van weekly shop");
+
+    // Back to the lists, open A, tick one item: `toggleItem` stamps A with updatedAt = now.
+    click("button", "Lists");
+    await flush();
+    click("button.library-button", marketRunTitle);
+    await flush();
+    const box = exists("md-checkbox");
+    expect(box, "list A has a checkbox").not.toBeNull();
+    box?.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    click("button", "Lists");
+    await flush();
+    click("button.nav-item", "Scan");
+    await flush();
+
+    expect(screenText()).toContain(marketRunTitle);
+    expect(screenText()).not.toContain("Van weekly shop");
+  });
+
+  it("breaks updatedAt ties deterministically (index order)", () => {
+    const tie: ListIndexEntry[] = [
+      {
+        id: "first-in-index",
+        title: "First",
+        itemCount: 1,
+        doneCount: 0,
+        importedAt: "2026-11-17T09:00:00.000Z",
+        updatedAt: "2026-11-17T09:00:00.000Z",
+      },
+      {
+        id: "second-in-index",
+        title: "Second",
+        itemCount: 1,
+        doneCount: 0,
+        importedAt: "2026-11-17T09:00:00.000Z",
+        updatedAt: "2026-11-17T09:00:00.000Z",
+      },
+    ];
+
+    // Equal timestamps keep stored index order: the first entry (the newest import) wins.
+    expect(scanTarget(tie)?.id).toBe("first-in-index");
+    expect(scanTarget([...tie].reverse())?.id).toBe("second-in-index");
+    expect(scanTarget([])).toBeNull();
   });
 });
 
@@ -369,6 +489,19 @@ describe("corrupt persisted data never white-screens", () => {
     // Degraded mode is announced...
     expect(screenText()).toContain("IMPORT A LIST");
     expect(screenText()).toContain("blocks localStorage");
+
+    // ...by a persistent banner, not only the 8 s toast (C5 review nit a).
+    const banner = exists(".degraded-banner");
+    expect(banner).not.toBeNull();
+    expect(banner?.getAttribute("role")).toBe("status");
+    expect(banner?.textContent).toContain("Storage off");
+
+    // Dismissing the toast must not take the banner with it.
+    click(".toast-close", "×");
+    await flush();
+    expect(exists(".toast-error")).toBeNull();
+    expect(exists(".degraded-banner")).not.toBeNull();
+    expect(screenText()).toContain("Storage off");
 
     // ...and the app is still usable for this session.
     click("md-text-button", "Load the demo list");

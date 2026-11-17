@@ -77,6 +77,19 @@ not be the place where a prefix is decided.
 
 Rule applied: `prefix + trim(text)`, trimming leading/trailing whitespace only, no case folding.
 
+## Golden-vector pairing contract (lead note 2026-11-17, from PR #10's adversarial review)
+
+`src/main/assets/embed_golden.json` was recorded with the **`mnemothera`** prefix set
+(`task: search query | text: ` / `task: search result | text: ` — recorded from
+references/embeddinggemma/src/…/AppConfig.kt). The self-test must compare goldens under the
+**same prefix set the vectors were recorded with** — NOT under `prompts.active` (currently
+`modelcard`), because cross-prefix cosines are far below 0.98 and the self-test would fail on
+every backend ( loudly, by design — but as a false alarm). Card S3 is running the real A/B and
+may legitimately flip `prompts.active`; when it does, the goldens must be RE-RECORDED under the
+new winner (owner: card B0 on device / S3 on CPU) or the comparison pinned to the recording set.
+Until B0 settles this, treat `embed_golden.json` + `active` as a PAIRED contract, not two
+independent knobs.
+
 ## LiteRT-LM version decision
 
 `com.google.ai.edge.litertlm:litertlm-android:0.18.1` — the version MnemoThera measured on three

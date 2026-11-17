@@ -94,7 +94,7 @@ Verify by hand:
 URL=https://$(tailscale status --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))'):8444
 curl -s -o /dev/null -w '%{http_code} %{ssl_verify_result}\n' "$URL/health"   # -> 200 0
 curl -s "$URL/health"
-echo | openssl s_client -connect "${URL#https://}/health" 2>/dev/null | openssl x509 -noout -subject -issuer
+echo | openssl s_client -connect "${URL#https://}" -servername "${URL#https://%%:*}" 2>/dev/null | openssl x509 -noout -subject -issuer
 ```
 
 Stop everything with `apps/web/run.sh --stop`; `--status` re-prints the URL from the recorded

@@ -39,6 +39,10 @@ WEB_DIR=$SCRIPT_DIR
 SERVER_DIR=$WEB_DIR/server
 FRONTEND_DIR=$WEB_DIR/frontend
 VENV=$SERVER_DIR/.venv
+# PID-reuse hardening (C6 adversarial review): the expect string is checkout-specific
+# (absolute per-checkout venv path), so a stale PID reused by ANOTHER checkout's
+# scanlist uvicorn fails /proc cmdline validation instead of getting killed.
+UVICORN_EXPECT="$VENV/bin/uvicorn app.main:app"
 
 PORT=${SCANLIST_WEB_PORT:-8000}
 HTTPS_PORT=${SCANLIST_WEB_HTTPS_PORT:-8444}
@@ -142,7 +146,7 @@ stop_tailscale_serve() {
 }
 
 stop_all() {
-  stop_pid_file "$UVICORN_PID_FILE" "app.main:app" "uvicorn (port $PORT)"
+  stop_pid_file "$UVICORN_PID_FILE" "$UVICORN_EXPECT" "uvicorn (port $PORT)"
   stop_pid_file "$CADDY_PID_FILE" "$RUN_DIR/Caddyfile" "caddy"
   stop_tailscale_serve
 }
@@ -203,7 +207,7 @@ action_status() {
   local pid
   mkdir -p "$RUN_DIR"
   printf 'run dir:      %s\n' "$RUN_DIR"
-  if pid=$(pid_from_file "$UVICORN_PID_FILE" "app.main:app"); then
+  if pid=$(pid_from_file "$UVICORN_PID_FILE" "$UVICORN_EXPECT"); then
     printf 'uvicorn:      pid %s, http://%s:%s (health %s)\n' "$pid" "$HOST" "$PORT" "$(http_code "http://$HOST:$PORT/health")"
   else
     printf 'uvicorn:      not running\n'
@@ -275,7 +279,7 @@ start_uvicorn() {
   echo "$pid" >"$UVICORN_PID_FILE"
   if ! wait_for_url "http://$HOST:$PORT/health" 60; then
     tail -n 25 "$LOG" >&2 || true
-    stop_pid_file "$UVICORN_PID_FILE" "app.main:app" "uvicorn"
+    stop_pid_file "$UVICORN_PID_FILE" "$UVICORN_EXPECT" "uvicorn"
     die "server did not become healthy on http://$HOST:$PORT/health (log: $LOG)"
   fi
   # Belt: if the forked pid is not the one holding the socket, record the real

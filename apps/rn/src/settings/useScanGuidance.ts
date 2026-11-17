@@ -12,7 +12,11 @@
  *    6 s threshold is crossed on time even when no signal arrives.
  */
 import {useEffect, useRef, useState} from 'react';
-import {embedStatus} from '../../modules/embed';
+import {
+  embedStatus,
+  type EmbedDownload,
+  type EmbedDownloadState,
+} from '../../modules/embed';
 import {
   factsFromNativeStatus,
   modelStatusFromFacts,
@@ -32,6 +36,41 @@ export interface ModelProbeState {
   missing: boolean;
   /** The bridge's pinned sha label, when this binary reports one. */
   sha256: string | null;
+  /** Card MODELDL: in-app download progress, or null before the first probe. */
+  download: EmbedDownload | null;
+}
+
+const DOWNLOAD_STATES: readonly EmbedDownloadState[] = [
+  'idle',
+  'downloading',
+  'verifying',
+  'ready',
+  'failed',
+];
+
+/**
+ * Maps the bridge's `download` payload defensively: an older binary has no field, and a partially
+ * released one must not crash the screen. Unknown states read as `idle`.
+ */
+export function downloadFromNativeStatus(value: unknown): EmbedDownload | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const shape = value as Record<string, unknown>;
+  const state = DOWNLOAD_STATES.includes(shape.state as EmbedDownloadState)
+    ? (shape.state as EmbedDownloadState)
+    : 'idle';
+  const number = (candidate: unknown): number =>
+    typeof candidate === 'number' && Number.isFinite(candidate) && candidate >= 0
+      ? candidate
+      : 0;
+  return {
+    state,
+    bytes: number(shape.bytes),
+    total: number(shape.total),
+    pct: Math.min(100, Math.floor(number(shape.pct))),
+    error: typeof shape.error === 'string' ? shape.error : null,
+  };
 }
 
 export interface ModelProbeOptions {
@@ -42,6 +81,7 @@ export interface ModelProbeOptions {
     modelBytes?: unknown;
     modelReadable?: unknown;
     modelSha256?: unknown;
+    download?: unknown;
   }>;
 }
 
@@ -56,39 +96,61 @@ export function useModelStatus({
     status: null,
     missing: false,
     sha256: null,
+    download: null,
   });
 
   useEffect(() => {
     let active = true;
-    probe()
-      .then(status => {
-        if (!active) {
-          return;
-        }
-        const facts = factsFromNativeStatus({
-          modelPresent: status.modelPresent === true,
-          modelPath:
-            typeof status.modelPath === 'string' ? status.modelPath : '',
-          modelBytes:
-            typeof status.modelBytes === 'number' ? status.modelBytes : undefined,
-          modelReadable:
-            typeof status.modelReadable === 'boolean'
-              ? status.modelReadable
-              : undefined,
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = () => {
+      probe()
+        .then(status => {
+          if (!active) {
+            return;
+          }
+          const facts = factsFromNativeStatus({
+            modelPresent: status.modelPresent === true,
+            modelPath:
+              typeof status.modelPath === 'string' ? status.modelPath : '',
+            modelBytes:
+              typeof status.modelBytes === 'number'
+                ? status.modelBytes
+                : undefined,
+            modelReadable:
+              typeof status.modelReadable === 'boolean'
+                ? status.modelReadable
+                : undefined,
+          });
+          const model = modelStatusFromFacts(facts);
+          const download = downloadFromNativeStatus(status.download);
+          setState({
+            status: model,
+            missing: model.kind === 'missing',
+            sha256:
+              typeof status.modelSha256 === 'string'
+                ? status.modelSha256
+                : null,
+            download,
+          });
+          // Card MODELDL: cheap re-check while bytes are moving; no polling once ready/failed.
+          if (
+            download?.state === 'downloading' ||
+            download?.state === 'verifying'
+          ) {
+            timer = setTimeout(poll, 1_000);
+          }
+        })
+        .catch(() => {
+          // Keep the previous state: an unavailable bridge is not a missing bundle.
         });
-        const model = modelStatusFromFacts(facts);
-        setState({
-          status: model,
-          missing: model.kind === 'missing',
-          sha256:
-            typeof status.modelSha256 === 'string' ? status.modelSha256 : null,
-        });
-      })
-      .catch(() => {
-        // Keep the previous state: an unavailable bridge is not a missing bundle.
-      });
+    };
+    poll();
     return () => {
       active = false;
+      if (timer !== null) {
+        clearTimeout(timer);
+      }
     };
     // `probe` is stable in the app (the module function); tests pass a new one per render on purpose.
   }, [probe]);
@@ -108,6 +170,12 @@ export interface ScanGuidanceInput {
    */
   tick?: {heroId: string | null; at: number} | null;
   modelMissing?: boolean;
+  /** Card MODELDL: in-app download progress shown in the model note. */
+  modelDownload?: {
+    state: string;
+    pct?: number;
+    error?: string | null;
+  } | null;
   /** Ticker period; 1000 ms is enough to cross `QUIET_GUIDANCE_MS` on time. */
   intervalMs?: number;
   /** Injectable clock (tests advance Jest's fake `Date.now` instead). */
@@ -121,6 +189,7 @@ export function useScanGuidance({
   activity,
   tick = null,
   modelMissing = false,
+  modelDownload = null,
   intervalMs = 1_000,
   now = Date.now,
 }: ScanGuidanceInput): ScanGuidance | null {
@@ -152,6 +221,7 @@ export function useScanGuidance({
     hasPermission,
     canRequestPermission,
     modelMissing,
+    modelDownload,
     quietMs: quietFor(
       {
         ...activity,

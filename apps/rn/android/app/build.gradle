@@ -155,6 +155,9 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Card MODELDL: JVM tests for the resumable model-download state machine (fake transport).
+    testImplementation("junit:junit:4.13.2")
 }
 
 /*

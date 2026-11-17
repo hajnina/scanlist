@@ -1,0 +1,35 @@
+pluginManagement {
+    /*
+     * ScanList bootstrap (card A1, see ../BUILD.md hack 6).
+     *
+     * node_modules is gitignored (AGENTS.md) and React Native's autolinking + the included
+     * :react-native Gradle plugin live in node_modules, while the lead-owned CI workflow
+     * (.github/workflows/pr.yml, `rn` job) builds this directory with a bare
+     * `./gradlew --no-daemon assembleDebug` and has no npm step. Install the JS dependencies
+     * here when they are missing — once per checkout, on the laptop, in CI and in a new
+     * worktree alike. Idempotent: skipped as soon as node_modules/react-native exists.
+     */
+    def scanlistAppRoot = new File(settingsDir, '..').canonicalFile
+    if (!new File(scanlistAppRoot, 'node_modules/react-native').exists()) {
+        println "[scanlist] node_modules missing in ${scanlistAppRoot} — running 'npm install' (one-off)"
+        def npm = System.getProperty('os.name').toLowerCase().contains('windows') ? 'npm.cmd' : 'npm'
+        def process = new ProcessBuilder(npm, 'install', '--no-audit', '--no-fund')
+                .directory(scanlistAppRoot)
+                .inheritIO()
+                .start()
+        def exit = process.waitFor()
+        if (exit != 0) {
+            throw new GradleException("npm install failed (exit ${exit}) in ${scanlistAppRoot}")
+        }
+    }
+
+    includeBuild("../node_modules/@react-native/gradle-plugin")
+}
+
+plugins { id("com.facebook.react.settings") }
+
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+
+rootProject.name = 'dev.hajnina.scanlist.rn'
+include ':app'
+includeBuild('../node_modules/@react-native/gradle-plugin')

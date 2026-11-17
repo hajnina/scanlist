@@ -232,43 +232,7 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          script: |
-            set -e
-            apk=apps/rn/android/app/build/outputs/apk/release/app-release.apk
-            adb install -r "$apk"
-            adb shell pm grant dev.hajnina.scanlist.rn android.permission.CAMERA || true
-            adb logcat -c
-            adb shell am start -W -n dev.hajnina.scanlist.rn/.MainActivity | tee launch.txt
-            grep -q "Status: ok" launch.txt
-            sleep 15
-            pid=$(adb shell pidof dev.hajnina.scanlist.rn)
-            test -n "$pid" || { echo "::error::app process not running after launch"; exit 1; }
-            adb exec-out screencap -p > screen-1-lists.png
-            if adb logcat -d | grep -q "FATAL EXCEPTION"; then
-              echo "::error::app crashed on launch"; adb logcat -d | tail -150; exit 1; fi
-            tap_text() {
-              adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || return 1
-              adb pull /sdcard/window.xml . >/dev/null 2>&1 || return 1
-              python3 - "$1" <<'PY'
-            import re, subprocess, sys, xml.etree.ElementTree as ET
-            needle = sys.argv[1].lower()
-            root = ET.parse('window.xml').getroot()
-            for node in root.iter('node'):
-                label = ((node.get('text') or '') + ' ' + (node.get('content-desc') or '')).strip()
-                if needle in label.lower():
-                    x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
-                    subprocess.run(['adb', 'shell', 'input', 'tap',
-                                    str((x1 + x2) // 2), str((y1 + y2) // 2)], check=True)
-                    print('tapped:', label)
-                    sys.exit(0)
-            sys.exit(1)
-            PY
-            }
-            tap_text "Settings" && { sleep 3; adb exec-out screencap -p > screen-2-settings.png; adb shell input keyevent 4; sleep 3; } || true
-            tap_text "Magic scan" && { sleep 4; adb exec-out screencap -p > screen-3-scan.png; adb shell input keyevent 4; sleep 2; } || true
-            if adb logcat -d | grep -q "FATAL EXCEPTION"; then
-              echo "::error::app crashed during navigation"; adb logcat -d | tail -150; exit 1; fi
-            echo "SMOKE PASS: pid=$pid"
+          script: bash scripts/rn-smoke.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:

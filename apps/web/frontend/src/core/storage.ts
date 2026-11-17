@@ -13,6 +13,10 @@
  * Corruption policy (card C2): never white-screen. A bad index or a bad document is dropped,
  * its raw text is kept under the corrupt key, and the caller is told to fall back to the import
  * screen with an error toast.
+ *
+ * Orphan policy (C2 follow-up): the index is the only route to a document, so documents the index
+ * does not reference are deleted on load (`sweepOrphanDocs` via `readIndex`) — except when the
+ * index itself was dropped, where deleting them would destroy recoverable data.
  */
 
 import { parseList } from "@scanlist/ts-core";
@@ -25,6 +29,13 @@ export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
+  /**
+   * Key enumeration, exactly the Web Storage shape (`Storage.length` / `Storage.key(i)`), and
+   * optional because a three-method stand-in is still a valid store. Without it the orphan sweep
+   * (below) declines to guess which keys exist rather than skipping silently by accident.
+   */
+  readonly length?: number;
+  key?(index: number): string | null;
 }
 
 export const STORAGE_KEYS = {
@@ -51,6 +62,16 @@ export interface ReadIndexResult {
   index: LibraryIndex;
   /** Non-null when something had to be dropped; show it as an error toast. */
   error: string | null;
+}
+
+/** Internal: the index plus whether its emptiness is evidence about the stored documents. */
+interface IndexRead extends ReadIndexResult {
+  /**
+   * False when the index itself was lost/unreadable. Then "zero entries" says nothing about the
+   * documents on disk, so the orphan sweep must not treat every document as garbage — the raw
+   * index is still in the quarantine key, so those documents remain recoverable by hand.
+   */
+  trustworthy: boolean;
 }
 
 export type ReadDocResult =
@@ -106,14 +127,18 @@ function isEntry(value: unknown): value is ListIndexEntry {
 }
 
 /** Read + validate the index. Always returns a usable index; `error` says what was dropped. */
-export function readIndex(storage: StorageLike): ReadIndexResult {
+function readIndexOnly(storage: StorageLike): IndexRead {
   let raw: string | null;
   try {
     raw = storage.getItem(STORAGE_KEYS.index);
   } catch {
-    return { index: emptyIndex(), error: "Could not read saved lists from this browser." };
+    return {
+      index: emptyIndex(),
+      error: "Could not read saved lists from this browser.",
+      trustworthy: false,
+    };
   }
-  if (raw === null) return { index: emptyIndex(), error: null };
+  if (raw === null) return { index: emptyIndex(), error: null, trustworthy: true };
 
   let parsed: unknown;
   try {
@@ -124,6 +149,7 @@ export function readIndex(storage: StorageLike): ReadIndexResult {
     return {
       index: emptyIndex(),
       error: "Saved list index was not valid JSON — it was moved aside and the import screen is shown.",
+      trustworthy: false,
     };
   }
 
@@ -139,6 +165,7 @@ export function readIndex(storage: StorageLike): ReadIndexResult {
     return {
       index: emptyIndex(),
       error: "Saved list index had an unknown shape — it was moved aside and the import screen is shown.",
+      trustworthy: false,
     };
   }
 
@@ -151,9 +178,69 @@ export function readIndex(storage: StorageLike): ReadIndexResult {
     return {
       index,
       error: `${dropped} saved list ${dropped === 1 ? "entry was" : "entries were"} corrupt and removed from the index.`,
+      trustworthy: true,
     };
   }
-  return { index: { version: 1, lists }, error: null };
+  return { index: { version: 1, lists }, error: null, trustworthy: true };
+}
+
+/**
+ * Read the index, then sweep documents that no index entry references (C2 follow-up: the review
+ * found orphaned documents accumulating until the quota filled up).
+ *
+ * Where orphans come from: an import writes the document first and the index second, so a failed
+ * second write (quota, private mode, a crash or a closed tab between the two) leaves a document
+ * nothing points at; dropping a corrupt index entry or removing a corrupt document does the same.
+ * Nothing else can reach such a document — the index is the only way in — so it is pure waste, and
+ * at 5 MiB per list a handful of them can evict live lists.
+ *
+ * Trigger: storage load (here), not list deletion. There is no delete-list UI yet, the index is
+ * rewritten on every tick, and every orphan source above is only observable once the index has been
+ * read — one call site covers all of them. The cost is one key enumeration per page load.
+ *
+ * Trigger is `readIndex` and not `resolveStorage`: the sweep needs the index to know what is live,
+ * and `resolveStorage` runs before any list is read. It is deliberately *not* run when the index
+ * itself was dropped (see `IndexRead.trustworthy`).
+ */
+export function sweepOrphanDocs(storage: StorageLike, index: LibraryIndex): string[] {
+  const live = new Set<string>();
+  for (const entry of index.lists) live.add(docKey(entry.id));
+
+  const length = storage.length;
+  const keyAt = storage.key;
+  if (typeof length !== "number" || typeof keyAt !== "function") return [];
+
+  // Snapshot the doomed keys first: removing keys while walking a real Storage shifts every later
+  // index. Enumeration order is unspecified by Web Storage, so nothing here depends on it.
+  const doomed: string[] = [];
+  for (let position = 0; position < length; position += 1) {
+    let key: string | null;
+    try {
+      key = keyAt.call(storage, position);
+    } catch {
+      return []; // storage became unreadable mid-scan: leave it for the next load
+    }
+    if (key === null || !key.startsWith(STORAGE_KEYS.docPrefix) || live.has(key)) continue;
+    doomed.push(key);
+  }
+
+  const removed: string[] = [];
+  for (const key of doomed) {
+    try {
+      storage.removeItem(key);
+      removed.push(key);
+    } catch {
+      // quota/blocked storage: the document stays, and the next load tries again
+    }
+  }
+  return removed;
+}
+
+/** `readIndex` + the orphan sweep above: the single entry point the app uses on startup. */
+export function readIndex(storage: StorageLike): ReadIndexResult {
+  const result = readIndexOnly(storage);
+  if (result.trustworthy) sweepOrphanDocs(storage, result.index);
+  return { index: result.index, error: result.error };
 }
 
 /** Write the index; false when the browser refused (quota / private mode). */
@@ -213,6 +300,11 @@ export function memoryStorage(initial: Record<string, string> = {}): StorageLike
     removeItem: (key) => {
       data.delete(key);
     },
+    // Enumeration so the orphan sweep works here exactly as it does on a real localStorage.
+    get length() {
+      return data.size;
+    },
+    key: (index) => Array.from(data.keys())[index] ?? null,
   };
 }
 

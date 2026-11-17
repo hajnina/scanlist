@@ -19,6 +19,7 @@ import {
   memoryStorage,
   readDoc,
   readIndex,
+  sweepOrphanDocs,
   writeDoc,
   writeIndex,
 } from "../src/core/storage";
@@ -164,6 +165,101 @@ describe("documents — the persisted format is the export document", () => {
     expect(isValidId("../x")).toBe(false);
     expect(isValidId("")).toBe(false);
     expect(readDoc(memoryStorage(), "../../x").ok).toBe(false);
+  });
+});
+
+describe("orphaned documents — the load-time sweep (C2 follow-up)", () => {
+  /** A library of `ids`, each with its stored document; returns the storage. */
+  function seeded(ids: string[]): StorageLike {
+    const storage = memoryStorage();
+    const list = parsedSample();
+    for (const id of ids) writeDoc(storage, id, list);
+    writeIndex(storage, { version: 1, lists: ids.map((id) => entry({ id })) });
+    return storage;
+  }
+
+  it("keeps every document a live list references", () => {
+    const storage = seeded(["list-1", "list-2"]);
+
+    expect(sweepOrphanDocs(storage, { version: 1, lists: [entry(), entry({ id: "list-2" })] })).toEqual(
+      [],
+    );
+    expect(storage.getItem(docKey("list-1"))).not.toBeNull();
+    expect(storage.getItem(docKey("list-2"))).not.toBeNull();
+
+    // The real entry point (readIndex) sweeps too, and leaves live documents alone.
+    expect(readIndex(storage)).toEqual({ index: { version: 1, lists: [entry(), entry({ id: "list-2" })] }, error: null });
+    expect(storage.getItem(docKey("list-1"))).not.toBeNull();
+  });
+
+  it("removes documents a list deletion orphaned", () => {
+    const storage = seeded(["list-1", "list-2"]);
+
+    // Delete list-2 the way the app would: rewrite the index without it (its document stays).
+    writeIndex(storage, { version: 1, lists: [entry()] });
+    const result = readIndex(storage);
+
+    expect(result.error).toBeNull();
+    expect(result.index.lists.map((list) => list.id)).toEqual(["list-1"]);
+    expect(storage.getItem(docKey("list-2"))).toBeNull();
+    expect(storage.getItem(docKey("list-1"))).not.toBeNull();
+  });
+
+  it("sweeps a document created but never attached (failed import)", () => {
+    const storage = seeded([]);
+    // Import order is writeDoc -> writeIndex; if the second write fails the document is stranded.
+    writeDoc(storage, "never-indexed", parsedSample());
+    expect(storage.getItem(docKey("never-indexed"))).not.toBeNull();
+
+    // Through the real entry point: a load finds an empty library and one unreferenced document.
+    expect(readIndex(storage)).toEqual({ index: emptyIndex(), error: null });
+    expect(storage.getItem(docKey("never-indexed"))).toBeNull();
+  });
+
+  it("is idempotent: a second sweep is a no-op", () => {
+    const storage = seeded(["list-1"]);
+    writeDoc(storage, "orphan", parsedSample());
+
+    const first = sweepOrphanDocs(storage, { version: 1, lists: [entry()] });
+    const second = sweepOrphanDocs(storage, { version: 1, lists: [entry()] });
+
+    expect(first).toEqual([docKey("orphan")]);
+    expect(second).toEqual([]);
+    expect(storage.getItem(docKey("list-1"))).not.toBeNull();
+  });
+
+  it("never touches anything that is not a list document", () => {
+    const storage = seeded(["list-1"]);
+    storage.setItem("someone.elses.key", "keep me");
+    storage.setItem(STORAGE_KEYS.corrupt, "forensics");
+
+    sweepOrphanDocs(storage, { version: 1, lists: [entry()] });
+
+    expect(storage.getItem("someone.elses.key")).toBe("keep me");
+    expect(storage.getItem(STORAGE_KEYS.corrupt)).toBe("forensics");
+    expect(storage.getItem(STORAGE_KEYS.index)).not.toBeNull();
+  });
+
+  it("does not sweep when the index itself was dropped (its emptiness proves nothing)", () => {
+    const storage = seeded(["list-1"]);
+    storage.setItem(STORAGE_KEYS.index, "{not json");
+
+    // A corrupt index is quarantined for manual recovery; deleting every document would make that
+    // recovery impossible, so readIndex skips the sweep on this path.
+    expect(readIndex(storage).error).toContain("not valid JSON");
+    expect(storage.getItem(docKey("list-1"))).not.toBeNull();
+  });
+
+  it("declines to sweep storage it cannot enumerate", () => {
+    const storage = seeded(["list-1"]);
+    const threeMethods: StorageLike = {
+      getItem: (key) => storage.getItem(key),
+      setItem: (key, value) => storage.setItem(key, value),
+      removeItem: (key) => storage.removeItem(key),
+    };
+
+    expect(sweepOrphanDocs(threeMethods, emptyIndex())).toEqual([]);
+    expect(storage.getItem(docKey("list-1"))).not.toBeNull();
   });
 });
 

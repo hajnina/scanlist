@@ -9,11 +9,11 @@ set -u
 cd "$(dirname "$0")/.." || exit 1
 
 echo "== open PRs =="
-gh pr list --state open --json number,title,headRefName,mergeable \
+timeout 60 gh pr list --state open --json number,title,headRefName,mergeable \
   --jq '.[] | "#\(.number) [\(.headRefName)] mergeable=\(.mergeable) \(.title)"' 2>/dev/null
-for n in $(gh pr list --state open --json number --jq '.[].number' 2>/dev/null); do
+for n in $(timeout 60 gh pr list --state open --json number --jq '.[].number' 2>/dev/null); do
   echo "-- checks #$n:"
-  gh pr checks "$n" 2>/dev/null | sed 's/^/   /'
+  timeout 60 gh pr checks "$n" 2>/dev/null | sed 's/^/   /'
 done
 
 echo "== lane branch tips (card/*) =="
@@ -48,10 +48,10 @@ rm -f "$RAW"
 echo "== closed-unmerged audit (lead incident lesson: a closeout isn't a closeout until mergedAt != null) =="
 # WAIVED: #34 closed-unmerged — superseded AND completed by re-land PR #37 (MERGED 13:13:41Z, mergedAt-verified).
 # The waiver is permanent: #34 can never merge; any NEW closed-unmerged PR still alarms.
-gh pr list --state closed --limit 10 --json number,mergedAt \
+timeout 60 gh pr list --state closed --limit 10 --json number,mergedAt \
   --jq '.[] | select(.mergedAt == null and .number != 34) | "ALARM: #\(.number) CLOSED-UNMERGED"' 2>/dev/null || true
 
 echo "== tag plague + release job =="
 echo "refs/tags/main count: $(git ls-remote --tags origin 'refs/tags/main' | wc -l) (0 = clean)"
 gh release list --limit 5 2>/dev/null | sed 's/^/   /'
-gh run list --workflow main.yml --limit 3 2>/dev/null | sed 's/^/   /'
+timeout 60 gh run list --workflow main.yml --limit 3 2>/dev/null | sed 's/^/   /'

@@ -4,9 +4,10 @@ package dev.hajnina.scanlist.kotlin.scan.sources
  * One visible OCR line: the words in reading order joined by single spaces, plus that line's own
  * confidence (never an average over the frame).
  *
- * ML Kit's bundled text recognition returns the tree but no per-line score (the `Text.Line` API has
- * no confidence); the seam therefore lets a reader carry one when it has it and otherwise uses
- * [ScanSignal.OCR_CONFIDENCE]. The scan screen only ever sees per-line values.
+ * The seam lets a reader carry the line's REAL score — ML Kit's `Text.Line.getConfidence()` is
+ * public in play-services-mlkit-text-recognition-common 19.1.0 (review-verified via javap) — and
+ * fall back to [ScanSignal.OCR_CONFIDENCE] only when a reader has nothing finite to offer. The
+ * scan screen only ever sees per-line values.
  */
 data class OcrLine(
     val text: String,
@@ -64,7 +65,7 @@ class OcrLineBatcher(
             val text = line.text.replace(WHITESPACE, " ").trim()
             if (text.length < minChars) continue
 
-            val normalised = if (text.length > maxChars) text.take(maxChars) else text
+            val normalised = if (text.length > maxChars) text.take(maxChars).trimEnd() else text
             val last = lastEmitMs[normalised]
             if (last != null && nowMs - last < repeatWindowMs) continue
 

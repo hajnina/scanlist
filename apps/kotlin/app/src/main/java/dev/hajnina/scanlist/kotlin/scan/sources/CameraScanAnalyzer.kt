@@ -80,10 +80,20 @@ class MlKitTextReader : TextReader {
     override fun read(image: InputImage, onResult: (List<OcrLine>) -> Unit) {
         client.process(image)
             .addOnSuccessListener { text ->
-                // One OcrLine per visible line, in ML Kit's reading order (blocks -> lines).
-                // Text recognition v2 exposes no per-line score, so each line carries the documented
-                // per-line default; nothing is ever averaged across lines (RANK.md §2.2).
-                onResult(text.textBlocks.flatMap { block -> block.lines.map { line -> OcrLine(line.text) } })
+                // One OcrLine per visible line, in ML Kit's reading order (blocks -> lines), with the
+                // line's real score (Text.Line.getConfidence() is public — see OcrLine's KDoc);
+                // nothing is ever averaged across lines (RANK.md §2.2).
+                onResult(
+                    text.textBlocks.flatMap { block ->
+                        block.lines.map { line ->
+                            val c = line.confidence
+                            OcrLine(
+                                line.text,
+                                c.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: ScanSignal.OCR_CONFIDENCE,
+                            )
+                        }
+                    },
+                )
             }
             .addOnFailureListener { onResult(emptyList()) }
     }

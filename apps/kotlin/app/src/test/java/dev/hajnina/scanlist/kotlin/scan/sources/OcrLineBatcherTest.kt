@@ -76,6 +76,38 @@ class OcrLineBatcherTest {
     }
 
     @Test
+    fun `a fresh line still emits while an older one is suppressed (cross-frame per-line emit)`() {
+        // B4-sync review nit (RN has this test; Kotlin was missing it): a mutant that aborts the
+        // whole frame when the FIRST line is still suppressed would pass the test above (both
+        // lines there expire together). Here only "Olive oil" is inside its window — "Basil" is
+        // new and MUST still be emitted (per-line semantics, not per-frame abort).
+        val batcher = OcrLineBatcher()
+        assertEquals(listOf("Olive oil"), batcher.batch(listOf(OcrLine("Olive oil")), nowMs = 0).map { it.text })
+        val next = batcher.batch(listOf(OcrLine("Olive oil"), OcrLine("Basil")), nowMs = 700)
+        assertEquals(listOf("Basil"), next.map { it.text })
+    }
+
+    @Test
+    fun `the 16 cap is applied AFTER filtering, not before (cap-after-filter)`() {
+        // B4-sync review nit: a mutant that takes the first 16 RAW lines and filters afterwards
+        // passes every existing test. With junk and repeats among the first 16, only the 5 real
+        // lines survive — a cap-before-filter mutant would wrongly truncate after 16 raws.
+        val batcher = OcrLineBatcher(repeatWindowMs = 10_000L)
+        val first = batcher.batch((1..12).map { OcrLine("real line $it") }, nowMs = 0)
+        assertEquals(12, first.size)
+        val junk = buildList {
+            add(OcrLine("x")) // below minChars
+            repeat(6) { add(OcrLine("real line 3")) } // repeats inside the window
+            repeat(8) { add(OcrLine("fresh line $it")) } // beyond a cap-before-filter's 16
+        }
+        val second = batcher.batch(junk, nowMs = 1_000)
+        assertEquals((0..7).map { "fresh line $it" }, second.map { it.text })
+    }
+
+    private fun buildList(block: MutableList<OcrLine>.() -> Unit): List<OcrLine> =
+        mutableListOf<OcrLine>().apply(block)
+
+    @Test
     fun `maxChars truncates a single line, not the frame`() {
         val batcher = OcrLineBatcher(maxChars = 5)
         val out = batcher.batch(listOf(OcrLine("abcdefghij"), OcrLine("klmno")), nowMs = 0)

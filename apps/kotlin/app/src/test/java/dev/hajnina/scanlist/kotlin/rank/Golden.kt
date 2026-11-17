@@ -80,6 +80,10 @@ object Golden {
         val expectedTop3: List<String>,
         val expectedScores: List<Double>,
         val expectedMargin: Double?,
+        /** Image queries only: the OFF product name recorded with the barcode (§6.3). */
+        val product: String?,
+        /** Image queries only: the EAN/UPC recorded with the frame. */
+        val barcode: String?,
     )
 
     private val root: JsonObject by lazy {
@@ -128,6 +132,8 @@ object Golden {
                 expectedTop3 = obj["expectedTop3"]!!.jsonArray.map { it.jsonPrimitive.content },
                 expectedScores = obj["expectedScores"]!!.jsonArray.map { it.jsonPrimitive.content.toDouble() },
                 expectedMargin = obj["expectedMargin"]?.jsonPrimitive?.content?.toDouble(),
+                product = obj["product"]?.jsonPrimitive?.content,
+                barcode = obj["barcode"]?.jsonPrimitive?.content,
             )
         }
     }

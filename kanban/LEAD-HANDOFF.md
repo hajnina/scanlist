@@ -22,19 +22,26 @@ newest are anchor-inserted near the TOP, use grep for headings).
   `bash scripts/lead-watchdog.sh`. Watchdog gh probes already have `timeout 60` (transient-hang hardening).
 - Disk quota: /tmp is a 16 GB tmpfs that hit EDQUOT twice — reviewers should clone into /dev/shm when tight.
 - ALWAYS `source scripts/android-env.sh` before gradle; `--tests` filter broken locally (run full suite for mutations).
+- `gh pr edit` is BROKEN on this gh version (projects-classic GraphQL deprecation) — update PR bodies via REST:
+  `gh api repos/hajnina/scanlist/pulls/<n> -X PATCH -f body="$(cat body.md)"`.
+- Martin merges his own lanes WITHOUT reviews sometimes (mergedBy hajnina, #42/#43) — accepted; adversarial
+  review then runs POST-merge and REQUEST-CHANGES becomes a fix-PR on main (that's how #42's inert ABI cut was caught).
 
-## Board state (2026-11-17 ~15:45Z)
+## Board state (2026-11-17 ~17:10Z)
 - **33 of 34 done.** doing: empty · review: empty · todo: **B0** (device-parked WITH MARTIN: no phone on adb —
   aarch64 laptop vs x86_64 adb binary; plus model-license ruling + fleet timebox preference).
 - X2 MERGED (PR #41, 15:13:09Z): `bench/COMPARISON.md` — verdict **Kotlin**, provisional on B0; strongest
   counter-argument **web, not RN**. Builder self-check 150 number assertions; reviewer re-ran 150/150.
-- Suites on main: Kotlin 39 classes / 329 · RN 31 suites / 342 · web 29 files / 291 · smoke 21/21 ·
-  ts-core 150 · server 130+1skip. All PRs #40/#39/#36/#41 mergedAt-verified.
+- HARDENING TAIL beyond the board: A6-followup merged (PR #44, 16:56:00Z, APPROVE on aaaa4b0) · apk-size merged
+  (PR #45, 16:39:55Z, arm64-only verified from the CI artifact: 113.5 MiB, arm64-v8a ONLY — retro card
+  kanban/done/apk-size.md) · model-download-fix = **PR #46 open, re-verify in flight**.
+- Suites on main: Kotlin 39 classes / 329 · RN **33 suites / 381** (post-#44) · web 29 files / 291 · smoke 21/21 ·
+  ts-core 150 · server 130+1skip.
 
 ## ACTIVE LANES
 | Lane | Session | State | Next action |
 |---|---|---|---|
-| **A6-followup builder** (lead-A child) | ses_e15d59e01ffetlSRYvfW4ZbdsC | Mounting SettingsScreen + startup backend application + haptics setting read; worktree ../scanlist-wt/A6FU, branch card/A6-followup | On PR open: dispatch fresh reviewer (clone into /dev/shm if /tmp tight). On APPROVE*: merge (mergedAt-verify) → evidence on done/A6.md → clean worktree/branch. NO card move |
+| **#46 model-download-fix re-verify** (lead-A child) | ses_e15b99e8affeea5X6HbcOuRY6r | Reviewer re-verifying the 6-item fix list (head 7493c25, rn CI pass 5m26s, MERGEABLE) | On APPROVE*: `gh pr merge 46 --merge` → pull → VERIFY mergedAt → retro card `kanban/done/model-download.md` (lane never had a card; reconstruct from PR bodies + review evidence incl. the pre-verdict-merge note) → clean `../scanlist-wt/MODELDL` + branch `card/model-download-fix` → lead-log → push. On REQUEST-CHANGES: fix round to builder ses_e15ab4fdaffeG4J0W5xDjJnh2Y |
 | **Heartbeat** | (background sleep) | RE-ARM after restart | Re-arm, then `bash scripts/lead-watchdog.sh` |
 
 ## QUEUED / PARKED
@@ -57,6 +64,13 @@ Sync rounds: no card move; evidence on parent done card.
 - Tips state file: /tmp/opencode/watchdog-tips.txt.
 
 ## Recent history (one line each — full detail in lead-log)
+- A6-followup merged (PR #44): Settings mounted + persisted backend applied at startup + haptics wired; fix round
+  made "no re-run on remount" TRUE (lastRunKey → controller — was a per-mount ref, would have re-run the 484 MB
+  self-test) + hardware BackHandler. 33 suites / 381.
+- apk-size merged (PR #45): the REAL lever `reactNativeArchitectures=arm64-v8a` (#42's build.gradle hunk was inert —
+  RN plugin re-unions ABIs); APK 290.7 → 113.5 MiB, arm64-only verified from the artifact. Retro card done/apk-size.md.
+- Martin merged his own lanes (#42/#43) pre-review — reviews ran post-merge and caught the inert #42 + #43's
+  cold-start race + 4 risks → fix PRs #45/#46.
 - X2 merged (PR #41): verdict Kotlin (provisional on B0), counter-argument web; one provenance blocker caught
   (web column mixed X1 branch-point timings with current bundle size) — fixed, 150/0 sanity re-run.
 - A6 merged (PR #36) after two REQUEST-CHANGES rounds — round 2 blocker was real: quiet hint could never render

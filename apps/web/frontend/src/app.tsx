@@ -27,6 +27,7 @@ import {
   writeIndex,
 } from "./core/storage";
 import type { LibraryIndex, ListIndexEntry, ReadIndexResult } from "./core/storage";
+import { ScanScreen } from "./scan/ui/ScanScreen";
 import { HomeScreen } from "./ui/HomeScreen";
 import { ListScreen } from "./ui/ListScreen";
 import { FilledButton, TextButton } from "./ui/md";
@@ -48,6 +49,7 @@ function Workspace() {
   const [library, setLibrary] = useState<ReadIndexResult>(() => readIndex(resolved.storage));
   const [openId, setOpenId] = useState<string | null>(null);
   const [list, setList] = useState<ScanList | null>(null);
+  const [showingScan, setShowingScan] = useState(false);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [toasts, setToasts] = useState<ToastSpec[]>([]);
   const nextToastId = useRef(0);
@@ -98,6 +100,7 @@ function Workspace() {
     setImportErrors([]);
     setList(imported);
     setOpenId(id);
+    setShowingScan(false);
 
     if (savedDoc && savedIndex) {
       pushToast("success", `Imported “${imported.title}”`);
@@ -107,6 +110,7 @@ function Workspace() {
   }
 
   function openList(id: string): void {
+    setShowingScan(false);
     const result = readDoc(resolved.storage, id);
     if (!result.ok) {
       // Corrupt document: fall back to the import screen (library) with an error toast.
@@ -166,17 +170,62 @@ function Workspace() {
     pushToast("success", `Exported ${exportFileName(list.title)}`);
   }
 
+  /**
+   * The magic scan screen (card C5) ranks one open list. The Scan nav entry lives on the lists
+   * screen, so it opens the most recently updated list; with no lists it lands on the scan screen's
+   * honest "import a list first" state instead of a dead button.
+   */
+  function openScan(): void {
+    const first = library.index.lists[0];
+    setImportErrors([]);
+    setShowingScan(true);
+    if (first === undefined) {
+      setOpenId(null);
+      setList(null);
+      return;
+    }
+    openList(first.id);
+    // openList clears scan mode on its own path; this entry point puts it back.
+    setShowingScan(true);
+  }
+
   function goHome(): void {
     setOpenId(null);
     setList(null);
     setImportErrors([]);
+    setShowingScan(false);
   }
 
   const showingList = openId !== null && list !== null;
 
   return (
     <>
-      {showingList ? (
+      {/*
+       * Card C5 (disclosed C2 nit): degraded storage was only an 8 s toast, so a later tick *looked*
+       * saved while the list was in memory only. A persistent banner stays for the whole session.
+       */}
+      {resolved.warning !== null && (
+        <div
+          class="degraded-banner"
+          role="status"
+          style={{
+            position: "sticky",
+            top: "0",
+            zIndex: "50",
+            padding: "8px 16px",
+            background: "var(--md-sys-color-error-container)",
+            color: "var(--md-sys-color-on-error-container)",
+            fontSize: "12px",
+            fontWeight: "700",
+            textAlign: "center",
+          }}
+        >
+          Storage off — changes work for this session but will not survive a reload.
+        </div>
+      )}
+      {showingScan ? (
+        <ScanScreen list={list} onBack={goHome} onToggle={toggleItem} />
+      ) : showingList ? (
         <ListScreen list={list} onBack={goHome} onToggle={toggleItem} onExport={exportCurrent} />
       ) : (
         <HomeScreen
@@ -186,6 +235,7 @@ function Workspace() {
           onOutcome={applyOutcome}
           onOpen={openList}
           onDemo={() => applyOutcome(importFromText(demoListText, "demo"))}
+          onScan={openScan}
         />
       )}
       <ToastStack toasts={toasts} onDismiss={dismissToast} />

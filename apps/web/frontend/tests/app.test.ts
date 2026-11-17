@@ -132,7 +132,7 @@ afterEach(() => {
 });
 
 describe("fresh start", () => {
-  it("shows the import screen with an empty library and the disabled C5 scan placeholder", async () => {
+  it("shows the import screen and an enabled Scan entry that asks for a list first", async () => {
     mount();
     await flush();
 
@@ -140,10 +140,18 @@ describe("fresh start", () => {
     expect(screenText()).toContain("SAVED LISTS");
     expect(screenText()).toContain("Nothing imported yet");
 
-    // Card C5 owns ranking; the nav shape is fixed now but the entry must not be clickable.
+    // Card C5 replaced the placeholder with the real entry: with no lists it is honest, not dead.
     const scan = find("button.nav-item", "Scan") as HTMLButtonElement;
-    expect(scan.disabled).toBe(true);
-    expect(scan.textContent).toContain("C5");
+    expect(scan.disabled).toBe(false);
+    expect(scan.textContent).not.toContain("C5");
+
+    scan.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    expect(screenText()).toContain("NO LIST OPEN");
+
+    click("md-filled-button", "Back to lists");
+    await flush();
+    expect(screenText()).toContain("IMPORT A LIST");
     expect(localStorage.getItem(STORAGE_KEYS.index)).toBeNull();
   });
 });

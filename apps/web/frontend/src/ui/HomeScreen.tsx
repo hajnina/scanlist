@@ -19,6 +19,8 @@ export interface HomeScreenProps {
   onOutcome: (outcome: ImportOutcome) => void;
   onOpen: (id: string) => void;
   onDemo: () => void;
+  /** The magic scan screen (card C5): ranks the most recently updated list. */
+  onScan: () => void;
 }
 
 function formatWhen(iso: string): string {
@@ -101,17 +103,14 @@ export function HomeScreen(props: HomeScreenProps) {
         <button type="button" class="nav-item nav-active" aria-current="page">
           <span aria-hidden="true">☰</span> Lists
         </button>
-        {/*
-         * Placeholder, deliberately disabled: the magic scan screen is card C5. It is rendered
-         * (not hidden) so the navigation shape is fixed now and the route can be swapped in later.
-         */}
+        {/* The magic scan screen (card C5): ranks the most recently updated list. */}
         <button
           type="button"
           class="nav-item"
-          disabled
-          title="The magic scan screen lands in card C5"
+          onClick={props.onScan}
+          title="Rank a list against what the camera sees"
         >
-          <span aria-hidden="true">◎</span> Scan <span class="nav-soon">C5</span>
+          <span aria-hidden="true">◎</span> Scan
         </button>
       </nav>
     </div>

@@ -24,3 +24,29 @@ export interface ScanSource {
   start(onSignal: (signal: ScanSignal) => void): Promise<void>;
   stop(): Promise<void>;
 }
+
+/**
+ * Card A4 — one sampled camera frame.
+ *
+ * The camera is sampled at ~2.5 fps (see ./captureLoop); the same capture feeds all three sources
+ * so barcode, OCR and image embedding see the exact same picture:
+ *  - `filePath` is the JPEG on disk, which is what ML Kit's static-image APIs read
+ *    (`processImageBarcodeScanning` / `processImageTextRecognition` accept a path or `file://` URI);
+ *  - `jpegBase64` is the same JPEG as bytes, for the embedder / backend (`Photo.getFileDataAsync`).
+ */
+export interface CameraFrame {
+  /** JPEG bytes, base64, no `data:` prefix. */
+  jpegBase64: string;
+  /** Filesystem path (no scheme) of the same JPEG, e.g. `/data/user/0/…/cache/photo-1.jpg`. */
+  filePath: string;
+  width: number;
+  height: number;
+  /** `Date.now()` at capture, ms. */
+  capturedAt: number;
+}
+
+/** Fan-out of captured frames to the sources attached to one camera session. */
+export interface FrameFeed {
+  /** Returns an unsubscribe function; safe to call more than once. */
+  subscribe(listener: (frame: CameraFrame) => void): () => void;
+}

@@ -208,10 +208,14 @@ else:
 
 ### 6.2 Evidence gate: margin M and no-match floor T
 
-An item is only worth a hero if it is **clearly ahead of the runner-up** (margin) *and* **plausibly similar to
-something on the list** (floor). A plain absolute threshold is not enough (EmbeddingGemma 2's cosine floor between
-unrelated grocery concepts is 0.65–0.79, `fixtures/PREFIX_AB.md` §5.5) and a plain margin is not enough either
-(a list of near-identical items can produce a decisive winner for a query that matches nothing).
+An item is only worth a hero if it is **decisive against the runner-up** (margin) *and* **plausibly similar to
+something on the list** (floor). Decisive is what §6.1 makes it: the hero is the candidate that *retains the
+hysteresis crown* — the sorted top-1, or the previous hero while it is within `0.02` of the top-1 — so the margin is
+checked on the sorted top pair, not "must be clearly ahead" (a hero inside the `0.02` band can be slightly *behind*
+and still be highlighted; §10's image tick shows `x` 0.850 behind `y` 0.855 with a hero). A plain absolute threshold
+is not enough (EmbeddingGemma 2's cosine floor between unrelated grocery concepts is 0.65–0.79,
+`fixtures/PREFIX_AB.md` §5.5) and a plain margin is not enough either (a list of near-identical items can produce a
+decisive winner for a query that matches nothing).
 
 `M` and `T` depend on which source drove the winner — a text query (`textCos`) or a camera frame (`imageCos`),
 per §3. Two gates exist because image margins are structurally much smaller than text margins:
@@ -264,8 +268,14 @@ from the image score can separate it, so v1 adds a guard that brings in **indepe
 > ranked order with **no hero** (`topId = null`).
 
 This reuses the predicate that already grants the +0.15 barcode boost (§3), so a resolved OFF name both confirms
-and promotes the item: `honey.jpg` ranks Honey at 0.752869; with the OFF name `"Honey"` it becomes 0.902869 and is
-highlighted, while `cheese.jpg` with the OFF name `"Cheese"` highlights Cheese instead of Greek yoghurt.
+and promotes the item: `honey.jpg` ranks Honey at 0.752869 (no hero); with its confirmed OFF name `"Honey"` it
+becomes 0.902869 and is highlighted. **Fixture fact:** of the 13 image queries in `fixtures/golden.json` only
+`honey.jpg` recorded an OFF name that exactly matches an item name/alias (`"Honey"`); the other 12 recorded a
+name that does not (e.g. `imilk` recorded `"Mléko polotučné s obsahem  1,5% tuku"` against item `"Milk"`), because
+`barcodeMatch` is exact after NFC + full case folding — so **expect no hero on image-only ticks unless the OFF name
+exactly matches an item's name or alias**. (Hypothetically, `cheese.jpg` with an OFF name of `"Cheese"` would
+highlight Cheese at 0.820091 instead of Greek yoghurt at 0.699416; the fixture records
+`"Fromage Blanc Nature"`, which matches nothing, so that is a property of the rule, not a measured pass.)
 
 **Why this option (evaluated against the three candidates in card S10):**
 
@@ -388,7 +398,7 @@ def rank(items, queries, prev, barcode_name):
             highlight = False                       # accept-list guard (§6.3)
 
     top = hero if highlight else None
-    rest = [e for e in scored if top is not None and e["id"] != top["id"]]
+    rest = [e for e in scored if top is None or e["id"] != top["id"]]   # no hero ⇒ full ranked order
     done = [{"id": it.id, "raw": None, "smoothed": None, "done": True}
             for it in items if it.done]                  # already in order
     entries = ([top] if top else []) + rest + done

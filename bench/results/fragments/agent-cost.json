@@ -1,0 +1,230 @@
+{
+  "generatedAt": "2026-11-17T06:14:21.176525+00:00",
+  "method": "bench/scripts/agent-cost.py \u2014 opencode session ledger (tokens/cost, attributed by card id in the session title) + committed kanban/lead-log evidence (merged PRs, REQUEST-CHANGES verdicts, sync rounds, infra deaths).",
+  "honestLimits": [
+    "tokens measure agent output, not human wall-clock; cost 0.00 on the free tier makes tokens the only comparable unit",
+    "sessions without a card id in the title are reported as `unattributed` \u2014 project-wide cost, not one track's",
+    "the ledger is a lower bound: it only holds sessions this machine still has (see sessions.coverage)",
+    "lead-log counts are regex over prose; the log is the evidence, the numbers are an index into it"
+  ],
+  "sessions": {
+    "status": "measured",
+    "source": "/home/martin/.local/share/opencode/opencode.db",
+    "coverage": {
+      "sessions": 69,
+      "from": "2026-11-16T18:58:23.949000+00:00",
+      "to": "2026-11-17T06:11:34.452000+00:00"
+    },
+    "tracks": {
+      "unattributed": {
+        "sessions": 7,
+        "tokensOutput": 259261,
+        "tokensInput": 3914650,
+        "cacheRead": 71693024,
+        "cost": 0.0,
+        "cards": []
+      },
+      "shared": {
+        "sessions": 23,
+        "tokensOutput": 418830,
+        "tokensInput": 3230666,
+        "cacheRead": 67135808,
+        "cost": 0.0,
+        "cards": [
+          "S1",
+          "S10",
+          "S2",
+          "S3",
+          "S4",
+          "S5",
+          "S6",
+          "S7",
+          "S8",
+          "S9"
+        ]
+      },
+      "rn": {
+        "sessions": 11,
+        "tokensOutput": 259696,
+        "tokensInput": 1900894,
+        "cacheRead": 64458632,
+        "cost": 0.0,
+        "cards": [
+          "A1",
+          "A2",
+          "A3",
+          "A4",
+          "A5"
+        ]
+      },
+      "web": {
+        "sessions": 16,
+        "tokensOutput": 275368,
+        "tokensInput": 1618487,
+        "cacheRead": 44044224,
+        "cost": 0.0,
+        "cards": [
+          "C1",
+          "C2",
+          "C3",
+          "C4",
+          "C6",
+          "C7",
+          "C8"
+        ]
+      },
+      "kotlin": {
+        "sessions": 11,
+        "tokensOutput": 260743,
+        "tokensInput": 2111812,
+        "cacheRead": 46722780,
+        "cost": 0.0,
+        "cards": [
+          "B1",
+          "B2",
+          "B3",
+          "B4",
+          "B6"
+        ]
+      },
+      "compare": {
+        "sessions": 1,
+        "tokensOutput": 47735,
+        "tokensInput": 305324,
+        "cacheRead": 10404864,
+        "cost": 0.0,
+        "cards": [
+          "X1"
+        ]
+      }
+    },
+    "unit": "tokens_output is the comparable unit (free tier => cost 0.00)"
+  },
+  "cards": {
+    "rn": {
+      "total": 6,
+      "done": 4,
+      "doing": 0,
+      "todo": 2,
+      "syncRounds": 0,
+      "ids": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6"
+      ]
+    },
+    "kotlin": {
+      "total": 8,
+      "done": 4,
+      "doing": 1,
+      "todo": 3,
+      "syncRounds": 0,
+      "ids": [
+        "B1",
+        "B2",
+        "B3",
+        "B4",
+        "B6",
+        "B0",
+        "B5",
+        "B7"
+      ]
+    },
+    "web": {
+      "total": 8,
+      "done": 5,
+      "doing": 1,
+      "todo": 2,
+      "syncRounds": 0,
+      "ids": [
+        "C1",
+        "C2",
+        "C3",
+        "C6",
+        "C8",
+        "C4",
+        "C5",
+        "C7"
+      ]
+    },
+    "shared": {
+      "total": 10,
+      "done": 10,
+      "doing": 0,
+      "todo": 0,
+      "syncRounds": 0,
+      "ids": [
+        "S1",
+        "S10",
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "S7",
+        "S8",
+        "S9"
+      ]
+    },
+    "compare": {
+      "total": 2,
+      "done": 0,
+      "doing": 1,
+      "todo": 1,
+      "syncRounds": 0,
+      "ids": [
+        "X1",
+        "X2"
+      ]
+    }
+  },
+  "leadLog": {
+    "status": "measured",
+    "mergedPrs": {
+      "rn": 4,
+      "kotlin": 5,
+      "web": 4,
+      "shared": 5
+    },
+    "requestChangesVerdicts": {
+      "rn": 3,
+      "kotlin": 1,
+      "shared": 5,
+      "web": 1
+    },
+    "infraDeaths": {
+      "web": 8,
+      "shared": 3,
+      "compare": 1,
+      "rn": 1
+    },
+    "infraDeathLines": [
+      "- C2 delivered (fresh session found the ENTIRE frontend uncommitted on disk \u2014 the killed sessions built it but never committed; crash discipline gap, now mitigated by checkpoint-of",
+      "## 2026-11-17 \u2014 INFRASTRUCTURE OUTAGE: 5 lanes died repeatedly, all restarted; S8-sync verdict REQUEST-CHANGES (1-line fix)",
+      "- **Outage event**: all five active lanes died at least once on network-class errors (\"the phone has not confirmed its public IP\", ECONNRESET, response-header timeouts) \u2014 C2 died 4",
+      "- PR #12 (C8) merged on APPROVE-WITH-NITS: parity test proven genuine (imports the spec's checker; mutation-killed), 108/108, cache/backoff semantics verified against OFF.md includ",
+      "- Five agents (S3, C8, C6, S5 builders + A1 reviewer) died on the free-usage limit mid-card; all five restarted with re-orientation prompts (verify-what-exists, never redo download"
+    ]
+  },
+  "normalised": {
+    "shared": {
+      "tokensOutputPerMergedPr": 83766,
+      "mergedPrs": 5
+    },
+    "rn": {
+      "tokensOutputPerMergedPr": 64924,
+      "mergedPrs": 4
+    },
+    "web": {
+      "tokensOutputPerMergedPr": 68842,
+      "mergedPrs": 4
+    },
+    "kotlin": {
+      "tokensOutputPerMergedPr": 52149,
+      "mergedPrs": 5
+    }
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "generatedAt": "2026-11-17T06:14:21.270Z",
+  "track": "rn",
+  "implementation": "apps/rn — React Native 0.88 + react-native-paper, shared ts-core ranker, on-device LiteRT via a Nitro module",
+  "provenance": [
+    "rank: shared/ts-core/src/rank.ts (the module apps/rn/src/list/core.ts imports) — labelled ts-core, not re-implemented",
+    "sizes: CI artifact scanlist-rn-apk (run 44023804443, card/A2) + a local `react-native bundle` of the same tree",
+    "build: local metro/jest timings on this laptop; the APK itself is built by CI (aarch64 laptop cannot run the NDK/CMake prebuilts)",
+    "loc: bench/scripts/loc.py over apps/rn (excludes node_modules, android/build)",
+    "cost: opencode session ledger + kanban/lead-log.md"
+  ],
+  "headline": "Biggest artifact by far (291 MB APK, 87% of it native .so files across four ABIs) and the slowest CI build (19 min), but it reuses the shared ts-core ranker instead of porting one.",
+  "measurements": {
+    "coldStart.listVisible": {
+      "status": "n/a",
+      "reason": "no Android device on adb (card B0 is device-blocked), so nothing can be measured on ART/the NPU; the number only exists once a phone is plugged in. Not a harness limitation — a missing device."
+    },
+    "embed.text.p50": {
+      "status": "n/a",
+      "reason": "no Android device on adb (card B0 is device-blocked), so nothing can be measured on ART/the NPU; the number only exists once a phone is plugged in. Not a harness limitation — a missing device."
+    },
+    "embed.image.p50": {
+      "status": "n/a",
+      "reason": "no Android device on adb (card B0 is device-blocked), so nothing can be measured on ART/the NPU; the number only exists once a phone is plugged in. Not a harness limitation — a missing device."
+    },
+    "rank200": {
+      "n": 300,
+      "min": 1.368916,
+      "p50": 1.378031,
+      "p95": 1.46975,
+      "max": 1.586418,
+      "mean": 1.3937163766666658,
+      "unit": "ms"
+    },
+    "rank200.coldFirstTick": {
+      "status": "measured",
+      "ms": 5.51207
+    },
+    "decideTop200": {
+      "n": 300,
+      "min": 0.000156,
+      "p50": 0.00026,
+      "p95": 0.000469,
+      "max": 0.025156,
+      "mean": 0.0003786166666666662,
+      "unit": "ms"
+    },
+    "rank200.label": "ts-core numbers: RN does not have its own ranker, it imports shared/ts-core (apps/rn/src/list/core.ts). Measured in node, not in Hermes — Hermes is slower on float64 loops, so treat this as a lower bound for the device.",
+    "apk": {
+      "status": "measured",
+      "bytes": 304797440,
+      "path": "/tmp/opencode/x1/apk-rn/ScanList-rn-debug.apk",
+      "source": "gh run download <run-id> -n scanlist-rn-apk -D dir && export X1_RN_APK=dir/ScanList-rn-debug.apk",
+      "entries": 719,
+      "byGroup": {
+        "meta": 12652,
+        "dex": 31532824,
+        "lib": 267084660,
+        "assets": 6314338,
+        "other": 607696,
+        "res": 363179
+      },
+      "byAbi": {
+        "arm64-v8a": 81671640,
+        "armeabi-v7a": 37627684,
+        "x86": 61034552,
+        "x86_64": 86750784
+      }
+    },
+    "jsBundle": {
+      "status": "measured",
+      "bytes": 1296555,
+      "path": "/tmp/opencode/x1/rn/index.android.bundle",
+      "source": "cd apps/rn && npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/…/index.android.bundle"
+    },
+    "loc": {
+      "path": "apps/rn",
+      "what": "React Native app (track A), excluding android/ Gradle glue counted separately",
+      "files": 87,
+      "lines": 8397,
+      "code": 6486,
+      "source": {
+        "files": 69,
+        "code": 4338
+      },
+      "test": {
+        "files": 18,
+        "code": 2148
+      },
+      "byExt": {
+        ".ts": 3835,
+        ".tsx": 2171,
+        ".kt": 319,
+        ".sh": 91,
+        ".js": 70
+      }
+    },
+    "buildTime": {
+      "status": "measured",
+      "metroBundle": {
+        "status": "measured",
+        "wallMs": 1286,
+        "exitCode": 0,
+        "command": "npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/x1-index.android.bundle --assets-dest /tmp/x1-rn-assets",
+        "cwd": "apps/rn",
+        "tail": " | LOG:Writing bundle output to: /tmp/x1-index.android.bundle | LOG:Done writing bundle output"
+      },
+      "metroBundleCold": {
+        "status": "measured",
+        "wallMs": 9073,
+        "exitCode": 0,
+        "command": "npx react-native bundle --reset-cache --platform android --dev false --entry-file index.js --bundle-output /tmp/x1-index-cold.android.bundle --assets-dest /tmp/x1-rn-assets-cold",
+        "cwd": "apps/rn",
+        "tail": " | LOG:Writing bundle output to: /tmp/x1-index-cold.android.bundle | LOG:Done writing bundle output"
+      },
+      "jest": {
+        "status": "measured",
+        "wallMs": 1752,
+        "exitCode": 0,
+        "command": "npx jest --ci --silent",
+        "cwd": "apps/rn",
+        "tail": "Tests:       146 passed, 146 total | Snapshots:   0 total | Time:        0.969 s, estimated 5 s"
+      },
+      "jestCold": {
+        "status": "measured",
+        "wallMs": 6389,
+        "exitCode": 0,
+        "command": "npx jest --ci --silent --no-cache",
+        "cwd": "apps/rn",
+        "tail": "Tests:       146 passed, 146 total | Snapshots:   0 total | Time:        5.486 s"
+      },
+      "apkLocal": {
+        "status": "n/a",
+        "reason": "not built on this aarch64 laptop by design (native NDK/CMake prebuilts are x86_64-only) — APK comes from CI, see ciJobs"
+      },
+      "ciJob": {
+        "status": "measured",
+        "runId": "44023804443",
+        "job": "rn",
+        "conclusion": "success",
+        "seconds": 1142,
+        "source": "gh api .../actions/runs/44023804443/jobs"
+      }
+    },
+    "agentCost": {
+      "status": "measured",
+      "sessions": 11,
+      "tokensOutput": 259696,
+      "tokensInput": 1900894,
+      "cacheRead": 64458632,
+      "costUsd": 0,
+      "cards": {
+        "total": 6,
+        "done": 4,
+        "doing": 0,
+        "todo": 2,
+        "syncRounds": 0,
+        "ids": [
+          "A1",
+          "A2",
+          "A3",
+          "A4",
+          "A5",
+          "A6"
+        ]
+      },
+      "mergedPrs": 4,
+      "requestChangesVerdicts": 3,
+      "tokensOutputPerMergedPr": 64924,
+      "method": "bench/scripts/agent-cost.py — opencode session ledger (tokens/cost, attributed by card id in the session title) + committed kanban/lead-log evidence (merged PRs, REQUEST-CHANGES verdicts, sync rounds, infra deaths).",
+      "honestLimits": [
+        "tokens measure agent output, not human wall-clock; cost 0.00 on the free tier makes tokens the only comparable unit",
+        "sessions without a card id in the title are reported as `unattributed` — project-wide cost, not one track's",
+        "the ledger is a lower bound: it only holds sessions this machine still has (see sessions.coverage)",
+        "lead-log counts are regex over prose; the log is the evidence, the numbers are an index into it"
+      ]
+    },
+    "sanity": {
+      "topId": null,
+      "entries": 200,
+      "top3": [
+        {
+          "id": "x1:0008",
+          "smoothed": 0.922101
+        },
+        {
+          "id": "x1:0096",
+          "smoothed": 0.920626
+        },
+        {
+          "id": "x1:0184",
+          "smoothed": 0.919466
+        }
+      ]
+    }
+  }
+}

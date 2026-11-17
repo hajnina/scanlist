@@ -1,0 +1,157 @@
+{
+  "generatedAt": "2026-11-17T06:13:46.700Z",
+  "method": "bench/scripts/sizes.mjs — file sizes on disk; APK internals via `unzip -l` stored lengths; web dist gzip via zlib level 9 (one asset at a time, not the whole tarball)",
+  "note": "Both APKs are fat (all four ABIs, x86/x86_64 included for emulators). A per-ABI split would be roughly the `lib.<abi>` number plus dex; the per-ABI table is included so the split is a visible decision, not a hidden one.",
+  "tracks": {
+    "kotlin": {
+      "apkLocal": {
+        "status": "measured",
+        "bytes": 149205160,
+        "path": "/home/martin/projects/scanlist-wt/X1/apps/kotlin/app/build/outputs/apk/debug/scanlistKotlin-debug.apk",
+        "source": "source scripts/android-env.sh && ./gradlew :scanlistKotlin:assembleDebug",
+        "entries": 588,
+        "byGroup": {
+          "meta": 52030,
+          "dex": 35763648,
+          "lib": 109955396,
+          "assets": 2396559,
+          "other": 882796,
+          "res": 278561
+        },
+        "byAbi": {
+          "arm64-v8a": 38210880,
+          "armeabi-v7a": 10057452,
+          "x86": 17734704,
+          "x86_64": 43952360
+        }
+      },
+      "apkCi": {
+        "status": "measured",
+        "bytes": 149319907,
+        "path": "/tmp/opencode/x1/apk-kotlin/ScanList-kotlin-debug.apk",
+        "source": "gh run download <run-id> -n scanlist-kotlin-apk -D dir && export X1_KOTLIN_CI_APK=dir/ScanList-kotlin-debug.apk",
+        "entries": 589,
+        "byGroup": {
+          "meta": 52030,
+          "dex": 35869096,
+          "lib": 109955396,
+          "assets": 2396559,
+          "other": 882796,
+          "res": 278561
+        },
+        "byAbi": {
+          "arm64-v8a": 38210880,
+          "armeabi-v7a": 10057452,
+          "x86": 17734704,
+          "x86_64": 43952360
+        }
+      }
+    },
+    "rn": {
+      "apkCi": {
+        "status": "measured",
+        "bytes": 304797440,
+        "path": "/tmp/opencode/x1/apk-rn/ScanList-rn-debug.apk",
+        "source": "gh run download <run-id> -n scanlist-rn-apk -D dir && export X1_RN_APK=dir/ScanList-rn-debug.apk",
+        "entries": 719,
+        "byGroup": {
+          "meta": 12652,
+          "dex": 31532824,
+          "lib": 267084660,
+          "assets": 6314338,
+          "other": 607696,
+          "res": 363179
+        },
+        "byAbi": {
+          "arm64-v8a": 81671640,
+          "armeabi-v7a": 37627684,
+          "x86": 61034552,
+          "x86_64": 86750784
+        }
+      },
+      "jsBundle": {
+        "status": "measured",
+        "bytes": 1296555,
+        "path": "/tmp/opencode/x1/rn/index.android.bundle",
+        "source": "cd apps/rn && npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/…/index.android.bundle"
+      }
+    },
+    "web": {
+      "dist": {
+        "status": "measured",
+        "path": "apps/web/frontend/dist",
+        "source": "npm run build (tsc --noEmit && vite build)",
+        "files": 10,
+        "bytes": 723785,
+        "gzipBytes": 90716,
+        "sourceMapBytes": 493392,
+        "shipped": {
+          "bytes": 230393,
+          "gzipBytes": 90716
+        },
+        "assets": {
+          "bytes": 182447,
+          "gzipBytes": 45652
+        },
+        "perAsset": [
+          {
+            "file": "assets/index-DzAEBmS5.js.map",
+            "bytes": 493392,
+            "kind": "source-map"
+          },
+          {
+            "file": "assets/index-DzAEBmS5.js",
+            "bytes": 166931,
+            "gzip": 42094,
+            "kind": "text"
+          },
+          {
+            "file": "icon-512.png",
+            "bytes": 23031,
+            "kind": "binary"
+          },
+          {
+            "file": "assets/index-BXHSbch_.css",
+            "bytes": 15516,
+            "gzip": 3558,
+            "kind": "text"
+          },
+          {
+            "file": "icon-maskable-512.png",
+            "bytes": 11579,
+            "kind": "binary"
+          },
+          {
+            "file": "icon-192.png",
+            "bytes": 8035,
+            "kind": "binary"
+          },
+          {
+            "file": "sw.js",
+            "bytes": 2762,
+            "gzip": 1187,
+            "kind": "text"
+          },
+          {
+            "file": "index.html",
+            "bytes": 1205,
+            "gzip": 565,
+            "kind": "text"
+          },
+          {
+            "file": "manifest.webmanifest",
+            "bytes": 800,
+            "gzip": 383,
+            "kind": "text"
+          },
+          {
+            "file": "icon.svg",
+            "bytes": 534,
+            "gzip": 284,
+            "kind": "text"
+          }
+        ]
+      }
+    }
+  }
+}

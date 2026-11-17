@@ -35,6 +35,7 @@ import {
 import {type Clock, systemClock} from './clock';
 import {createFrameCapturer} from './frameCapturer';
 import type {FrameFeedSink} from './frames';
+import {deleteTempFile} from '../../../modules/embed';
 
 /** 720p-ish is plenty for barcode/OCR and cheap to encode for the image embedder. */
 export const SCAN_PHOTO_RESOLUTION = CommonResolutions.HD_16_9;
@@ -94,7 +95,10 @@ export function useScanCamera({
   const loop = useMemo(
     () =>
       createCaptureLoop({
-        capture: createFrameCapturer(photoOutput),
+        capture: createFrameCapturer(photoOutput, {
+          // Card A6: the capturer hands out a release hook; the feed deletes after its grace.
+          deleteFile: path => deleteTempFile(path).then(() => undefined),
+        }),
         intervalMs,
         clock,
         onFrame: frame => feed.push(frame),
@@ -103,22 +107,35 @@ export function useScanCamera({
     [photoOutput, intervalMs, clock, feed],
   );
 
-  // The loop must not outlive the component (a capture keeps the native output alive otherwise).
-  useEffect(() => () => loop.stop(), [loop]);
-
   const {hasPermission, canRequestPermission, requestPermission, status} =
     permission;
+  const cameraActive = active && hasPermission;
+
+  /**
+   * Card A6 (A4 review nit): the loop follows the same condition as `<Camera isActive>` instead of
+   * the native `onStarted`/`onStopped` callbacks. A device that never invokes them (or invokes them
+   * out of order) could otherwise leave the loop sampling a dead session or stop a live one.
+   */
+  useEffect(() => {
+    if (!cameraActive) {
+      loop.stop();
+      return;
+    }
+    loop.start();
+    return () => loop.stop();
+  }, [cameraActive, loop]);
+
+  // Unmount (or a new feed): delete the temp JPEGs the capture loop left behind.
+  useEffect(() => () => feed.releaseAll(), [feed]);
 
   const cameraProps = useMemo<Omit<CameraViewProps, 'style'>>(
     () => ({
       device: position,
-      isActive: active && hasPermission,
+      isActive: cameraActive,
       outputs: [photoOutput],
-      onStarted: () => loop.start(),
-      onStopped: () => loop.stop(),
       onError: (error: Error) => onErrorRef.current?.(error),
     }),
-    [position, active, hasPermission, photoOutput, loop],
+    [position, cameraActive, photoOutput],
   );
 
   return {

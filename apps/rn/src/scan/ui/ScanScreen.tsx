@@ -28,10 +28,18 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Button, Text, useTheme} from 'react-native-paper';
 import {Camera} from 'react-native-vision-camera';
 import {flatten, type FlattenedItem} from '@scanlist/ts-core';
-import {CapsLabel, ExpressiveCard, MachineText, SpringIn, haptic} from '../../ui';
+import {
+  CapsLabel,
+  ExpressiveCard,
+  GuidanceNote,
+  MachineText,
+  SpringIn,
+  haptic,
+} from '../../ui';
 import {HEAVY, Spacing} from '../../theme/tokens';
 import type {ScanListTheme} from '../../theme';
 import type {ListRepository, StoredList} from '../../list/store';
+import {quietFor, scanGuidance} from '../../settings/polish';
 import {embedder} from '../../../modules/embed';
 import {createFrameFeed} from '../sources';
 import {useScanCamera} from '../sources/camera';
@@ -201,6 +209,16 @@ export function ScanScreen({repository, stored, onBack, onChanged}: Props) {
   const error = commitError ?? session.error;
   const backend = embedder.backend;
 
+  // Card A6 (POLISH.md): permission → missing model → quiet-for-6-s advice, in that order.
+  const guidance = scanGuidance({
+    hasPermission: camera.hasPermission,
+    canRequestPermission: camera.canRequestPermission,
+    quietMs: quietFor(activity, Date.now()),
+  });
+  const permissionCopy = guidance?.kind === 'camera' ? guidance : null;
+  const hint = guidance !== null && guidance.kind !== 'camera' ? guidance : null;
+  const counters = __DEV__ ? session.diagnostics() : null;
+
   return (
     <SafeAreaView
       edges={['top', 'bottom']}
@@ -246,16 +264,18 @@ export function ScanScreen({repository, stored, onBack, onChanged}: Props) {
                 <Text
                   variant="titleMedium"
                   style={{color: theme.colors.onSurface}}>
-                  {camera.canRequestPermission
-                    ? 'The magic scan needs the camera'
-                    : 'Camera permission is blocked'}
+                  {permissionCopy?.title ??
+                    (camera.canRequestPermission
+                      ? 'The magic scan needs the camera'
+                      : 'Camera permission is blocked')}
                 </Text>
                 <Text
                   variant="bodySmall"
                   style={{color: theme.colors.onSurfaceVariant}}>
-                  {camera.canRequestPermission
-                    ? 'Barcode, OCR and frame embedding all read the same preview.'
-                    : 'Allow the camera in Android Settings, then return here.'}
+                  {permissionCopy?.detail ??
+                    (camera.canRequestPermission
+                      ? 'Barcode, OCR and frame embedding all read the same preview.'
+                      : 'Allow the camera in Android Settings, then return here.')}
                 </Text>
                 {camera.canRequestPermission ? (
                   <Button
@@ -280,6 +300,16 @@ export function ScanScreen({repository, stored, onBack, onChanged}: Props) {
         <SpringIn index={2}>
           <SourceChips chips={chips} />
         </SpringIn>
+
+        {hint !== null ? (
+          <SpringIn index={2}>
+            <GuidanceNote
+              kind={hint.kind}
+              title={hint.title}
+              detail={hint.detail}
+            />
+          </SpringIn>
+        ) : null}
 
         <SpringIn index={3}>
           {heroEntry !== undefined ? (
@@ -334,6 +364,13 @@ export function ScanScreen({repository, stored, onBack, onChanged}: Props) {
             onTick={commit}
           />
         </SpringIn>
+
+        {counters !== null ? (
+          <MachineText
+            style={[styles.footer, {color: theme.colors.onSurfaceVariant}]}>
+            {`debug · ${counters.listeners} feed listeners · ${counters.dropped} dropped while busy · ${counters.skipped} gated · ${counters.pendingReleases} temp files`}
+          </MachineText>
+        ) : null}
 
         {rankedEntries.length === 0 && doneCount === 0 ? null : (
           <MachineText

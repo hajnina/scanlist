@@ -37,8 +37,8 @@ delegate agents. Full rules in AGENTS.md; running decision log in kanban/lead-lo
 | Lane | Session | State | Next action |
 |---|---|---|---|
 | **A6 re-review** (PR #36) | ses_e1644f1ceffeX6geWskfWSGy7J | Fresh adversarial reviewer (old session orphaned); head 3d6c68f; rn CI in_progress | On APPROVE*: merge (#36) → `gh pr view --json mergedAt` → `board.py move A6 done` → clean ../scanlist-wt/A6 + branch → **dispatch A6-followup** → fire X2 check |
-| **B7 review** (PR #39) | ses_e1644f1cdffef0SfOFkbX0bnEs | Fresh reviewer; kotlin pass on 739a84c; MERGEABLE/CLEAN | On APPROVE*: merge → verify mergedAt → move B7 done → clean ../scanlist-wt/B7 → X2 check |
-| **C2-followup review** (PR #40) | ses_e1644f1c6ffeRKiFvbtX1wbHlb | Fresh reviewer; web pass on 2bc52ef; MERGEABLE/CLEAN | On APPROVE*: merge → NO card move → evidence to done/C2.md → clean ../scanlist-wt/C2FU |
+| **B7 review** (PR #39) | ses_e1644f1cdffef0SfOFkbX0bnEs | Fresh reviewer; kotlin pass on 739a84c; MERGEABLE/CLEAN. Prior verdict (pre-restart, recorded in lead-log): **APPROVE-WITH-NITS** — merge still gates on the FRESH verdict | On APPROVE*: merge → verify mergedAt → move B7 done → clean ../scanlist-wt/B7 → X2 check. On REQUEST-CHANGES: fix round to builder **ses_e166dcf0dffeTF3L7GY3H5VHKo**, same reviewer re-verifies |
+| **C2-followup review** (PR #40) | ses_e1644f1c6ffeRKiFvbtX1wbHlb | Fresh reviewer; web pass on 2bc52ef; MERGEABLE/CLEAN. Prior verdict (pre-restart, recorded in lead-log): **APPROVE-WITH-NITS** — merge still gates on the FRESH verdict | On APPROVE*: merge → NO card move → evidence to done/C2.md → clean ../scanlist-wt/C2FU |
 | **X2 builder** (bench/COMPARISON.md) | ses_e1644f1c4ffe15SZAnuhPFy9xt | Pre-fired in parallel; claims X2 then worktree card/X2; must refresh numbers vs origin/main before PR-open | On PR open: dispatch fresh reviewer; on APPROVE*: merge → move X2 done → clean worktree/branch |
 | **Heartbeat** | (background sleep, armed 13:34Z) | ALIVE | Re-arm on every fire; run scripts/lead-watchdog.sh |
 

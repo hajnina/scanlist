@@ -56,7 +56,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    kotlinOptions {
+        jvmTarget = "17"
+        // Card B3: this app now depends on :shared:android-embed, whose LiteRT-LM 0.18.1 dependency
+        // is built with Kotlin 2.4 (metadata 2.4, stdlib 2.4 on the compile classpath) while the repo
+        // pins Kotlin 2.0.21. Same workaround, same reason, as shared/android-embed/build.gradle.kts
+        // (its README §"Kotlin metadata workaround"); it is needed on CI too, not a laptop override.
+        freeCompilerArgs += "-Xskip-metadata-version-check"
+    }
     buildFeatures { compose = true }
 }
 
@@ -79,4 +86,9 @@ dependencies {
 
     // Card B2 Done-when: JVM unit tests for the parse/flatten/persist/export logic.
     testImplementation("junit:junit:4.13.2")
+
+    // Card B3 (rank package): the shared EmbeddingGemma 2 seam — `Embedder`/`Embedders`/`Prompts`
+    // from shared/android-embed (card S5). Disclosed in the B3 PR as the one build-file line the
+    // rank package needs; no plugin or version pin changes.
+    implementation(project(":shared:android-embed"))
 }

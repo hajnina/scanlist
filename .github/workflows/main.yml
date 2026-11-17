@@ -93,6 +93,32 @@ jobs:
           if [ ! -f gradlew ] || [ ! -f settings.gradle.kts ]; then echo "::error::no root gradle build yet (card S9) - cannot run apps/kotlin unit tests"; exit 1; fi
           chmod +x gradlew
           ./gradlew --no-daemon :scanlistKotlin:testDebugUnitTest
+      - name: Unit test summary
+        # Mirror of pr.yml: surface the real test totals (gradle prints none by default) so an
+        # empty/zero-test run can never pass silently.
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          roots = [
+              'apps/kotlin/app/build/test-results/testDebugUnitTest',
+              'apps/kotlin/build/test-results/testDebugUnitTest',
+          ]
+          files = []
+          for r in roots:
+              files += sorted(glob.glob(r + '/TEST-*.xml'))
+          if not files:
+              sys.exit('::error::testDebugUnitTest produced no XML reports in ' + ' / '.join(roots))
+          total = fails = errors = skipped = 0
+          for path in files:
+              node = ET.parse(path).getroot()
+              total += int(node.get('tests', 0))
+              fails += int(node.get('failures', 0))
+              errors += int(node.get('errors', 0))
+              skipped += int(node.get('skipped', 0))
+          print(f'kotlin unit tests: {len(files)} classes, {total} tests, '
+                f'{fails} failures, {errors} errors, {skipped} skipped')
+          sys.exit(1 if (fails or errors or total == 0) else 0)
+          PY
       - name: Rename APK
         if: hashFiles('apps/kotlin/app/build/outputs/apk/debug/*.apk') != ''
         run: mv apps/kotlin/app/build/outputs/apk/debug/*.apk ScanList-kotlin-debug.apk

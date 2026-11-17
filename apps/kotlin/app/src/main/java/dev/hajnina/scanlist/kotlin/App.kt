@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import dev.hajnina.scanlist.kotlin.list.ListDetailScreen
 import dev.hajnina.scanlist.kotlin.list.ListsHomeScreen
 import dev.hajnina.scanlist.kotlin.list.rememberListState
+import dev.hajnina.scanlist.kotlin.settings.SettingsScreen
 
 /** Top-level destinations. List is pushed from Lists (see [ScanListApp]). */
 enum class Tab(val label: String) {

@@ -164,6 +164,7 @@ fun ErrorDialog(errors: List<String>, onDismiss: () -> Unit) {
 @Composable
 fun NoteCard(text: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val cs = MaterialTheme.colorScheme
+    val haptic = LocalHapticFeedback.current
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = Shapes.leafMirror,
@@ -177,7 +178,13 @@ fun NoteCard(text: String, onDismiss: () -> Unit, modifier: Modifier = Modifier)
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         ) {
             Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            TextButton(onClick = onDismiss) { Text("OK") }
+            // Card B7: every action gets a haptic (style guide §4) — dismissing a note included.
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ToggleOff)
+                    onDismiss()
+                },
+            ) { Text("OK") }
         }
     }
 }

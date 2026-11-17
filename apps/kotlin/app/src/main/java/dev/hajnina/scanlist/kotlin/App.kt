@@ -1,5 +1,6 @@
 package dev.hajnina.scanlist.kotlin
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,6 +21,9 @@ import dev.hajnina.scanlist.kotlin.list.ListsHomeScreen
 import dev.hajnina.scanlist.kotlin.list.rememberListState
 import dev.hajnina.scanlist.kotlin.scan.ui.ScanScreen
 import dev.hajnina.scanlist.kotlin.settings.SettingsScreen
+import dev.hajnina.scanlist.kotlin.ui.BackTarget
+import dev.hajnina.scanlist.kotlin.ui.backTarget
+import dev.hajnina.scanlist.kotlin.ui.handledLocally
 
 /** Top-level destinations. List is pushed from Lists (see [ScanListApp]). */
 enum class Tab(val label: String) {
@@ -37,6 +41,8 @@ enum class Tab(val label: String) {
  * tick, persist, export) from the `list` package; the pushed detail screen is keyed by the list id.
  * Card B5: the Scan tab is the real magic scan (`scan/ui`), which needs the list state to rank and to
  * tick — the last B1 stub screen is gone.
+ * Card B7: system back now follows the shell's own stack (`ui/BackPolicy`): pop the open list, then
+ * return to Lists from Scan/Settings, and only leave the app from the Lists root.
  */
 @Composable
 fun ScanListApp() {
@@ -44,6 +50,20 @@ fun ScanListApp() {
     var tab by remember { mutableStateOf(Tab.Lists) }
     var openList by remember { mutableStateOf<String?>(null) }
     val listState = rememberListState()
+
+    // Back must not skip the shell's state: the List screen is pushed on the tab, so back closes it
+    // first (previously it fell through to the Activity and exited the whole app).
+    val back = backTarget(tab, openList)
+    BackHandler(enabled = back.handledLocally) {
+        when (back) {
+            BackTarget.CLOSE_LIST -> openList = null
+            BackTarget.LISTS_TAB -> {
+                openList = null
+                tab = Tab.Lists
+            }
+            BackTarget.EXIT -> Unit
+        }
+    }
 
     Column(
         Modifier

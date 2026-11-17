@@ -53,14 +53,37 @@ class ScanFrameCoreTest {
     }
 
     @Test
-    fun `OCR lines become one TEXT signal`() {
+    fun `OCR emits one TEXT signal per line with that line's confidence`() {
         val core = ScanFrameCore(clock = FakeClock())
-        val signal = core.onOcrLines(listOf("Fresh milk", "1 L"), nowMs = 0)
+        val signals = core.onOcrLines(
+            listOf(OcrLine("Fresh milk", 0.9f), OcrLine("1 L", 0.3f)),
+            nowMs = 0,
+        )
 
-        assertNotNull(signal)
-        assertEquals(ScanKind.TEXT, signal!!.kind)
-        assertEquals("Fresh milk | 1 L", signal.text)
-        assertEquals(ScanSignal.OCR_CONFIDENCE, signal.confidence, 0f)
+        assertEquals(2, signals.size)
+        assertEquals(listOf("Fresh milk", "1 L"), signals.map { it.text })
+        assertTrue(signals.all { it.kind == ScanKind.TEXT })
+        assertEquals(listOf(0.9f, 0.3f), signals.map { it.confidence })
+    }
+
+    @Test
+    fun `OCR lines are capped at 16 in detection order`() {
+        val core = ScanFrameCore(clock = FakeClock())
+        val lines = (1..20).map { OcrLine("word %02d".format(it)) }
+
+        val signals = core.onOcrLines(lines, nowMs = 0)
+
+        assertEquals(OcrLineBatcher.MAX_LINES_PER_FRAME, signals.size)
+        assertEquals(16, signals.size)
+        assertEquals((1..16).map { "word %02d".format(it) }, signals.map { it.text })
+    }
+
+    @Test
+    fun `the same OCR line inside the repeat window emits nothing`() {
+        val core = ScanFrameCore(clock = FakeClock())
+        assertEquals(1, core.onOcrLines(listOf(OcrLine("Olive oil")), nowMs = 0).size)
+        assertTrue(core.onOcrLines(listOf(OcrLine("Olive oil")), nowMs = 500).isEmpty())
+        assertEquals(1, core.onOcrLines(listOf(OcrLine("Olive oil")), nowMs = 1_500).size)
     }
 
     @Test

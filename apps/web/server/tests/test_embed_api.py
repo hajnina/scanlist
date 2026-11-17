@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,14 +25,17 @@ def test_health_reports_backend_model_dims_and_modalities(client: TestClient) ->
 
 
 def test_root_is_friendly_without_a_built_frontend() -> None:
-    with TestClient(create_app()) as client:
+    # Point at a MISSING dist explicitly (C2 review note): the real repo now ships a built
+    # frontend, and CI builds dist before pytest — create_app() would resolve the real one
+    # and serve the UI, making the "not built" fallback untestable implicitly.
+    with TestClient(create_app(frontend_dist=Path("does/not/exist"))) as client:
         response = client.get("/")
     assert response.status_code == 200
     assert response.json()["frontend"] == "not built"
 
 
 def test_unknown_api_path_is_404_without_frontend() -> None:
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(frontend_dist=Path("does/not/exist"))) as client:
         assert client.get("/nope").status_code == 404
 
 

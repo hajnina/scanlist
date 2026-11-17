@@ -3,7 +3,9 @@
  *
  * - `parseList` validates the LIST.md JSON shape and reports RFC 6901 pointer errors.
  * - `flatten` / `docText` implement FLATTEN.md (ids, order, embedding text).
- * - `rank` implements RANK.md (cosine, max-fusion, barcode boost, EMA, hysteresis, ordering).
+ * - `rank` implements RANK.md (cosine, max-fusion, barcode boost, EMA, per-source highlight gates,
+ *   image accept-list guard, ordering), and `casefold` is the shared Unicode full folding used by
+ *   both barcode/OFF name matching and alias dedupe.
  *
  * Zero runtime dependencies, ESM, no React and no I/O, so React Native and the web app can import
  * the same code. The golden fixture (`shared/fixtures/golden.json`) pins behaviour to the S2
@@ -29,6 +31,7 @@ export type {
 export type { ParseListResult } from "./parse";
 export { errorsOf, parseList } from "./parse";
 
+export { casefold } from "./casefold";
 export { docText, docTexts, flatten } from "./flatten";
 export { sha1Hex } from "./sha1";
 
@@ -37,8 +40,12 @@ export {
   DIMS_ACTIVE,
   EMA_ALPHA,
   HYSTERESIS,
+  MARGIN_IMAGE,
+  MARGIN_TEXT,
   MAX_TEXT_QUERIES,
   MIN_INTERVAL_MS,
+  NO_MATCH_IMAGE,
+  NO_MATCH_TEXT,
   barcodeMatch,
   cosine,
   decideTop,
@@ -48,4 +55,4 @@ export {
   sortCandidates,
   unranked,
 } from "./rank";
-export type { RankedCandidate } from "./rank";
+export type { CandidateSource, RankedCandidate } from "./rank";

@@ -22,8 +22,8 @@ const out = rank(
   previousState,                               // persist out.state between ticks
   barcodeProductName,                          // OFF name or null; adds the 0.15 boost
 );
-out.topId;                                     // hysteresis winner
-out.entries;                                   // top, candidates, then done group
+out.topId;                                     // highlighted hero, or null when the gate is closed
+out.entries;                                   // hero first (if any), ranked candidates, done group
 ```
 
 ## Behaviour contracts
@@ -33,14 +33,23 @@ out.entries;                                   // top, candidates, then done gro
   rejected (`1e999` → Infinity → pointer error), never a partial import.
 - **`flatten` / `docText`** are byte-identical to `shared/ref/scanlist_ref.py` on all 44 sample
   items: sha1 ids from `section/path/name#index`, depth-first items-before-sub-sections order,
-  alias NFC+lowercase dedupe, `name; aliases; path` text.
+  alias NFC + full-casefold dedupe (`casefold`, not `toLowerCase`), `name; aliases; path` text.
 - **`rank`** is a port of RANK.md §1–§9: 256-d cosine (dot), `q6` rounding, max fusion, barcode
-  boost, EMA α = 0.5, 0.02 hysteresis, done group last, every degraded state. `decideTop` is the
-  only highlight decision point — card S10 will add the margin/threshold rule there.
+  boost, EMA α = 0.5, done group last, every degraded state. The highlight is decided in exactly
+  one place, `decideTop`, in the spec's order: 0.02 hysteresis (§6.1) → per-source evidence gate
+  (text 0.05 / 0.79, image 0.005 / 0.68, §6.2) → image accept-list guard (§6.3). `topId` may be
+  `null` while `entries` stays the full ranked order; barcode/OFF-name matching uses Unicode full
+  case folding (`casefold`, so `ß` → `ss`, `İ` → `i̇`, `ﬁ` → `fi`).
 
 `npm test` replays all 58 queries (5 lists / 88 items) of `shared/fixtures/golden.json` through
 this implementation with no model and asserts the oracle's `expectedTop3`, `expectedScores` and
 `expectedMargin`, and byte-compares the four sample flattens.
+
+**Known divergence (tracked, intentionally not changed here):** `parseList` trims a non-blank
+string `amount` (`"2 packs "` → `"2 packs"`), as the Kotlin importer does, while the Python oracle
+keeps the string verbatim (S8's pre-existing divergence). It is outside RANK.md's highlight contract
+and awaits a spec ruling; the golden samples contain no non-blank string amount with surrounding
+whitespace, so the fixture does not observe it. (`flatten` itself does not trim.)
 
 ## Commands
 

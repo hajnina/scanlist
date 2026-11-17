@@ -15,6 +15,33 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 ```
 
+### C3: the real EmbeddingGemma 2 (card C3, merged 2026-11-17)
+
+`SCANLIST_EMBEDDER=gemma` activates the real model. It needs:
+
+```bash
+.venv/bin/pip install -r requirements-gemma.txt   # CPU torch index, pinned
+# weights OUTSIDE the repo: a HF-cache snapshot of google/embeddinggemma-2 @ f9972ac2
+# (fp32 CPU, ~1.5 GB). Point HF/HF_HOME at its parent (~/models/scanlist/hf-cache works).
+.venv/bin/uvicorn app.main:app --port 8000        # lazy-loads on first embed call
+```
+
+- Model-free behaviour is unchanged: without weights or with `SCANLIST_EMBEDDER=fake`,
+  the fake stays default; with `gemma` set but weights absent, `/embed/*` return
+  **503 `E_NO_MODEL`** (note: C3's error body shape is `{"error": {...}}`, not C1's
+  `{"detail": ...}` — document-side acknowledgment, unify if it ever matters client-side).
+- Parity gate: `python3 check_golden.py` reproduces all 146 golden vectors (min cos
+  0.999999999996) and 58/58 `expectedTop3`; 5 parity tests skip without weights
+  (`SCANLIST_SKIP_GEMMA=1` forces the skip path).
+- Latency (`PERF.md`): text ~400–500 ms cold / 0 ms cached per call; **image 6.4–11.9 s
+  per frame** on this fp32 CPU path — see the X1/C4 notes: treat image queries as
+  on-demand/opportunistic, never per-camera-frame.
+- Docker: `Dockerfile` (python:3.12-slim, non-root, healthcheck, amd64+arm64) carries
+  **no weights** (licence ruling pending) — mount the HF-cache ROOT read-only
+  (`/home/…/hf-cache:/hf-cache:ro`, NOT the snapshot dir — symlinks) and pass
+  `HF_HOME=/hf-cache`. Verified arm64 + amd64/qemu; no-mount → `/health` 200 +
+  503 `E_NO_MODEL`.
+
 ## Run
 
 ```bash

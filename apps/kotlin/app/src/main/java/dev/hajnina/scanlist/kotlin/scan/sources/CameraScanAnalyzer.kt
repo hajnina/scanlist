@@ -30,7 +30,7 @@ fun interface BarcodeReader {
 
 /** ML Kit text recogniser behind a callback seam; returns the visible lines, top-to-bottom. */
 fun interface TextReader {
-    fun read(image: InputImage, onResult: (List<String>) -> Unit)
+    fun read(image: InputImage, onResult: (List<OcrLine>) -> Unit)
 
     fun close() {}
 }
@@ -77,10 +77,23 @@ class MlKitTextReader : TextReader {
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     }
 
-    override fun read(image: InputImage, onResult: (List<String>) -> Unit) {
+    override fun read(image: InputImage, onResult: (List<OcrLine>) -> Unit) {
         client.process(image)
             .addOnSuccessListener { text ->
-                onResult(text.textBlocks.flatMap { block -> block.lines.map { line -> line.text } })
+                // One OcrLine per visible line, in ML Kit's reading order (blocks -> lines), with the
+                // line's real score (Text.Line.getConfidence() is public — see OcrLine's KDoc);
+                // nothing is ever averaged across lines (RANK.md §2.2).
+                onResult(
+                    text.textBlocks.flatMap { block ->
+                        block.lines.map { line ->
+                            val c = line.confidence
+                            OcrLine(
+                                line.text,
+                                c.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: ScanSignal.OCR_CONFIDENCE,
+                            )
+                        }
+                    },
+                )
             }
             .addOnFailureListener { onResult(emptyList()) }
     }
@@ -148,7 +161,7 @@ class CameraScanAnalyzer(
 
         try {
             textReader.read(input) { lines ->
-                runCatching { core.onOcrLines(lines, clock.nowMs())?.let(onSignal) }
+                runCatching { core.onOcrLines(lines, clock.nowMs()).forEach(onSignal) }
                 finish()
             }
         } catch (t: Throwable) {

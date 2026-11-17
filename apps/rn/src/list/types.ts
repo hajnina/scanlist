@@ -1,46 +1,20 @@
 /**
- * Nested shopping-list JSON model — TypeScript mirror of docs/list.schema.json, field for field
- * (`title`/`version`/`sections` at the root, recursive sections, items with optional
- * amount/unit/note/aliases/done). Card A2 (import/persist) and A4 (ranking) build against this
- * contract; card A1 only needs the shape, parsing/flattening is NOT implemented here.
+ * The list JSON contract — card A1 wrote these types by hand from `docs/list.schema.json`; card A2
+ * (this card) replaces them with a re-export of the MERGED shared core (`@scanlist/ts-core`, card
+ * S8), whose `ScanList` / `ScanListSection` / `ScanListItem` / `ScanListAmount` are the same shape
+ * and the ones `parseList` / `flatten` actually return.
+ *
+ * Keeping one declaration (the shared package's) means the app can never drift from the validator:
+ * `parseList` hands back `ScanList`, `flatten` hands back `FlattenedItem[]`, and every screen uses
+ * exactly those types. Adding fields here would silently disagree with the validator — don't.
+ *
+ * A1's `FlatItem` helper (`itemId`/`path`/`name`/`done`) is superseded by ts-core's `FlattenedItem`
+ * (FLATTEN.md §1), which additionally carries `amount`/`unit`/`note`/`aliases`/`index`/`order`.
  */
-
-/** `amount` may be absent, a number (2, 0.5) or free text ("2 packs"); `unit` and `note` are their own fields. */
-export type ScanListAmount = number | string;
-
-/** Item: `name` is the only required field; `id` is optional — the app derives sha1(path) when absent. */
-export interface ScanListItem {
-  id?: string;
-  name: string;
-  amount?: ScanListAmount;
-  unit?: string;
-  note?: string;
-  /** Extra words embedded with the item (brand, other language), e.g. "coke" -> "Coca-Cola". */
-  aliases?: string[];
-  /** `done: true` items sink into the collapsed "Done" group. */
-  done?: boolean;
-}
-
-/** Section: only `name` is required; sub-sections nest recursively, any depth. */
-export interface ScanListSection {
-  name: string;
-  items?: ScanListItem[];
-  sections?: ScanListSection[];
-}
-
-/** List document root: `title` + `sections` required, `version` optional (schema default 1). */
-export interface ScanList {
-  title: string;
-  version?: number;
-  sections: ScanListSection[];
-}
-
-/** One item flattened out of the tree, with its section path for the embedding document. */
-export interface FlatItem {
-  /** Derived id — sha1(sectionPath) when the item has no `id` (docs/list.schema.json). */
-  itemId: string;
-  /** Section names from the root to the item's parent. */
-  path: string[];
-  name: string;
-  done: boolean;
-}
+export type {
+  FlattenedItem,
+  ScanList,
+  ScanListAmount,
+  ScanListItem,
+  ScanListSection,
+} from '@scanlist/ts-core';

@@ -6,6 +6,7 @@ import {StatusBar, useColorScheme} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {HomeSkeleton} from './list';
 import {ScanListThemeProvider} from './theme';
+import {DevEntry} from './dev';
 
 export default function App() {
   const scheme = useColorScheme();
@@ -16,6 +17,8 @@ export default function App() {
           barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
         />
         <HomeSkeleton />
+        {/* Card A3: renders nothing unless the dev menu opens the embed self-test. */}
+        <DevEntry />
       </ScanListThemeProvider>
     </SafeAreaProvider>
   );

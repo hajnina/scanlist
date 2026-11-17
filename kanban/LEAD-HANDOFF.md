@@ -26,28 +26,22 @@ delegate agents. Full rules in AGENTS.md; running decision log in kanban/lead-lo
 2. Re-arm heartbeat: background shell `sleep 600 && echo HEARTBEAT-FIRE`.
 3. Run `bash scripts/lead-watchdog.sh` and reconcile with the state below.
 
-## Board state (ls-verified 2026-11-17 13:40Z — the old "31" tally was WRONG by one)
-- **30 of 34 cards done.** doing: A6, B7, **X2 (pre-fired, building — will show as doing once claimed)**. todo: B0 (device-parked, parked with Martin).
-- Kotlin main suite 296/0 · RN main 237 · web main 279 (29 files) · smoke 21/21 · ts-core 150 · server 130+1skip.
-- Rolling release pipeline WORKS ("ScanList (rolling)" refreshes on code pushes; refs/tags/main stays 0 —
-  the release job now self-cleans legacy tags unconditionally).
-- CI runs real gates on every track (kotlin unit tests + summary, rn tsc+jest+APK, shared tsc+vitest, web).
+## Board state (FINAL, 2026-11-17 15:15Z)
+- **33 of 34 cards done.** doing: none. review: none. **todo: B0 only** (device-parked with Martin).
+- Merged this session: C2-followup (#40, 13:49:35Z), B7 (#39, 14:40:36Z), A6 (#36, 14:52:08Z), X2 (#41, 15:13:09Z) — all `mergedAt`-verified.
+- Main suites: Kotlin 329 · RN 352 · web 291 · ts-core 150 · server 130+1 skip · smoke 21/21.
+- Rolling release healthy; `refs/tags/main` = 0; no closed-unmerged PRs.
 
-## ACTIVE LANES (sessionIDs — these are POST-RESTART sessions, children of the current lead)
-| Lane | Session | State | Next action |
-|---|---|---|---|
-| **A6 fix round 2** (PR #36) | builder ses_e1636da09ffevG9Bg3oxf2lHRU · reviewer ses_e1644f1ceffeX6geWskfWSGy7J (alive) | REQUEST-CHANGES round 2: quiet hint unreachable (image markers refresh activity every ~400 ms); POLISH 74-76 false. Fixing in ../scanlist-wt/A6 at 3d6c68f | On push: message the SAME reviewer to re-verify. On APPROVE*: merge → verify mergedAt → move A6 done → clean worktree/branch → **dispatch A6-followup** |
-| **B7 review** (PR #39) | ses_e1644f1cdffef0SfOFkbX0bnEs | Fresh reviewer; kotlin pass on 739a84c; MERGEABLE/CLEAN. Prior verdict (pre-restart, recorded in lead-log): **APPROVE-WITH-NITS** — merge still gates on the FRESH verdict | On APPROVE*: merge → verify mergedAt → move B7 done → clean ../scanlist-wt/B7 → X2 check. On REQUEST-CHANGES: fix round to builder **ses_e166dcf0dffeTF3L7GY3H5VHKo**, same reviewer re-verifies |
-| **C2-followup review** (PR #40) | ses_e1644f1c6ffeRKiFvbtX1wbHlb | Fresh reviewer; web pass on 2bc52ef; MERGEABLE/CLEAN. Prior verdict (pre-restart, recorded in lead-log): **APPROVE-WITH-NITS** — merge still gates on the FRESH verdict | On APPROVE*: merge → NO card move → evidence to done/C2.md → clean ../scanlist-wt/C2FU |
-| **X2 builder** (bench/COMPARISON.md) | ses_e1644f1c4ffe15SZAnuhPFy9xt | Pre-fired in parallel; claims X2 then worktree card/X2; must refresh numbers vs origin/main before PR-open | On PR open: dispatch fresh reviewer; on APPROVE*: merge → move X2 done → clean worktree/branch |
-| **Heartbeat** | (background sleep, armed 13:34Z) | ALIVE | Re-arm on every fire; run scripts/lead-watchdog.sh |
 
-## QUEUED (dispatch on trigger)
-- **X2** (COMPARISON.md, final content card) — **IN FLIGHT** (pre-fired 13:40Z, session ses_e1644f1c4ffe15SZAnuhPFy9xt). Deps B7+A6 are landing in parallel; brief forbids citing them as merged and requires a number refresh vs origin/main before PR-open. Evidence inputs: bench/results/*.json + fragments, bench/README.md, apps/web/server/PERF.md, done cards X1/C4/C5/C7/A5/B5/B6, lead-log "X2 dispatch checklist" (bundle sizes web ~211 kB / APK 291 MB vs 142 MB, agent-cost ~parity, image-latency asymmetry headline).
-- **A6-followup** — fires when A6 merges: mount SettingsScreen (App.tsx disclosed wiring), startup application of
-  the persisted backend choice, haptics setting read. Branch card/A6-followup + PR, evidence → done/A6.md.
-- **B0** — parked (no phone on adb; aarch64 adb is x86_64 binary). Parked with Martin: model-license ruling,
-  fleet timebox preference — resurface when board is otherwise clear.
+## ACTIVE LANES
+**None.** Every lane is closed and its worktree/branch is deleted (A6, B7, C2FU, X2 all removed).
+
+
+## QUEUED (nothing is dispatched)
+- **B0** — still parked with Martin: needs a phone on adb (aarch64 adb is an x86_64 binary), plus his model-license ruling and fleet-timebox preference.
+- **A6-followup** (not a card; deferred by the 2026-11-17 deadline): mount `SettingsScreen` from `App.tsx`, apply the persisted backend choice at startup, read the haptics setting. Evidence would go to `done/A6.md`.
+- **Recorded-only nits** (do NOT dispatch without a reason): 6 C2-followup sweep nits on `done/C2.md`; B7 N5/N8/N9 on `done/B7.md`; A6's hero-reset-only mutation caveat on `done/A6.md`.
+
 
 ## Merge protocol (verbatim)
 `gh pr merge <n> --merge` → `git pull --no-rebase` → `gh pr view <n> --json mergedAt` (VERIFY) →

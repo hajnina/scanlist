@@ -18,7 +18,7 @@ native tracks cannot be measured on a phone at all yet (no device on adb — car
 | **cold start → list visible** | n/a — no device | n/a — no device | **176 ms** (real Chrome) |
 | **text embed** | n/a — on-device LiteRT | n/a — on-device LiteRT | **295 ms** cold / **0.04 ms** cached |
 | **image embed** | n/a — on-device LiteRT | n/a — on-device LiteRT | **6.4–11.9 s / frame** |
-| **artifact** | **142 MB** APK | **291 MB** APK (+1.3 MB JS bundle) | **89 kB** gzip |
+| **artifact** | **142 MB** APK | **291 MB** APK (+1.3 MB JS bundle) | **89 kB** gzip (dist incl. icons) |
 | **source code** | 5,448 lines (39% tests) | 6,486 lines (33% tests) | 5,391 lines (29% / 51% tests) |
 | **build** | 0.8 s warm / 6.9 s cold | 1.3 s bundle warm / 9.1 s cold | 2.4 s |
 | **CI job** | 93 s | **1,142 s** (19 min) | 23 s |
@@ -173,7 +173,7 @@ the app's own localStorage keys, then measures two marks from `page.goto` start:
 
 This is the pattern of `apps/web/frontend/scripts/smoke-e2e.mjs` (read-only, not edited) applied to
 measurement instead of assertions. Caveat: localhost, no network latency; a real phone over 4G adds
-the download of ~89 kB gzip plus TLS.
+the download of ~89 kB gzip (whole dist incl. icons) plus TLS.
 
 ### embed latency (web, recorded)
 

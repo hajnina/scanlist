@@ -8,7 +8,7 @@
   "scripts": {
     "rank:ts-core": "node scripts/rank-ts-core.mjs",
     "rank:oracle": "python3 scripts/rank-oracle.py",
-    "loc": "bash scripts/loc.sh",
+    "loc": "python3 scripts/loc.py",
     "run-all": "bash scripts/run-all.sh"
   },
   "devDependencies": {

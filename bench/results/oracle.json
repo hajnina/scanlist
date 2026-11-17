@@ -5,7 +5,8 @@
   "provenance": [
     "rank: bench/scripts/rank-oracle.py over the same 200-item fixture as the ts-core and Kotlin runs",
     "loc: bench/scripts/loc.py over shared/ (ts-core + oracle + android-embed + spec/fixtures)",
-    "cost: shared/S-cards are foundation work, reported but not a track"
+    "cost: shared/S-cards are foundation work, reported but not a track",
+    "measured against card/X1 @ e8b795c (branch point; pre-B6/A4-sync merge — suite counts and code snapshots are branch-point truth, not current main)"
   ],
   "headline": "The reference every track is graded against: 1.59 ms p50 for 200 items with numpy matmul — slower than the Kotlin port, faster than nothing, and the only implementation whose output is normative.",
   "measurements": {

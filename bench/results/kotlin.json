@@ -7,7 +7,9 @@
     "sizes: apps/kotlin/app/build/outputs/apk/debug + CI artifact scanlist-kotlin-apk (run 44026921235, card/B6)",
     "build: ./gradlew via scripts/android-env.sh on this aarch64 laptop; CI job duration from gh api",
     "loc: bench/scripts/loc.py over apps/kotlin (excludes build/)",
-    "cost: opencode session ledger + kanban/lead-log.md"
+    "cost: opencode session ledger + kanban/lead-log.md",
+    "measured against card/X1 @ e8b795c (branch point; pre-B6/A4-sync merge — suite counts and code snapshots are branch-point truth, not current main)",
+    "caveat: apps/kotlin's decideTop here is the PRE-S10 ranker (card/B3-sync merged after this measurement) — it returns a hero where S10/ts-core/oracle return null; the rank-time figure compares a different gate layer and must not be read as 'Kotlin ranker is faster'"
   ],
   "headline": "Smallest APK of the two native tracks (142 MB vs RN's 291 MB) and the fastest ranker (0.66 ms p50 for 200 items) — but every on-device latency number is still unmeasurable without the phone.",
   "measurements": {

@@ -9,7 +9,8 @@
     "sizes: apps/web/frontend/dist from `npm run build` (tsc --noEmit && vite build), gzip level 9",
     "build: local vite/vitest timings; CI job duration from gh api (run 44024925977, card/C2)",
     "loc: bench/scripts/loc.py, frontend and server counted separately",
-    "cost: opencode session ledger + kanban/lead-log.md"
+    "cost: opencode session ledger + kanban/lead-log.md",
+    "measured against card/X1 @ e8b795c (branch point; pre-B6/A4-sync merge — suite counts and code snapshots are branch-point truth, not current main)"
   ],
   "headline": "The only track with a real cold-start number (174 ms to list visible, real Chrome) and the smallest artifact (89 kB gzipped) — but image embedding costs 6.4–11.9 s per frame on the fp32 CPU path, ~4 orders of magnitude off the interactive 400 ms scan cadence.",
   "measurements": {

@@ -7,7 +7,8 @@
     "sizes: CI artifact scanlist-rn-apk (run 44023804443, card/A2) + a local `react-native bundle` of the same tree",
     "build: local metro/jest timings on this laptop; the APK itself is built by CI (aarch64 laptop cannot run the NDK/CMake prebuilts)",
     "loc: bench/scripts/loc.py over apps/rn (excludes node_modules, android/build)",
-    "cost: opencode session ledger + kanban/lead-log.md"
+    "cost: opencode session ledger + kanban/lead-log.md",
+    "measured against card/X1 @ e8b795c (branch point; pre-B6/A4-sync merge — suite counts and code snapshots are branch-point truth, not current main)"
   ],
   "headline": "Biggest artifact by far (291 MB APK, 87% of it native .so files across four ABIs) and the slowest CI build (19 min), but it reuses the shared ts-core ranker instead of porting one.",
   "measurements": {

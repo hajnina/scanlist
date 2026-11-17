@@ -2,9 +2,21 @@
 <!-- ScanList Kotlin app (card B1). No XML theme file: Compose paints everything and the window
      theme is the platform NoActionBar one, exactly like Bonsai
      (references/bonsai-ui/src/bonsai-serve/app/src/main/AndroidManifest.xml). -->
-<!-- Least privilege (B1 adversarial review, PR #9): the stub uses no camera and no
-     network. Card B4 re-adds CAMERA + INTERNET when CameraX/ML Kit actually land. -->
+<!-- Least privilege (B1 adversarial review, PR #9): the B1 stub used no camera and no network.
+     Card B4 re-adds exactly the two permissions its CameraX + ML Kit scan sources need:
+       * CAMERA      — CameraX preview + ImageAnalysis;
+       * INTERNET    — Open Food Facts name lookup for a scanned barcode (docs/ARCHITECTURE.md);
+                       ML Kit itself is bundled and needs no network.
+     The camera feature is declared optional so the APK still installs on camera-less devices /
+     the CI emulator image (the Scan screen then shows the permission/placeholder box). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
 
     <application
         android:label="ScanList"

@@ -77,6 +77,23 @@ dependencies {
     // needed — no root-owned plugin id has to change for this card.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
+    // Card B4 (camera scan sources): CameraX preview + one ImageAnalysis use case. Pinned
+    // individually at module level like the rest of this file (allowed by the S9/B4 convention:
+    // "module-level dependency pins are fine; plugin pins are root-owned"). 1.4.1 is the newest
+    // CameraX line that builds on compileSdk 35 (1.5.x wants 36).
+    implementation("androidx.camera:camera-core:1.4.1")
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+
+    // Card B4: ML Kit BUNDLED variants — the models ship inside the APK, so scanning works offline
+    // and without Google Play Services. That is the point of "bundled": no Play-services dependency.
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+
     // Card B2 Done-when: JVM unit tests for the parse/flatten/persist/export logic.
+    // Card B4 Done-when: JVM unit tests for the scan-source logic with fake frames/clocks.
     testImplementation("junit:junit:4.13.2")
 }

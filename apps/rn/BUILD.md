@@ -10,11 +10,18 @@ This file lists **every** local override and hack, and what is deliberately not 
 
 | Build | Command | Result |
 |---|---|---|
-| Laptop (aarch64 Linux) | `apps/rn/build.sh` | **see "Local build log" at the bottom** |
-| CI (x86_64 ubuntu runner) | `.github/workflows/pr.yml` → `rn` job: `cd apps/rn/android && ./gradlew --no-daemon assembleDebug` | see the PR |
+| **Shipping** (x86_64 host / CI) | `cd apps/rn/android && ./gradlew assembleRelease` | `app/build/outputs/apk/release/app-release.apk` — bundles + Hermes-compiles the JS, runs standalone. **The only publishable artifact.** |
+| Dev, laptop (aarch64 Linux) | `apps/rn/build.sh` | `app/build/outputs/apk/debug/app-debug.apk` + Metro — **see "Local build log"** |
+| Dev, CI (x86_64 ubuntu runner) | `.github/workflows/pr.yml` → `rn` job: `cd apps/rn/android && ./gradlew --no-daemon assembleDebug` | debug APK, dev-only (see the PR) |
 
 `apps/rn/build.sh` is the entry point on the laptop; plain `./gradlew assembleDebug` in
 `apps/rn/android` is the same project without the four aarch64-only `-P` flags.
+
+> **Debug ≠ shippable.** `assembleDebug` deliberately contains **no** `assets/index.android.bundle`:
+> it loads the JS from Metro, so on a fresh install it shows
+> *"Metro can't load the script"* (or a red screen asking for the dev server). That message is the
+> signature of a debug APK, not an app bug. Never publish, rename-and-attach, or hand out a
+> `-debug.apk`. Details and the pre-publish check: [`docs/RELEASE.md`](docs/RELEASE.md).
 
 ## Versions
 
@@ -38,10 +45,30 @@ deleted (no Mac in this project, and every comparison target is an APK).
 
 ## How to build
 
+### Shipping build (the artifact you publish)
+
+```bash
+# x86_64 host or CI runner — NOT this aarch64 laptop (hermesc is linux-x86_64 only, see below)
+cd apps/rn/android
+./gradlew --no-daemon assembleRelease
+# -> app/build/outputs/apk/release/app-release.apk
+```
+
+`assembleRelease` runs Metro's bundler (`createBundleReleaseJsAndAssets`) and compiles the bundle to
+Hermes bytecode, so the APK carries `assets/index.android.bundle` and starts without a dev server.
+It is signed by the `release` build type, which reuses the throwaway debug keystore
+(`android/app/build.gradle:141` → `signingConfigs.debug`, generated on demand by
+`scripts/make-debug-keystore.sh`); ProGuard/minify is off (`enableProguardInReleaseBuilds = false`,
+`android/app/build.gradle:60`). That is enough for side-loading, **not** for Play/store distribution
+(identity is the public Android debug key).
+
+Add `-Pscanlist.ndkVersion=<ndk>` only on an aarch64 host that has such an NDK; CI passes nothing.
+
+### Dev build (Metro, never publish)
+
 ```bash
 # laptop (aarch64): sources scripts/android-env.sh itself
 apps/rn/build.sh                 # assembleDebug -> android/app/build/outputs/apk/debug/app-debug.apk
-apps/rn/build.sh assembleRelease # not on this laptop, see "Not done here"
 
 # CI / x86_64 host: stock toolchain, RN's own defaults
 cd apps/rn/android && ./gradlew --no-daemon assembleDebug
@@ -50,8 +77,23 @@ cd apps/rn/android && ./gradlew --no-daemon assembleDebug
 cd apps/rn && npm install && npm run typecheck && npm test
 ```
 
-Install: `adb install -r apps/rn/android/app/build/outputs/apk/debug/app-debug.apk`
-then `npm start` (Metro) in `apps/rn` for the dev bundle.
+Install the **dev** APK: `adb install -r apps/rn/android/app/build/outputs/apk/debug/app-debug.apk`,
+then `npm start` (Metro) in `apps/rn` — without Metro this build shows "Metro can't load the script".
+Install the **shipping** APK: `adb install -r apps/rn/android/app/build/outputs/apk/release/app-release.apk`
+— no Metro, no dev server, works offline (network only for OpenFoodFacts lookups and the model download).
+Because both build types use the same package id **and the same debug key**, `-r` replaces one with the
+other cleanly.
+
+### Verify an APK before publishing
+
+```bash
+unzip -l app-release.apk | grep assets/index.android.bundle   # must print one line
+unzip -Z1 app-release.apk 'lib/*' | cut -d/ -f2 | sort -u     # must print only arm64-v8a
+```
+
+A debug APK fails the first check: it has no `assets/index.android.bundle` at all (the ABI check only
+catches a build where the ABI filter was widened, which is why it must not be the only check). Also
+confirm the package: `aapt2 dump badging app-release.apk | head -1` → `package: name='dev.hajnina.scanlist.rn'`.
 
 ## Overrides and hacks (all of them)
 
@@ -68,6 +110,15 @@ then `npm start` (Metro) in `apps/rn` for the dev bundle.
 
 Nothing above is baked into `android/build.gradle`, `android/app/build.gradle` or
 `gradle.properties` as a laptop path: on CI the same project builds with RN's stock versions.
+
+### Release configuration (audited 2026-11-17)
+
+No release-specific override exists, and none is needed for a standalone APK: `debuggableVariants`
+keeps its RN default (`debug`, `debugOptimized`), so `release` runs the bundle + Hermes tasks;
+`hermesEnabled=true` (`android/gradle.properties:42`) compiles the bundle; ProGuard is off
+(`android/app/build.gradle:60`); and `android:usesCleartextTraffic` is resolved by the RN Gradle
+plugin (`true` debug / `false` release). Full findings, file:line, with the CI gap that currently
+publishes the debug APK: [`docs/RELEASE.md`](docs/RELEASE.md).
 
 ## Something for the lead (outside this card's `owns`)
 
@@ -89,7 +140,13 @@ Nothing above is baked into `android/build.gradle`, `android/app/build.gradle` o
 * **`modules/embed`** — directory + `Embedder` contract only; no TurboModule, no model weights
   (weights live in `~/models/scanlist/` and are gitignored anyway).
 * **Release builds on this laptop** — `assembleRelease` bundles JS through `hermesc`, which RN
-  downloads as a **linux-x86_64** binary; it cannot run on aarch64. Release is a CI job.
+  downloads as a **linux-x86_64** binary; it cannot run on aarch64. Release is built on an x86_64
+  host / CI runner. `apps/rn/build.sh assembleRelease` is **not** a supported release path either:
+  it passes the aarch64 `-P` flags (fine) but its report step hardcodes
+  `app/build/outputs/apk/debug/app-debug.apk` (`build.sh:103`), so a successful release build is
+  reported as "FAILED — no APK" (or a stale debug APK is reported as `OK`). Run `./gradlew
+  assembleRelease` in `apps/rn/android` directly. `build.sh` has no release handling in this card;
+  see [`docs/RELEASE.md`](docs/RELEASE.md).
 * **iOS** — deleted, see above.
 
 ## Layout

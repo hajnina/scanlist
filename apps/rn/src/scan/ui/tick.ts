@@ -38,6 +38,7 @@ import type {CameraFrame, ScanSignal} from '../sources';
 import type {OffLookupSource, OffLookupResult} from './off';
 import {
   SignalPool,
+  buildTextQueries,
   type PoolSnapshot,
   type ScanPoolOptions,
 } from './pool';
@@ -317,9 +318,11 @@ export class ScanTickEngine {
       return this.failedTick(at, embedError, barcode, ocrTexts);
     }
 
-    // 3. Text queries: barcode first, then OCR lines, ≤16 (pool-order fix).
-    const textQueries = this.pool.textQueries(barcodeName, at).slice(
-      0,
+    // 3. Text queries: barcode first, then OCR lines, ≤16 (pool-order fix). Built from the OCR
+    // batch taken above — `pool.textQueries` cannot be used here because `takeOCR` cleared it.
+    const textQueries = buildTextQueries(
+      snapshot.barcode === null ? null : barcodeName,
+      ocrTexts,
       this.maxTextQueries,
     );
     const textVectors: number[][] = [];

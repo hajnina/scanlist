@@ -70,4 +70,13 @@ dependencies {
     implementation("androidx.compose.foundation:foundation:1.8.2")
     implementation("androidx.compose.animation:animation:1.8.2")
     implementation("androidx.compose.material3:material3:1.4.0")
+
+    // Card B2 (list import/export). kotlinx.serialization-json is pinned at module level (allowed by
+    // the S9/B4 convention: "module-level dependency pins are fine; plugin pins are root-owned").
+    // Only the JsonElement tree API is used, so the kotlinx.serialization COMPILER PLUGIN is not
+    // needed — no root-owned plugin id has to change for this card.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // Card B2 Done-when: JVM unit tests for the parse/flatten/persist/export logic.
+    testImplementation("junit:junit:4.13.2")
 }

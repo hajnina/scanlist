@@ -15,6 +15,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.hajnina.scanlist.kotlin.list.ListDetailScreen
+import dev.hajnina.scanlist.kotlin.list.ListsHomeScreen
+import dev.hajnina.scanlist.kotlin.list.rememberListState
 
 /** Top-level destinations. List is pushed from Lists (see [ScanListApp]). */
 enum class Tab(val label: String) {
@@ -27,12 +30,16 @@ enum class Tab(val label: String) {
  * Root shell: one scrolling screen body + an expressive pill tab bar, edge-to-edge like Bonsai
  * (root background = surface, windowInsetsPadding(safeDrawing) — STYLE_GUIDE.md §5/§6).
  * No navigation library for a four-screen skeleton; the List screen is a simple back-stack of one.
+ *
+ * Card B2: the Lists tab is now the real imported-list screen (import file/paste, nested list,
+ * tick, persist, export) from the `list` package; the pushed detail screen is keyed by the list id.
  */
 @Composable
 fun ScanListApp() {
     val cs = MaterialTheme.colorScheme
     var tab by remember { mutableStateOf(Tab.Lists) }
-    var openList by remember { mutableStateOf<StubList?>(null) }
+    var openList by remember { mutableStateOf<String?>(null) }
+    val listState = rememberListState()
 
     Column(
         Modifier
@@ -42,10 +49,14 @@ fun ScanListApp() {
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            val list = openList
+            val listId = openList
             when {
-                list != null -> ListScreen(list, onBack = { openList = null })
-                tab == Tab.Lists -> ListsScreen(onOpen = { openList = it })
+                listId != null -> ListDetailScreen(
+                    state = listState,
+                    listId = listId,
+                    onBack = { openList = null },
+                )
+                tab == Tab.Lists -> ListsHomeScreen(listState, onOpen = { openList = it })
                 tab == Tab.Scan -> ScanScreen()
                 else -> SettingsScreen()
             }

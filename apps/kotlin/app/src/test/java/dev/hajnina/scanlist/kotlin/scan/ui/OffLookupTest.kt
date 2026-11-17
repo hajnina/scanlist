@@ -281,6 +281,35 @@ class OffLookupTest {
         assertEquals("no fourth attempt", 3, transport.urls.size)
     }
 
+    @Test
+    fun `a failing barcode does not delay another barcode's first attempt`() {
+        val store = cache()
+        val a = "3017620422003"
+        val b = "8076800195057"
+        val transport = object : OffTransport {
+            val urls = mutableListOf<String>()
+
+            override fun get(url: String, userAgent: String): OffHttp {
+                urls += url
+                return if (url.contains(a)) {
+                    OffHttp(500, "down")
+                } else {
+                    OffHttp(200, """{"status":1,"product":{"product_name":"Barilla"}}""")
+                }
+            }
+        }
+        val resolver = OffResolver(store, transport, RequestThrottle(minSpacingMs = 0))
+
+        assertEquals(OffOutcome.TRANSIENT, resolver.lookup(a, nowMs = 0).outcome)
+        assertEquals("A is now backing off", OffOutcome.TRANSIENT, resolver.lookup(a, nowMs = 100).outcome)
+        assertEquals("the backoff blocked A's second attempt", 1, transport.urls.size)
+
+        val other = resolver.lookup(b, nowMs = 100)
+        assertEquals("another barcode is not gated by A's retry state", OffOutcome.HIT, other.outcome)
+        assertEquals("Barilla", other.text)
+        assertEquals("B reached the network immediately", 2, transport.urls.size)
+    }
+
     // ---------------------------------------------------------------- OFF.md §2 redirects
 
     @Test

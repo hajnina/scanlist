@@ -7,6 +7,7 @@ import java.io.File
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -115,6 +116,41 @@ class ScanControllerTest {
         assertNotEquals("A's text never reaches B's ranking", "A Product", controller.view.barcodeText)
     }
 
+    // ---------------------------------------------------------------- fix 1b: cache still warms
+
+    /**
+     * The guard above protects the strip, not the cache: A's product name is still a valid OFF
+     * answer, so a superseded (late) answer must land in the cache for the next pass that scans A.
+     */
+    @Test
+    fun `a superseded answer still warms the OFF cache`() {
+        val a = "3017620422003"
+        val b = "3017620425035"
+        val store = cache()
+        val transport = BlockingTransport(a)
+        val resolver = OffResolver(store, transport, RequestThrottle(minSpacingMs = 0))
+        val clock = MutableClock()
+        val controller = controller(resolver = resolver, clock = clock)
+        controller.start()
+
+        controller.onSignal(ScanSignal.barcode(a, clock.nowMs()))
+        assertTrue("A's lookup started", transport.aStarted.await(10, TimeUnit.SECONDS))
+
+        clock.now += 100
+        controller.onSignal(ScanSignal.barcode(b, clock.nowMs()))
+        await("B's strip") {
+            controller.barcodeUi.barcode == b && controller.barcodeUi.text == "B Product"
+        }
+
+        transport.releaseA.countDown()
+        assertTrue("A's request returned", transport.aReturned.await(10, TimeUnit.SECONDS))
+        // The write happens on the IO lane, just before the answer is enqueued for the strip.
+        await("A's late answer reaches the cache") { store.get(a, 0)?.text == "A Product" }
+
+        assertEquals("the strip still describes B", b, controller.barcodeUi.barcode)
+        assertEquals("A Product", store.get(a, 0)?.text)
+    }
+
     // ---------------------------------------------------------------- fix 3: newest frame wins
 
     /** An image embed blocks; frames 2 and 3 arrive; after release the lane must embed frame 3. */
@@ -142,6 +178,52 @@ class ScanControllerTest {
         assertEquals("frame 2 was superseded before it could embed", listOf(1, 3), embedder.images.toList())
     }
 
+    // ---------------------------------------------------------------- fix 4: lane fairness
+
+    /**
+     * The reviewer's repro: a CPU embed (~600 ms) outlasts the ~400 ms frame cadence, so a frame is
+     * always pending. With the old `while (true)` drain loop the single work lane never yielded and a
+     * mid-stream TEXT signal stayed queued forever; one frame per task + re-enqueue lets it through.
+     */
+    @Test
+    fun `slow embeds do not starve the lane`() {
+        val embedder = SlowImageEmbedder(embedMs = 600)
+        val clock = MutableClock()
+        val controller = controller(embedder = embedder, clock = clock)
+        controller.start()
+
+        val line = "milk"
+        val feeding = AtomicBoolean(true)
+        val feeder = Thread {
+            while (feeding.get()) {
+                controller.onSignal(ScanSignal.image(byteArrayOf(7), clock.nowMs()))
+                clock.now += 400
+                try {
+                    Thread.sleep(400)
+                } catch (_: InterruptedException) {
+                    return@Thread
+                }
+            }
+        }
+        feeder.isDaemon = true
+        feeder.start()
+
+        try {
+            Thread.sleep(500) // the first 600 ms embed is still in flight
+            controller.onSignal(ScanSignal.text(line, clock.nowMs()))
+
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (!embedder.texts.contains(line) && System.nanoTime() < deadline) Thread.sleep(10)
+            assertTrue(
+                "a TEXT signal enqueued mid-stream never reached the embedder — the frame lane starved it",
+                embedder.texts.contains(line),
+            )
+        } finally {
+            feeding.set(false)
+            feeder.interrupt()
+        }
+    }
+
     // ---------------------------------------------------------------- fakes
 
     /** Answers B immediately; blocks A until the test releases it. */
@@ -165,6 +247,22 @@ class ScanControllerTest {
 
         private fun body(name: String) =
             """{"status":1,"product":{"product_name":"$name"}}"""
+    }
+
+    /** Takes ~[embedMs] per image, like the CPU backend, and records every text query it is asked. */
+    private class SlowImageEmbedder(private val embedMs: Long) : QueryEmbedder {
+        override val dims: Int = RANK_DIMS_ACTIVE
+        val texts: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
+        override fun text(text: String): DoubleArray {
+            texts += text
+            return axis(0, RANK_DIMS_ACTIVE)
+        }
+
+        override fun image(jpeg: ByteArray): DoubleArray {
+            Thread.sleep(embedMs)
+            return axis(0, RANK_DIMS_ACTIVE)
+        }
     }
 
     /** Records the frame tag (its first byte) and blocks the first embed so a queue can build. */

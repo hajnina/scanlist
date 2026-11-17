@@ -107,21 +107,36 @@ class ScanController(
         }
     }
 
-    /** Embeds the newest pending frame, then loops if more arrived while that embed was running. */
+    /**
+     * Embeds **one** pending frame, then yields the lane: if another frame arrived meanwhile it is
+     * re-enqueued at the back of the queue, so an OCR/TICK/OFF task that was already waiting runs
+     * between frames instead of starving behind a camera that never pauses (a CPU embed can easily
+     * outlast the ~400 ms frame cadence). The frame choice is still newest-wins, because coalescing
+     * happens in [onSignal] while the previous frame is embedding.
+     */
     private fun drainImages() {
-        while (true) {
-            val next = synchronized(lock) {
-                val queued = pendingImage
-                if (queued == null) {
-                    imageDraining = false
-                    null
-                } else {
-                    pendingImage = null
-                    queued
-                }
-            } ?: return
-            publish(session.signal(next))
+        val next = synchronized(lock) {
+            val queued = pendingImage
+            if (queued == null) {
+                imageDraining = false
+                null
+            } else {
+                pendingImage = null
+                queued
+            }
         }
+        if (next == null) return
+        publish(session.signal(next))
+
+        val again = synchronized(lock) {
+            if (pendingImage == null) {
+                imageDraining = false
+                false
+            } else {
+                true
+            }
+        }
+        if (again) enqueue { drainImages() }
     }
 
     /** The big tick: commit to the list (never automatic) and re-rank with the updated `done` flags. */

@@ -55,16 +55,11 @@
 
 .scan-chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin: 0;
   padding: 2px 2px 4px;
-  overflow-x: auto;
   list-style: none;
-  scrollbar-width: none;
-}
-
-.scan-chips::-webkit-scrollbar {
-  display: none;
 }
 
 .scan-chip {

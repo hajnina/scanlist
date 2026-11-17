@@ -59,7 +59,7 @@ then `npm start` (Metro) in `apps/rn` for the dev bundle.
 |---|---|---|---|---|
 | 1 | `-Pandroid.aapt2FromMavenOverride=<aarch64 aapt2>` | the SDK's Maven aapt2 is an x86_64 ELF and dies with "Exec format error" on this laptop | `scripts/android-env.sh` (`GRADLE_OPTS`), re-passed explicitly by `build.sh` | no — CI has no aarch64 toolchain, so the flag is absent |
 | 2 | `-Pscanlist.ndkVersion=<version>` | RN 0.88's default NDK 27.1.x ships **x86_64-only** LLVM prebuilts; the new-arch C++ glue (`ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt`) cannot be compiled with it on aarch64. NDK 30.0.16248370 in the shared toolchain *does* have `toolchains/llvm/prebuilt/linux-aarch64` | `build.sh` (auto-detects the newest aarch64-capable NDK); `android/app/build.gradle` reads the property, defaulting to `rootProject.ext.ndkVersion` | no — property unset ⇒ RN's default 27.1.12297006 |
-| 3 | `-PreactNativeArchitectures=arm64-v8a` | the debug APK only needs the phone's ABI; CMake otherwise builds 4 ABIs (4× the native work) | `build.sh` only | no — CI builds all four |
+| 3 | `-PreactNativeArchitectures=arm64-v8a` | the debug APK only needs the phone's ABI; CMake otherwise builds 4 ABIs (4× the native work) | `build.sh` only | no — `abiFilters 'arm64-v8a'` in `android/app/build.gradle` already limits CI (and every local build) to one ABI; the flag is now redundant but harmless |
 | 4 | `-Dorg.gradle.jvmargs=-Xmx3g …` | the shared Gradle slot lock (`~/projects/martins-whisper/owner/tools/gradle-slot.sh`) caps the daemon at 1.5 GB, which is not enough for AGP 9 + Kotlin + codegen | `build.sh` only | no |
 | 5 | Throwaway debug keystore generated on demand | AGENTS.md: keystores never in git. RN's template signs with `android/app/debug.keystore` | `scripts/make-debug-keystore.sh` (keytool, alias `androiddebugkey`, password `android`, RSA 2048, 10 000 days, PKCS12); called by `android/app/build.gradle` when the file is missing **and** by `build.sh` | **yes** — the file is gitignored, so the Gradle call is what keeps CI signing; nothing secret is committed |
 | 6 | `npm install` from `android/settings.gradle` when `node_modules` is missing | the lead-owned CI workflow builds `apps/rn/android` with a bare `./gradlew assembleDebug` and has no npm step, but RN autolinking + the included `:react-native` Gradle plugin live in `node_modules` (gitignored) | `android/settings.gradle` (first 20 lines) — idempotent one-off | **yes** |
@@ -147,11 +147,14 @@ lib/arm64-v8a/libreactnative.so        24 062 944 B
 
 A3 update (2026-11-17): the TurboModule card wired `shared/android-embed` into the app, so the
 APK grows 38M → 71M (the LiteRT-LM JNI lib `liblitertlm_jni.so` is packaged for arm64-v8a and
-x86_64 only — the CI all-ABI APK is 178 MiB; on armeabi-v7a/x86 the app installs but engine
-calls reject as `E_EMBED`, no crash) and
-`minSdkVersion` is now `31`. CI `rn` job green on the A3 head in 2m42s. Dev screen:
+x86_64 only) and `minSdkVersion` is now `31`. CI `rn` job green on the A3 head in 2m42s. Dev screen:
 `apps/rn/src/dev/` (hidden dev affordance; shows backend/dims/latency or `E_NO_BACKEND` until
 card B0 provisions the model on device).
+
+ABI update: `android/app/build.gradle` now packages `arm64-v8a` only, so the APK no longer carries
+the unused `x86`/`x86_64`/`armeabi-v7a` copies (the four-ABI CI APK was 178 MiB). Non-arm64
+devices/emulators can no longer install it — see [`README.md`](README.md).
+
 lib/arm64-v8a/libhermesvm.so            4 021 008 B
 lib/arm64-v8a/libreact_codegen_safeareacontext.so
 ```

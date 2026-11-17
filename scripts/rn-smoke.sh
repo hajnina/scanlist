@@ -53,7 +53,7 @@ if grep -q "FATAL EXCEPTION" logcat-launch.txt; then
   exit 1
 fi
 
-# Best-effort navigation by visible/accessibility label. Returns 1 when not found (caller ignores).
+# Best-effort navigation by visible/accessibility label. Returns 1 when not found.
 tap_text() {
   adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || return 1
   adb pull /sdcard/window.xml . >/dev/null 2>&1 || return 1
@@ -79,19 +79,31 @@ sys.exit(1)
 PY
 }
 
-if tap_text "Settings"; then
-  sleep 3
-  adb exec-out screencap -p > screen-2-settings.png
-  adb shell input keyevent 4
-  sleep 3
-fi
+# The three screenshots are REQUIRED evidence for UI review, not best-effort decorations.
+# There is no reachable "Magic scan" screen on a fresh install: the only occurrences of that
+# label live in the dead HomeSkeleton (ListsScreen replaced it in card A2). The real app has two
+# screens (lists, settings) plus the Paste-JSON dialog — capture all three.
+tap_text "Paste JSON" || { echo "::error::could not find the Paste JSON button"; exit 1; }
+sleep 2
+adb exec-out screencap -p > screen-2-import.png
+tap_text "Cancel" || { echo "::error::could not dismiss the paste dialog"; exit 1; }
+sleep 2
 
-if tap_text "Magic scan"; then
-  sleep 4
-  adb exec-out screencap -p > screen-3-scan.png
-  adb shell input keyevent 4
-  sleep 2
-fi
+tap_text "Settings" || { echo "::error::could not find the Settings button"; exit 1; }
+sleep 3
+adb exec-out screencap -p > screen-3-settings.png
+
+# Hardware back must return to the lists screen; proves the settings exit path too.
+adb shell input keyevent 4
+sleep 3
+adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1
+adb pull /sdcard/window.xml . >/dev/null 2>&1
+grep -q 'Shopping list' window.xml || {
+  echo "::error::back from Settings did not return to the lists screen"; exit 1; }
+
+for shot in screen-1-lists.png screen-2-import.png screen-3-settings.png; do
+  test -s "$shot" || { echo "::error::missing screenshot $shot"; exit 1; }
+done
 
 adb logcat -d > logcat-end.txt
 if grep -q "FATAL EXCEPTION" logcat-end.txt; then

@@ -221,6 +221,7 @@ export function ScanScreen({repository, stored, onBack, onChanged}: Props) {
     activity,
     tick,
     modelMissing: model.missing,
+    modelDownload: model.download,
   });
   const permissionCopy = guidance?.kind === 'camera' ? guidance : null;
   const hint = guidance !== null && guidance.kind !== 'camera' ? guidance : null;

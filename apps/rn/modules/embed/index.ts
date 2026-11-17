@@ -96,7 +96,34 @@ export interface EmbedStatus {
   modelSha256: string;
   /** The prefix set from the bundled prompts.json, or null when unavailable. */
   prompts: NativePrompts | null;
+  /** Card MODELDL: in-app download of the 484 MB bundle (idle when absent). */
+  download: EmbedDownload;
 }
+
+/** State of the in-app model download (`ModelDownload.kt`). */
+export type EmbedDownloadState =
+  | 'idle'
+  | 'downloading'
+  | 'verifying'
+  | 'ready'
+  | 'failed';
+
+export interface EmbedDownload {
+  state: EmbedDownloadState;
+  bytes: number;
+  total: number;
+  /** 0-100, rounded down. */
+  pct: number;
+  error: string | null;
+}
+
+export const IDLE_DOWNLOAD: EmbedDownload = {
+  state: 'idle',
+  bytes: 0,
+  total: 0,
+  pct: 0,
+  error: null,
+};
 
 /** Stable error codes crossing the bridge (Kotlin `EmbedModule.codeOf`). */
 export const EMBED_ERROR = {
@@ -377,6 +404,7 @@ export async function embedStatus(): Promise<EmbedStatus> {
       modelReadable: false,
       modelSha256: '',
       prompts: null,
+      download: IDLE_DOWNLOAD,
     };
   }
   try {
@@ -394,6 +422,7 @@ export async function embedStatus(): Promise<EmbedStatus> {
       modelReadable: status.modelReadable === true,
       modelSha256: status.modelSha256 ?? '',
       prompts: status.prompts ?? null,
+      download: status.download ?? IDLE_DOWNLOAD,
     };
   } catch (error) {
     throw wrapError(error);

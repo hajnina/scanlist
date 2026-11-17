@@ -48,11 +48,14 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - name: ts-core tests
+      - name: ts-core typecheck + tests
+        # Mirrors pr.yml: vitest alone let type errors in shared/ts-core through.
+        # `npm run typecheck` is `tsc --noEmit` per its package.json.
         run: |
           if [ -f shared/ts-core/package.json ]; then
             cd shared/ts-core
             npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+            npm run typecheck
             npm test
           elif [ -d shared/ts-core/src ]; then
             echo "::error::shared/ts-core has sources but no package.json - card not done"; exit 1
@@ -83,6 +86,13 @@ jobs:
           if [ ! -f apps/kotlin/app/build.gradle.kts ] && [ ! -f apps/kotlin/build.gradle.kts ]; then echo "::error::apps/kotlin changed but has no module build file - card not done"; exit 1; fi
           chmod +x gradlew
           ./gradlew --no-daemon :scanlistKotlin:assembleDebug
+      - name: Unit tests
+        # Mirrors pr.yml: assembleDebug alone never ran apps/kotlin/app/src/test. Same root
+        # build/wrapper as the step above (compiled debug classes are reused).
+        run: |
+          if [ ! -f gradlew ] || [ ! -f settings.gradle.kts ]; then echo "::error::no root gradle build yet (card S9) - cannot run apps/kotlin unit tests"; exit 1; fi
+          chmod +x gradlew
+          ./gradlew --no-daemon :scanlistKotlin:testDebugUnitTest
       - name: Rename APK
         if: hashFiles('apps/kotlin/app/build/outputs/apk/debug/*.apk') != ''
         run: mv apps/kotlin/app/build/outputs/apk/debug/*.apk ScanList-kotlin-debug.apk
@@ -107,6 +117,15 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      - name: JS typecheck + jest
+        # Mirrors pr.yml: jest + tsc gate the JS side before the APK build (fail fast). Node '22'
+        # matches the web job pin and apps/rn's engines (>= 22.11.0).
+        working-directory: apps/rn
+        run: |
+          if [ ! -f package.json ]; then echo "::error::apps/rn changed but has no package.json - card not done"; exit 1; fi
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          npm run typecheck
+          npm test -- --ci
       - name: Build APK
         working-directory: apps/rn/android
         run: |

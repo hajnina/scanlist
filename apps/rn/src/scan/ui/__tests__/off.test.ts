@@ -9,9 +9,12 @@ import {readFileSync} from 'fs';
 import {join} from 'path';
 import {MemoryKeyValueStore} from '../../../list/store';
 import {
+  OFF_BACKOFF_CAP_MS,
   OFF_CACHE_MAX_ENTRIES,
   OFF_CACHE_PREFIX,
+  OFF_CONNECT_TIMEOUT_MS,
   OFF_FIELDS,
+  OFF_REDIRECT_MAX_HOPS,
   OFF_TTL_HIT_S,
   OFF_TTL_MISS_S,
   OFF_USER_AGENT,
@@ -22,8 +25,10 @@ import {
   isOffEntryFresh,
   isValidBarcode,
   offCacheKey,
+  resolveOffRedirect,
   truncateOffText,
   type OffCacheEntry,
+  type OffClientOptions,
   type OffFetch,
   type OffResponseLike,
 } from '../off';
@@ -255,12 +260,14 @@ function clientWith(
   fetchImpl: OffFetch,
   store = new MemoryKeyValueStore(),
   clock = mutableClock(),
+  options: Partial<OffClientOptions> = {},
 ) {
   const client = new OffClient({
     store,
     fetch: fetchImpl,
     now: clock.now,
     sleep: clock.sleep,
+    ...options,
   });
   return {client, store, clock};
 }
@@ -384,11 +391,19 @@ test('transient failure without a stale entry is "none", never a throw', async (
 
 test('a 5xx or timeout is retried at most 3 times per scan session', async () => {
   let fetches = 0;
-  const {client} = clientWith(async () => {
-    fetches += 1;
-    return response(500, 'error');
-  });
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  const clock = mutableClock(0);
+  const {client} = clientWith(
+    async () => {
+      fetches += 1;
+      return response(500, 'error');
+    },
+    new MemoryKeyValueStore(),
+    clock,
+    {minSpacingMs: 0},
+  );
+  // Each retry waits its 1 s / 2 s backoff, so the clock is advanced between attempts.
+  for (const at of [0, 1_000, 3_000, 7_000, 120_000]) {
+    clock.advance(at - clock.now());
     await client.lookup('3017620422003');
   }
   expect(fetches).toBe(3);
@@ -422,6 +437,300 @@ test('429 honours Retry-After before the next attempt at that barcode', async ()
   expect(after.source).toBe('network');
   expect(after.text).toBe('Nutella');
   expect(fetches).toBe(2);
+});
+
+// --- OFF.md §4.4/§5 retry timing (Kotlin OffResolver parity) --------------------------------
+
+test('a 5xx backs off 1 s → 2 s → 4 s and stops after the third attempt', async () => {
+  let fetches = 0;
+  const clock = mutableClock(0);
+  const {client} = clientWith(
+    async () => {
+      fetches += 1;
+      return response(500, 'down');
+    },
+    new MemoryKeyValueStore(),
+    clock,
+    {minSpacingMs: 0},
+  );
+
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  expect(fetches).toBe(1);
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  expect(fetches).toBe(1); // inside the 1 s backoff
+
+  clock.advance(1_000);
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  expect(fetches).toBe(2); // 1 s after the first failure
+
+  clock.advance(1_999);
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  expect(fetches).toBe(2); // still inside the 2 s backoff
+
+  clock.advance(1);
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  expect(fetches).toBe(3); // 2 s after the second failure
+
+  const exhausted = await client.lookup('3017620422003');
+  expect(exhausted.source).toBe('none');
+  expect(exhausted.note).toContain('retry budget exhausted');
+  clock.advance(10 * 60_000);
+  await client.lookup('3017620422003');
+  expect(fetches).toBe(3); // the third failure's 4 s value never buys a fourth request
+});
+
+test('the exponential backoff is capped at 60 s', async () => {
+  let fetches = 0;
+  const clock = mutableClock(0);
+  const {client} = clientWith(
+    async () => {
+      fetches += 1;
+      return response(500, 'down');
+    },
+    new MemoryKeyValueStore(),
+    clock,
+    // A higher budget than the default exposes the later rungs of the ladder.
+    {minSpacingMs: 0, maxTransientAttempts: 8},
+  );
+  expect(OFF_BACKOFF_CAP_MS).toBe(60_000);
+
+  // 1 s, 2 s, 4 s, 8 s, 16 s, 32 s between the first seven failures.
+  for (const at of [0, 1_000, 3_000, 7_000, 15_000, 31_000, 63_000]) {
+    clock.advance(at - clock.now());
+    expect((await client.lookup('3017620422003')).source).toBe('none');
+  }
+  expect(fetches).toBe(7);
+
+  // The seventh failure would schedule 64 s; the cap makes it 60 s.
+  clock.advance(59_999);
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  expect(fetches).toBe(7);
+  clock.advance(1);
+  await client.lookup('3017620422003');
+  expect(fetches).toBe(8);
+});
+
+test('Retry-After wins over the exponential schedule, even on a 5xx', async () => {
+  let fetches = 0;
+  const clock = mutableClock(0);
+  const {client} = clientWith(
+    async () => {
+      fetches += 1;
+      return fetches === 1
+        ? response(503, 'busy', {'retry-after': '7'})
+        : response(200, HIT_BODY);
+    },
+    new MemoryKeyValueStore(),
+    clock,
+    {minSpacingMs: 0},
+  );
+
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  clock.advance(6_999);
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  expect(fetches).toBe(1);
+  clock.advance(1);
+  expect((await client.lookup('3017620422003')).source).toBe('network');
+  expect(fetches).toBe(2);
+});
+
+test('a 429 without Retry-After waits the 60 s default', async () => {
+  let fetches = 0;
+  const clock = mutableClock(0);
+  const {client} = clientWith(
+    async () => {
+      fetches += 1;
+      return fetches === 1 ? response(429, {}) : response(200, HIT_BODY);
+    },
+    new MemoryKeyValueStore(),
+    clock,
+    {minSpacingMs: 0},
+  );
+
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  clock.advance(59_999);
+  expect((await client.lookup('3017620422003')).source).toBe('none');
+  expect(fetches).toBe(1);
+  clock.advance(1);
+  expect((await client.lookup('3017620422003')).source).toBe('network');
+  expect(fetches).toBe(2);
+});
+
+test('a failing barcode does not delay another barcode’s first attempt', async () => {
+  const a = '3017620422003';
+  const b = '8076800195057';
+  const urls: string[] = [];
+  const clock = mutableClock(0);
+  const {client} = clientWith(
+    async url => {
+      urls.push(url);
+      return url.includes(a)
+        ? response(500, 'down')
+        : response(200, {status: 1, product: {product_name: 'Barilla'}});
+    },
+    new MemoryKeyValueStore(),
+    clock,
+    {minSpacingMs: 0},
+  );
+
+  expect((await client.lookup(a)).source).toBe('none');
+  const gated = await client.lookup(a);
+  expect(gated.note).toContain('backing off');
+  expect(urls).toHaveLength(1); // A is in its 1 s backoff
+
+  const other = await client.lookup(b);
+  expect(other).toMatchObject({text: 'Barilla', source: 'network'});
+  expect(urls).toHaveLength(2); // B reached the network at the same instant
+});
+
+test('after three transient failures the answer is cache-only, with an honest note', async () => {
+  const store = new MemoryKeyValueStore();
+  const clock = mutableClock(0);
+  const staleAt = 0 - OFF_TTL_HIT_S - 10; // expired 10 s ago: usable as stale only
+  await store.setItem(
+    offCacheKey('3017620422003'),
+    JSON.stringify({text: 'Nutella', hit: true, fetchedAt: staleAt}),
+  );
+  let fetches = 0;
+  const {client} = clientWith(
+    async () => {
+      fetches += 1;
+      return response(503, 'down');
+    },
+    store,
+    clock,
+    {minSpacingMs: 0},
+  );
+
+  for (const at of [0, 1_000, 3_000]) {
+    clock.advance(at - clock.now());
+    const result = await client.lookup('3017620422003');
+    expect(result).toMatchObject({text: 'Nutella', source: 'stale'});
+  }
+  expect(fetches).toBe(3);
+  const exhausted = await client.lookup('3017620422003');
+  expect(exhausted).toMatchObject({text: 'Nutella', source: 'stale'});
+  expect(exhausted.note).toContain('retry budget exhausted');
+  const stored = JSON.parse(
+    store.raw(offCacheKey('3017620422003')) as string,
+  ) as OffCacheEntry;
+  expect(stored.fetchedAt).toBe(staleAt);
+});
+
+// --- OFF.md §2 redirects (Kotlin OffRedirect parity) ----------------------------------------
+
+test('redirect policy: three hops, HTTPS only, relative targets resolve', () => {
+  let url = `https://world.openfoodfacts.org/api/v2/product/3017620422003.json`;
+  for (let followed = 0; followed < OFF_REDIRECT_MAX_HOPS; followed += 1) {
+    const next = resolveOffRedirect(
+      url,
+      `https://world.openfoodfacts.org/hop${followed + 1}`,
+      followed,
+    );
+    expect(next).toBe(`https://world.openfoodfacts.org/hop${followed + 1}`);
+    url = next as string;
+  }
+  expect(
+    resolveOffRedirect(url, 'https://world.openfoodfacts.org/hop4', 3),
+  ).toBeNull();
+  expect(resolveOffRedirect(url, '/next', 0)).toBe(
+    'https://world.openfoodfacts.org/next',
+  );
+  expect(resolveOffRedirect(url, null, 0)).toBeNull();
+  expect(resolveOffRedirect(url, '   ', 0)).toBeNull();
+  expect(() =>
+    resolveOffRedirect(url, 'http://world.openfoodfacts.org/y', 0),
+  ).toThrow(/HTTPS/);
+});
+
+test('the client follows three HTTPS hops and refuses a fourth', async () => {
+  const urls: string[] = [];
+  const {client} = clientWith(async (url, init) => {
+    urls.push(url);
+    expect(init.redirect).toBe('manual');
+    return urls.length <= 3
+      ? response(302, null, {location: `/hop${urls.length}`})
+      : response(302, null, {location: '/hop4'});
+  });
+
+  const result = await client.lookup('3017620422003');
+  expect(result).toMatchObject({text: null, hit: false, source: 'none'});
+  expect(result.note).toContain('redirect not followed');
+  expect(urls).toEqual([
+    `https://world.openfoodfacts.org/api/v2/product/3017620422003.json?fields=${OFF_FIELDS}`,
+    'https://world.openfoodfacts.org/hop1',
+    'https://world.openfoodfacts.org/hop2',
+    'https://world.openfoodfacts.org/hop3',
+  ]);
+});
+
+test('a redirect that leaves HTTPS is refused and degrades', async () => {
+  const {client} = clientWith(async () =>
+    response(302, null, {location: 'http://world.openfoodfacts.org/y'}),
+  );
+  const result = await client.lookup('3017620422003');
+  expect(result).toMatchObject({text: null, source: 'none'});
+  expect(result.note).toMatch(/HTTPS/);
+});
+
+test('a silently auto-followed response that ends on http is refused', async () => {
+  // RN's fetch follows redirects itself; `Response.url` is the one trace we get.
+  const {client} = clientWith(async () => ({
+    ...response(200, HIT_BODY),
+    url: 'http://world.openfoodfacts.org/x',
+  }));
+  const result = await client.lookup('3017620422003');
+  expect(result).toMatchObject({text: null, source: 'none'});
+  expect(result.note).toMatch(/left HTTPS/);
+});
+
+// --- OFF.md §4.5/§4.6 single-flight, eviction and timeouts ---------------------------------
+
+test('the in-flight entry is evicted on completion and on failure', async () => {
+  let release: (value: OffResponseLike) => void = () => undefined;
+  const pending = new Promise<OffResponseLike>(resolve => {
+    release = resolve;
+  });
+  const {client} = clientWith(async () => pending);
+
+  const lookup = client.lookup('3017620422003');
+  expect(client.isInFlight('3017620422003')).toBe(true);
+  release(response(200, HIT_BODY));
+  await lookup;
+  expect(client.isInFlight('3017620422003')).toBe(false);
+
+  const failing = clientWith(async () => {
+    throw new Error('boom');
+  });
+  const bad = failing.client.lookup('3017620422003');
+  expect(failing.client.isInFlight('3017620422003')).toBe(true);
+  await bad;
+  expect(failing.client.isInFlight('3017620422003')).toBe(false);
+});
+
+test('the 3 s connect budget aborts a hanging request', async () => {
+  jest.useFakeTimers();
+  try {
+    expect(OFF_CONNECT_TIMEOUT_MS).toBe(3_000);
+    const client = new OffClient({
+      store: new MemoryKeyValueStore(),
+      fetch: (_url, init) =>
+        new Promise<OffResponseLike>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new Error('Aborted')),
+          );
+        }),
+    });
+    const lookup = client.lookup('3017620422003');
+    await jest.advanceTimersByTimeAsync(OFF_CONNECT_TIMEOUT_MS);
+    const result = await lookup;
+    expect(result).toMatchObject({text: null, hit: false, source: 'none'});
+    expect(result.note).toContain('connect timeout');
+    expect(client.isInFlight('3017620422003')).toBe(false);
+    expect(jest.getTimerCount()).toBe(0);
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 test('single-flight: concurrent lookups for one barcode share one request', async () => {

@@ -44,6 +44,9 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Reviewer dispatched (fresh session ses_e180f8ff0ffekQw04k0F2lfM2l): strict scope mapping, §83-88 line-by-line (cap DROPS in detection order — not confidence-sort), 0.75-default judgment, 4 mutations (cap 3, rejoin, global-dedupe, reversed order), RN-twin symmetry table (A4-sync branch), consumers-unbroken grep.
 - Fleet: A2-review, B4-sync-review, C3? no — building: C2, A4-sync; reviewing: PR #24 (B3-sync), PR #26 (B4-sync), PR #22 (A2) = 5.
 
+## 2026-11-17 — Release badge follows the rolling tag (7ca8ca0)
+- README.md:4 badge updated by micro-delegate: `release-main--rolling → /releases/tag/main` → `release-rolling → /releases/tag/rolling`; branch links (tree/main, workflows) untouched. PR #32's last nit closed.
+
 ## 2026-11-17 — PR #32 MERGED: CI now runs real gates everywhere; rolling release renamed main→rolling
 - Reviewer APPROVE-WITH-NITS (diff +104/−5, exactly 2 workflow files; throwaway-commit cleanliness byte-verified; summary-step logic sound incl. 0-tests guard; main.yml step-identity JSON-verified; actionlint 1.7.7 clean; shared-job staleness confirmed against origin/main). Tag amend e73839e verified: main.yml:242-259's delete/create/title/notes all target `rolling` now, legacy `main` tag+release deleted with `|| true` (no-op today — origin has zero tags), `--latest` + rel/* attach preserved. MERGED. Effect: the next push to main creates/updates the rolling release at /releases/tag/rolling — the shadow-tag source is dead. README:4 badge micro-delegate dispatched (ses_e16b962b3ffeOtx8EZEiJlCmEi).
 - CI coverage after PR #32: kotlin = assembleDebug + unit tests (+ summary), rn = tsc + jest + APK, shared = tsc + vitest (+ android-embed JVM tests), web unchanged. The "kotlin CI runs assembleDebug only" / "rn jest is local-only" caveats in older briefs/reviews are now obsolete.

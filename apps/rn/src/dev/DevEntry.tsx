@@ -8,7 +8,6 @@
  * mocked native module and prints a warning into every test that renders `<App />`.
  */
 import React, {useEffect, useState} from 'react';
-import {EmbedSelfTestScreen} from './EmbedSelfTestScreen';
 
 const MENU_LABEL = 'Embed self-test (A3)';
 
@@ -40,5 +39,9 @@ export function DevEntry() {
   if (!open) {
     return null;
   }
+  // Required here, not at the top of the file, so the 232-line dev screen stays out of the
+  // release bundle: __DEV__ is false in release, Metro eliminates the dead branch, and the
+  // module is never included. (The "lazy import" in the header comment refers to react-native.)
+  const EmbedSelfTestScreen = require('./EmbedSelfTestScreen').EmbedSelfTestScreen;
   return <EmbedSelfTestScreen onClose={() => setOpen(false)} />;
 }

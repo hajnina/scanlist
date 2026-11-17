@@ -969,8 +969,8 @@ class TestHighlightGate:
         assert out["topId"] == "a"
 
     def test_image_floor_rejects_below_068_even_when_margin_passes(self):
-        # Confirmed, wide margin, but 0.60+0.15 = 0.75 ... use an unboosted path:
-        # confirmation is on a *different* item, so the image winner stays raw.
+        # No barcode confirmation is passed at all, so the image winner stays raw:
+        # wide margin, but 0.60 < the 0.68 image floor ⇒ no hero (fail-safe).
         items = [
             make_item("a", [0.60, 0, 0, 0], order=0, name="Alpha"),
             make_item("b", [0.40, 0, 0, 0], order=1, name="Beta"),

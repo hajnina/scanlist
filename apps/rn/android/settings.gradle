@@ -77,5 +77,5 @@ if (new File(scanlistEmbedProjectDir, 'build.gradle.kts').isFile()) {
         }
     }
 } else {
-    println "[scanlist] shared/android-embed not found at ${scanlistEmbedProjectDir} — building without the embed module (card A3)"
+    println "[scanlist] shared/android-embed not found at ${scanlistEmbedProjectDir} — the build FAILS without the embed module (card A3: EmbedModule.kt is compiled unconditionally; provide the path above or restore the checkout)"
 }

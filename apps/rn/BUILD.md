@@ -146,7 +146,9 @@ lib/arm64-v8a/libreactnative.so        24 062 944 B
 ```
 
 A3 update (2026-11-17): the TurboModule card wired `shared/android-embed` into the app, so the
-APK grows 38M → 71M (the LiteRT-LM JNI lib `liblitertlm_jni.so` is packaged for all ABIs) and
+APK grows 38M → 71M (the LiteRT-LM JNI lib `liblitertlm_jni.so` is packaged for arm64-v8a and
+x86_64 only — the CI all-ABI APK is 178 MiB; on armeabi-v7a/x86 the app installs but engine
+calls reject as `E_EMBED`, no crash) and
 `minSdkVersion` is now `31`. CI `rn` job green on the A3 head in 2m42s. Dev screen:
 `apps/rn/src/dev/` (hidden dev affordance; shows backend/dims/latency or `E_NO_BACKEND` until
 card B0 provisions the model on device).

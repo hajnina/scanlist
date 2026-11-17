@@ -112,7 +112,9 @@ class ListEmbeddingState internal constructor() {
 /**
  * Embed [items] in the background on list open, reporting progress, and expose the result as Compose
  * state. Idempotent per list: the pass runs when the list (or its doc texts) changes, cache hits are
- * file reads, and leaving the screen cancels the coroutine (the disk cache keeps whatever finished).
+ * file reads, and leaving the screen tears down the state — the coroutine is cancelled between
+ * batches, but a batch already handed to the embedder runs to completion (the disk cache keeps
+ * whatever finished either way).
  *
  * This is the only function a screen needs; it never throws — a missing model or an embedder failure
  * lands in [ListEmbeddingState.error].

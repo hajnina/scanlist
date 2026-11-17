@@ -269,7 +269,7 @@ from the image score can separate it, so v1 adds a guard that brings in **indepe
 
 This reuses the predicate that already grants the +0.15 barcode boost (§3), so a resolved OFF name both confirms
 and promotes the item: `honey.jpg` ranks Honey at 0.752869 (no hero); with its confirmed OFF name `"Honey"` it
-becomes 0.902869 and is highlighted. **Fixture fact:** of the 13 image queries in `fixtures/golden.json` only
+becomes 0.902869 and is highlighted. **Fixture fact:** of the 13 image hits in `fixtures/golden.json` (15 image-kind queries: 13 hits + 2 distractors) only
 `honey.jpg` recorded an OFF name that exactly matches an item name/alias (`"Honey"`); the other 12 recorded a
 name that does not (e.g. `imilk` recorded `"Mléko polotučné s obsahem  1,5% tuku"` against item `"Milk"`), because
 `barcodeMatch` is exact after NFC + full case folding — so **expect no hero on image-only ticks unless the OFF name

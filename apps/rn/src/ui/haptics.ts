@@ -36,8 +36,16 @@ const supported = Platform.OS === 'android' || Platform.OS === 'ios';
 
 /**
  * Settings' haptics switch (card A6). Module-level so every caller (scan tick, card press, tabs)
- * obeys one preference without threading a prop through the tree; `SettingsController` applies the
- * persisted value at start-up, so the very first tap already respects it.
+ * obeys one preference without threading a prop through the tree.
+ *
+ * Read points (card A6-followup):
+ *  - app start applies the *persisted* value once (`settings/startup.ts`, called from `App.tsx`),
+ *    so the very first tap of a session already respects it — before Settings was ever opened;
+ *  - `SettingsController.setHaptics` applies every later switch immediately, so a change takes
+ *    effect for the next call without a restart.
+ *
+ * The default is on: AsyncStorage resolves after the first render, and a tap in that window should
+ * feel like a tap rather than silently missing its tick.
  */
 let enabled = true;
 

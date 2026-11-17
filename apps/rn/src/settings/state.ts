@@ -96,6 +96,13 @@ export class SettingsController {
   /** The promise chain that serialises self-test runs (B6's mutex). */
   private chain: Promise<unknown> = Promise.resolve();
 
+  /**
+   * The `(choice, runToken)` pair a run was last started for. Controller-owned on purpose: the
+   * screen unmounts when the user leaves Settings, and a per-mount ref would forget this and pay a
+   * second 484 MB model open on the next visit (A6-followup review).
+   */
+  private lastRunKey: string | null = null;
+
   /** Increments on every switch/rerun: an older run's result is stale and must be dropped. */
   private generation = 0;
 
@@ -104,6 +111,7 @@ export class SettingsController {
     this.init = this.init.bind(this);
     this.select = this.select.bind(this);
     this.run = this.run.bind(this);
+    this.runIfNeeded = this.runIfNeeded.bind(this);
     this.rerun = this.rerun.bind(this);
     this.setHaptics = this.setHaptics.bind(this);
     this.subscribe = this.subscribe.bind(this);
@@ -194,6 +202,25 @@ export class SettingsController {
       result: null,
       runToken: this.snapshot.runToken + 1,
     });
+  }
+
+  /**
+   * Run only if the current `(choice, runToken)` has not been measured yet — the screen's effect
+   * path. The key lives on the controller, so leaving Settings and returning (a remount with the
+   * same controller) reuses the measurement instead of opening the 484 MB model again; a switch or
+   * "test again" still changes the key and runs. A not-yet-loaded controller does nothing (the
+   * effect fires again once `ready` flips).
+   */
+  runIfNeeded(): Promise<void> {
+    if (!this.snapshot.ready) {
+      return Promise.resolve();
+    }
+    const key = `${this.snapshot.choice}:${this.snapshot.runToken}`;
+    if (this.lastRunKey === key) {
+      return Promise.resolve();
+    }
+    this.lastRunKey = key;
+    return this.run();
   }
 
   /** Flip haptics: apply immediately (the switch must feel instant) and persist in the background. */

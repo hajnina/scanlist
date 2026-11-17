@@ -16,7 +16,9 @@ import {createSelfTestRunner, type EngineProbe} from './latency';
 import {factsFromNativeStatus} from './modelStatus';
 import {prefixInfoFromNative} from './prefix';
 import {createSettingsRepository} from './asyncStorage';
+import {applyStoredSettings, type StartupOutcome} from './startup';
 import {SettingsController, type SettingsDeps} from './state';
+import {setHapticsEnabled} from '../ui/haptics';
 
 /**
  * Opens the engine under the picked policy and hands the runner a live view of it.
@@ -79,4 +81,20 @@ export function createNativeSettingsController(): SettingsController {
     probeModelHint,
   };
   return new SettingsController(deps);
+}
+
+/**
+ * App start-up wiring (card A6-followup): read the persisted document once and put it in force —
+ * the backend policy in the native engine (`setBackend`, which also unloads any open engine, so the
+ * first embed opens on the chosen ladder) and the haptics flag in the UI kit. Called
+ * fire-and-forget from `App.tsx`: it never rejects and never blocks the first render
+ * (`startup.ts` has the rules; the `auto` choice is re-applied every start because the native
+ * policy is process-local).
+ */
+export function applyPersistedSettings(): Promise<StartupOutcome> {
+  return applyStoredSettings({
+    repository: createSettingsRepository(),
+    applyBackend: setBackend,
+    applyHaptics: setHapticsEnabled,
+  });
 }

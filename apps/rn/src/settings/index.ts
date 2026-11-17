@@ -4,6 +4,10 @@
  *   <SettingsScreen onBack={…} />                       // device controller, the app path
  *   <SettingsScreen controller={ctl} onBack={…} />      // tests / a provided controller
  *
+ * Card A6-followup wires it into the app: `App.tsx` owns the `lists | settings` screen flag and
+ * calls `applyPersistedSettings()` on mount, so the persisted backend choice and haptics switch are
+ * in force before the first scan or tap (see `startup.ts`).
+ *
  * Every rule (backend mapping, latency maths, model file status, prefix formatting, persistence,
  * the serialised self-test) is a plain module below; the screen and the hook only lay state out.
  */
@@ -102,7 +106,13 @@ export {
 } from './SettingsScreen';
 export {
   createNativeSettingsController,
+  applyPersistedSettings,
 } from './device';
+export {
+  applyStoredSettings,
+  type StartupDeps,
+  type StartupOutcome,
+} from './startup';
 export {
   asyncStorageSettingsStore,
   createSettingsRepository,

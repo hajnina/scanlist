@@ -190,6 +190,47 @@ describe('SettingsController.select', () => {
   });
 });
 
+describe('SettingsController.runIfNeeded', () => {
+  test('measures each (choice, runToken) once — a remount reuses the measurement', async () => {
+    const {controller, fake} = makeController();
+    await controller.init();
+
+    const first = controller.runIfNeeded();
+    await flush();
+    fake.gates.shift()?.();
+    await first;
+    expect(fake.calls).toEqual(['auto']);
+
+    // What a screen remount does: same controller, ready snapshot, same choice + runToken.
+    await controller.runIfNeeded();
+    await flush();
+    expect(fake.calls).toEqual(['auto']);
+
+    // "Test again" changes the key and measures a fresh run.
+    controller.rerun();
+    const again = controller.runIfNeeded();
+    await flush();
+    fake.gates.shift()?.();
+    await again;
+    expect(fake.calls).toEqual(['auto', 'auto']);
+
+    // A backend switch changes it too ("auto:1" → "cpu:1").
+    controller.select('cpu');
+    const switched = controller.runIfNeeded();
+    await flush();
+    fake.gates.shift()?.();
+    await switched;
+    expect(fake.calls).toEqual(['auto', 'auto', 'cpu']);
+  });
+
+  test('does nothing before the stored settings are loaded', async () => {
+    const {controller, fake} = makeController();
+    await controller.runIfNeeded();
+    expect(fake.calls).toEqual([]);
+    expect(controller.getSnapshot().phase).toBe('idle');
+  });
+});
+
 describe('SettingsController.run', () => {
   test('runs, reports the measured backend and re-probes the model afterwards', async () => {
     const {controller, fake, probeModel} = makeController();

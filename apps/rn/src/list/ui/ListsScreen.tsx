@@ -12,10 +12,10 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {ActivityIndicator, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text, useTheme} from 'react-native-paper';
+import {Button, Text, useTheme} from 'react-native-paper';
 import {CapsLabel, ExpressiveCard, HeroNumeral, MachineText, SpringIn} from '../../ui';
 import {haptic} from '../../ui';
-import {Spacing} from '../../theme/tokens';
+import {HEAVY, Spacing} from '../../theme/tokens';
 import type {ScanListTheme} from '../../theme';
 import {flatten} from '../core';
 import {createListRepository} from '../asyncStorage';
@@ -26,7 +26,15 @@ import {NoteCard, type Note} from './NoteCard';
 import {ProgressBar} from './ProgressBar';
 import {TRACK_ALPHA, withAlpha} from './color';
 
-export function ListsScreen() {
+export interface ListsScreenProps {
+  /**
+   * Opens the settings screen (card A6-followup). Optional: `App` owns the screen flag, and a bare
+   * `<ListsScreen />` (tests, a future embed) simply shows no entry point.
+   */
+  onOpenSettings?: () => void;
+}
+
+export function ListsScreen({onOpenSettings}: ListsScreenProps = {}) {
   const theme = useTheme<ScanListTheme>();
   const repository = useMemo(() => createListRepository(), []);
   const [lists, setLists] = useState<StoredList[] | null>(null);
@@ -128,6 +136,19 @@ export function ListsScreen() {
             style={{color: theme.colors.onSurfaceVariant}}>
             Import, tick, export.
           </Text>
+          {onOpenSettings !== undefined ? (
+            // Card A6-followup: the one entry point to Settings. Text-only (the app has no icon
+            // font dependency) and styled like the back button the other screens use.
+            <Button
+              onPress={onOpenSettings}
+              compact
+              style={styles.settings}
+              labelStyle={styles.settingsLabel}
+              accessibilityLabel="Settings"
+              textColor={theme.colors.onSurfaceVariant}>
+              Settings
+            </Button>
+          ) : null}
         </SpringIn>
 
         <SpringIn index={1}>
@@ -329,6 +350,14 @@ const styles = StyleSheet.create({
   header: {
     paddingStart: 8,
     gap: 4,
+  },
+  settings: {
+    alignSelf: 'flex-start',
+    marginStart: -8,
+  },
+  settingsLabel: {
+    fontWeight: HEAVY,
+    letterSpacing: Spacing.labelTracking,
   },
   hero: {
     padding: Spacing.heroPadding,

@@ -2,11 +2,11 @@
  * React binding for {@linkcode SettingsController} (card A6): one subscription and the two effects
  * the screen owns.
  *
- * The run effect is keyed by `(choice, runToken)` — B6's `LaunchedEffect(state.choice, state.runToken)`.
- * A ref holds the last key so React 19 StrictMode's double mount cannot queue two identical
- * self-tests (they would serialise, doubling a 484 MB model load for nothing).
+ * The run effect calls `controller.runIfNeeded()`; the `(choice, runToken)` guard lives on the
+ * controller, so React 19 StrictMode's double mount cannot queue two identical self-tests AND a
+ * screen remount (leave Settings → come back) does not re-open the model (A6-followup review).
  */
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useState} from 'react';
 import type {BackendChoice, NativeBackend} from './backend';
 import type {SettingsController, SettingsSnapshot} from './state';
 
@@ -23,7 +23,6 @@ export function useSettings(controller: SettingsController): UseSettingsResult {
   const [snapshot, setSnapshot] = useState<SettingsSnapshot>(() =>
     controller.getSnapshot(),
   );
-  const lastRunKey = useRef<string | null>(null);
 
   useEffect(() => {
     setSnapshot(controller.getSnapshot());
@@ -38,15 +37,9 @@ export function useSettings(controller: SettingsController): UseSettingsResult {
   }, [controller]);
 
   useEffect(() => {
-    if (!snapshot.ready) {
-      return;
-    }
-    const key = `${snapshot.choice}:${snapshot.runToken}`;
-    if (lastRunKey.current === key) {
-      return;
-    }
-    lastRunKey.current = key;
-    controller.run().catch(() => {
+    // The `(choice, runToken)` guard is controller-owned (A6-followup review): a per-mount ref here
+    // forgot the last run when the screen unmounted, so returning to Settings re-opened the model.
+    controller.runIfNeeded().catch(() => {
       // A run never rejects (failures are outcomes); this is belt-and-braces for the effect.
     });
   }, [controller, snapshot.ready, snapshot.choice, snapshot.runToken]);

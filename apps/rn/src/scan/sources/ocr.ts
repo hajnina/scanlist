@@ -1,16 +1,35 @@
 /**
- * OCR signal shaping (card A4).
+ * OCR signal shaping (card A4, converged to shared/spec/RANK.md §2.2 "Text/OCR source").
  *
- * ML Kit text recognition returns blocks → lines → elements. The scan pipeline only wants one
- * query string per sampled frame ("visible words") plus a confidence for the OCR chip, so this
- * module flattens lines, drops duplicates/empty strings and averages the per-line confidences
- * (Android reports them; iOS reports `null` → fall back to a neutral 0.6).
+ * The spec mandates **one text query per OCR line**:
+ *
+ *   > each OCR line is its own text query: `queryPrefix + trim(line)`, where the line is the
+ *   > visible words in reading order joined by single spaces. […] At most 16 text query vectors
+ *   > per tick are used (barcode + OCR lines, dropping extra OCR lines in detection order). All
+ *   > supplied vectors participate; the ranker takes the max, never an average.
+ *
+ * So this module no longer joins blocks/lines into one frame-wide string and no longer averages
+ * confidence across different lines. ML Kit already returns lines with their visible words in
+ * reading order; each of them becomes its own {@linkcode ScanSignal} with **that line's own**
+ * confidence (its `confidence`, else the mean of its element confidences, else a neutral 0.6 —
+ * never a cross-line mean).
+ *
+ * Pool cap: the ranker owns "16 text vectors per tick" (S8's rank/decideTop); the source must not
+ * flood it, so it emits at most {@linkcode MAX_OCR_LINES_PER_TICK} OCR lines per batch — with one
+ * barcode per frame that keeps barcode + OCR ≤ 16 together in the common case.
  */
+import {type Clock, systemClock} from './clock';
 import type {ScanSignal} from './types';
+
+export interface OcrElementLike {
+  confidence?: number | null;
+}
 
 export interface OcrLineLike {
   text?: string | null;
+  /** Android fills this; iOS reports `null` (then the element confidences are averaged). */
   confidence?: number | null;
+  elements?: readonly OcrElementLike[] | null;
 }
 
 export interface OcrBlockLike {
@@ -22,89 +41,194 @@ export interface OcrResultLike {
   blocks?: readonly OcrBlockLike[] | null;
 }
 
+/** RANK.md §2.2 pool cap. Barcode + OCR ≤ 16 text vectors per tick; OCR alone may not exceed it. */
+export const MAX_OCR_LINES_PER_TICK = 16;
+/** Do not re-emit an identical line within this window (mirrors the barcode debounce). */
+export const DEFAULT_OCR_LINE_REPEAT_MS = 4000;
+export const DEFAULT_OCR_MIN_CHARS = 3;
+/** Used when neither the line nor its elements report a confidence (iOS). */
+export const NEUTRAL_OCR_CONFIDENCE = 0.6;
+
 /** Collapse all whitespace (ML Kit keeps line breaks and padding) into single spaces. */
 export function normalizeOcrText(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-export interface OcrQuery {
+function clampConfidence(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function mean(values: readonly number[]): number {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+/** One OCR line as a query: its visible words (single-spaced) and its own confidence. */
+export interface OcrLine {
   text: string;
   confidence: number;
 }
 
-const NEUTRAL_CONFIDENCE = 0.6;
-
 /**
- * Flatten an ML Kit result into one query string. Returns `undefined` when the frame contains
- * nothing worth ranking on (blank wall, only a barcode, …).
- *
- * `minChars` keeps single glyphs ("I", "l", a stray comma) from firing the OCR chip.
+ * Confidence of a single ML Kit line — never across lines:
+ *  1. the line's own `confidence` (Android);
+ *  2. else the mean of the line's element confidences;
+ *  3. else {@linkcode NEUTRAL_OCR_CONFIDENCE} (iOS reports none).
  */
-export function buildOcrQuery(
-  result: OcrResultLike,
-  minChars: number = 3,
-): OcrQuery | undefined {
-  const lines: string[] = [];
-  const confidences: number[] = [];
-
-  for (const block of result.blocks ?? []) {
-    for (const line of block.lines ?? []) {
-      const text = normalizeOcrText(line.text ?? '');
-      if (text.length === 0) {
-        continue;
-      }
-      lines.push(text);
-      if (
-        typeof line.confidence === 'number' &&
-        Number.isFinite(line.confidence)
-      ) {
-        confidences.push(Math.min(1, Math.max(0, line.confidence)));
-      }
-    }
+export function lineConfidence(line: OcrLineLike): number {
+  if (typeof line.confidence === 'number' && Number.isFinite(line.confidence)) {
+    return round3(clampConfidence(line.confidence));
   }
-
-  // Some backends only fill `result.text`; fall back to it rather than dropping the frame.
-  if (lines.length === 0) {
-    const fallback = normalizeOcrText(result.text ?? '');
-    if (fallback.length === 0) {
-      return undefined;
-    }
-    lines.push(fallback);
+  const elementConfidences = (line.elements ?? [])
+    .map(element => element?.confidence)
+    .filter(
+      (value): value is number =>
+        typeof value === 'number' && Number.isFinite(value),
+    )
+    .map(clampConfidence);
+  if (elementConfidences.length > 0) {
+    return round3(mean(elementConfidences));
   }
-
-  // Keep reading order but do not repeat the same line twice (logos, reflections).
-  const seen = new Set<string>();
-  const words = lines.filter(line => {
-    const key = line.toLowerCase();
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-
-  const text = normalizeOcrText(words.join(' '));
-  if (text.length < minChars) {
-    return undefined;
-  }
-
-  const confidence =
-    confidences.length === 0
-      ? NEUTRAL_CONFIDENCE
-      : confidences.reduce((sum, value) => sum + value, 0) /
-        confidences.length;
-
-  return {text, confidence: Math.round(confidence * 1000) / 1000};
+  return NEUTRAL_OCR_CONFIDENCE;
 }
 
-/** Signal for the OCR source; `undefined` when the text is too short to be useful. */
-export function ocrSignal(
+export interface ExtractOcrLinesOptions {
+  /** Ignore lines shorter than this after whitespace normalisation. Default 3. */
+  minChars?: number;
+  /** Hard cap, in detection order. Default {@linkcode MAX_OCR_LINES_PER_TICK}. */
+  maxLines?: number;
+}
+
+/**
+ * Flatten an ML Kit result into per-line queries in detection order.
+ *
+ * Within one batch: blank/too-short lines are dropped, and a repeated line (case-insensitive, e.g.
+ * a logo or a reflection) is kept only once — the first occurrence wins.
+ *
+ * When the backend only fills `result.text`, it is split on line breaks so the per-line contract
+ * still holds.
+ */
+export function extractOcrLines(
   result: OcrResultLike,
-  minChars: number = 3,
-): ScanSignal | undefined {
-  const query = buildOcrQuery(result, minChars);
-  if (query === undefined) {
-    return undefined;
+  {
+    minChars = DEFAULT_OCR_MIN_CHARS,
+    maxLines = MAX_OCR_LINES_PER_TICK,
+  }: ExtractOcrLinesOptions = {},
+): OcrLine[] {
+  const raw: OcrLineLike[] = [];
+  for (const block of result.blocks ?? []) {
+    for (const line of block.lines ?? []) {
+      raw.push(line);
+    }
   }
-  return {source: 'ocr', text: query.text, confidence: query.confidence};
+
+  if (raw.length === 0) {
+    // Fallback: some backends only provide the concatenated text.
+    for (const text of (result.text ?? '').split(/\r?\n/)) {
+      raw.push({text});
+    }
+  }
+
+  const lines: OcrLine[] = [];
+  const seen = new Set<string>();
+  for (const line of raw) {
+    const text = normalizeOcrText(line.text ?? '');
+    if (text.length < minChars) {
+      continue;
+    }
+    const key = text.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    lines.push({text, confidence: lineConfidence(line)});
+    if (lines.length >= maxLines) {
+      break;
+    }
+  }
+
+  return lines;
+}
+
+export interface OcrLineDeduper {
+  readonly repeatMs: number;
+  /** True if this line should be emitted now. */
+  accept(text: string, at?: number): boolean;
+  reset(): void;
+}
+
+/**
+ * Time-based repeat window, keyed per line (unlike the single-value barcode deduper): pointing at
+ * the same shelf re-emits the same words only every `repeatMs`, so an 800 ms OCR tick does not
+ * re-rank on identical queries four times in a row.
+ */
+export function createOcrLineDeduper(
+  repeatMs: number = DEFAULT_OCR_LINE_REPEAT_MS,
+  clock: Clock = systemClock,
+): OcrLineDeduper {
+  if (!Number.isFinite(repeatMs) || repeatMs < 0) {
+    throw new Error(
+      `ocr line repeat must be a finite number >= 0, got ${repeatMs}`,
+    );
+  }
+  /** lowercased text → last emitted timestamp */
+  const lastEmittedAt = new Map<string, number>();
+
+  return {
+    repeatMs,
+    accept(text: string, at: number = clock.now()): boolean {
+      const key = text.toLowerCase();
+      // Drop expired entries so a long scanning session keeps the map small.
+      for (const [entryKey, emittedAt] of lastEmittedAt) {
+        if (at - emittedAt >= repeatMs) {
+          lastEmittedAt.delete(entryKey);
+        }
+      }
+      if (lastEmittedAt.has(key)) {
+        return false;
+      }
+      lastEmittedAt.set(key, at);
+      return true;
+    },
+    reset(): void {
+      lastEmittedAt.clear();
+    },
+  };
+}
+
+export interface OcrLineSignalsOptions extends ExtractOcrLinesOptions {
+  /** Repeat window when no shared `deduper` is passed. Default {@linkcode DEFAULT_OCR_LINE_REPEAT_MS}. */
+  repeatMs?: number;
+  /** Shared across ticks by the source; created on demand for one-shot calls. */
+  deduper?: OcrLineDeduper;
+  clock?: Clock;
+}
+
+/**
+ * Turn one ML Kit result into **one ScanSignal per OCR line** (≤ {@linkcode MAX_OCR_LINES_PER_TICK},
+ * detection order). Lines emitted within the repeat window are suppressed.
+ */
+export function ocrLineSignals(
+  result: OcrResultLike,
+  {
+    minChars,
+    maxLines,
+    repeatMs,
+    deduper,
+    clock = systemClock,
+  }: OcrLineSignalsOptions = {},
+): ScanSignal[] {
+  const dedupe = deduper ?? createOcrLineDeduper(repeatMs, clock);
+  const now = clock.now();
+
+  return extractOcrLines(result, {minChars, maxLines})
+    .filter(line => dedupe.accept(line.text, now))
+    .map(line => ({
+      source: 'ocr' as const,
+      text: line.text,
+      confidence: line.confidence,
+    }));
 }

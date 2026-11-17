@@ -201,13 +201,18 @@ describe('barcodeSource', () => {
 });
 
 describe('ocrSource', () => {
-  test('emits normalized visible words with confidence', async () => {
+  test('emits one signal per OCR line, in detection order, with per-line confidence', async () => {
     const feed = createFrameFeed();
     const onSignal = jest.fn();
     const source = createOcrSource(feed, {
       read: async () => ({
         blocks: [
-          {lines: [{text: 'Vollmilch', confidence: 0.9}, {text: '1 l', confidence: 0.7}]},
+          {
+            lines: [
+              {text: 'Vollmilch', confidence: 0.9},
+              {text: '1 l', confidence: 0.7},
+            ],
+          },
         ],
       }),
     });
@@ -215,11 +220,11 @@ describe('ocrSource', () => {
 
     feed.push(frame(0));
     await flush();
-    expect(onSignal).toHaveBeenCalledWith({
-      source: 'ocr',
-      text: 'Vollmilch 1 l',
-      confidence: 0.8,
-    });
+
+    expect(onSignal.mock.calls.map(([signal]) => signal)).toEqual([
+      {source: 'ocr', text: 'Vollmilch', confidence: 0.9},
+      {source: 'ocr', text: '1 l', confidence: 0.7},
+    ]);
     await source.stop();
   });
 
@@ -242,11 +247,78 @@ describe('ocrSource', () => {
 
     expect(read).toHaveBeenCalledTimes(2);
     expect(source.skippedByGate()).toBe(1);
-    expect(onSignal).toHaveBeenCalledTimes(2);
+    // 800 ms apart is inside the 4 s line repeat window, so the second read emits nothing.
+    expect(onSignal).toHaveBeenCalledTimes(1);
     await source.stop();
   });
 
-  test('short results do not emit', async () => {
+  test('per-line repeat window: same words suppressed, changed line fires', async () => {
+    const feed = createFrameFeed();
+    const {clock, advance} = mutableClock();
+    let lines = ['Vollmilch', '1 l'];
+    const onSignal = jest.fn();
+    const source = createOcrSource(feed, {
+      read: async () => ({blocks: [{lines: lines.map(text => ({text}))}]}),
+      clock,
+    });
+    await source.start(onSignal);
+
+    feed.push(frame(0));
+    await flush();
+    expect(onSignal.mock.calls.map(([signal]) => signal.text)).toEqual([
+      'Vollmilch',
+      '1 l',
+    ]);
+
+    advance(800);
+    feed.push(frame(800));
+    await flush();
+    expect(onSignal).toHaveBeenCalledTimes(2); // both lines repeat inside the window
+
+    advance(800);
+    lines = ['Vollmilch', '2 l'];
+    feed.push(frame(1600));
+    await flush();
+    expect(onSignal.mock.calls.map(([signal]) => signal.text)).toEqual([
+      'Vollmilch',
+      '1 l',
+      '2 l',
+    ]);
+
+    advance(2400); // 4000 ms after the first batch
+    lines = ['Vollmilch', '1 l'];
+    feed.push(frame(4000));
+    await flush();
+    expect(onSignal).toHaveBeenCalledTimes(5); // the full pair is re-emitted
+    await source.stop();
+  });
+
+  test('caps a noisy frame at 16 line signals (RANK.md pool cap)', async () => {
+    const feed = createFrameFeed();
+    const onSignal = jest.fn();
+    const source = createOcrSource(feed, {
+      read: async () => ({
+        blocks: [
+          {
+            lines: Array.from({length: 20}, (_, index) => ({
+              text: `label ${index + 1}`,
+            })),
+          },
+        ],
+      }),
+      clock: mutableClock().clock,
+    });
+    await source.start(onSignal);
+
+    feed.push(frame(0));
+    await flush();
+
+    expect(onSignal).toHaveBeenCalledTimes(16);
+    expect(onSignal.mock.calls[15][0].text).toBe('label 16');
+    await source.stop();
+  });
+
+  test('short lines do not emit', async () => {
     const feed = createFrameFeed();
     const onSignal = jest.fn();
     const source = createOcrSource(feed, {read: async () => ({text: 'l'})});
@@ -255,6 +327,37 @@ describe('ocrSource', () => {
     feed.push(frame(0));
     await flush();
     expect(onSignal).not.toHaveBeenCalled();
+    await source.stop();
+  });
+
+  test('single-flight: frames during a slow read are dropped, not queued', async () => {
+    const feed = createFrameFeed();
+    let releaseRead: (() => void) | undefined;
+    const read = jest.fn(
+      () =>
+        new Promise<{blocks: {lines: {text: string}[]}[]}>(resolve => {
+          releaseRead = () =>
+            resolve({blocks: [{lines: [{text: 'Vollmilch'}]}]});
+        }),
+    );
+    const onSignal = jest.fn();
+    const source = createOcrSource(feed, {
+      read,
+      clock: mutableClock().clock,
+      minIntervalMs: 0,
+    });
+    await source.start(onSignal);
+
+    feed.push(frame(0));
+    feed.push(frame(400));
+    feed.push(frame(800));
+    await flush();
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(source.droppedWhileBusy()).toBe(2);
+
+    releaseRead?.();
+    await flush();
+    expect(onSignal).toHaveBeenCalledTimes(1);
     await source.stop();
   });
 });

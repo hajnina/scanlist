@@ -82,6 +82,17 @@ export interface HarnessOptions {
   maxBatchTokens?: number;
   /** Injected clock; defaults to `performance.now`. */
   now?: () => number;
+  /**
+   * Stage logger (the page pipes it to its log). The harness emits one line per measurable step so
+   * a stalled run says exactly where it stalled instead of looking like a dead page.
+   */
+  onStage?: (line: string) => void;
+  /**
+   * Per-call watchdog in ms (0 = off). A GPU that loses the device can leave a promise pending
+   * forever; the watchdog turns that into a recorded failure instead of a hung page. The abandoned
+   * promise still runs — acceptable for a one-shot spike, never for the app.
+   */
+  callTimeoutMs?: number;
   /** Facts from the loader/page, copied into the report's environment block. */
   environment?: {
     userAgent?: string;
@@ -150,6 +161,26 @@ export async function runMeasurement(
   const imageRepeats = Math.max(1, options.imageRepeats ?? 3);
   const notes: string[] = [];
   const env = options.environment ?? {};
+  const stage = (line: string): void => options.onStage?.(line);
+
+  /** Stage log + optional watchdog around one model call (see `HarnessOptions.callTimeoutMs`). */
+  const guarded = async <T>(label: string, run: () => Promise<T>): Promise<T> => {
+    stage(`${label}: start`);
+    const started = now();
+    const timeout = options.callTimeoutMs ?? 0;
+    const pending = run();
+    const result =
+      timeout > 0
+        ? await Promise.race([
+            pending,
+            new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error(`${label} timed out after ${timeout} ms`)), timeout);
+            }),
+          ])
+        : await pending;
+    stage(`${label}: ${(now() - started).toFixed(0)} ms`);
+    return result;
+  };
 
   // --- 1. token budget ---------------------------------------------------------------------
   const docTexts = items.map((item) => docInput(prompts, docText(item)));
@@ -159,7 +190,9 @@ export async function runMeasurement(
 
   let docTokens: number[];
   if (session.countTokens) {
-    docTokens = await session.countTokens(docTexts);
+    docTokens = await guarded(`tokenize ${docTexts.length} docs`, () =>
+      (session.countTokens as (texts: string[]) => Promise<number[]>)(docTexts),
+    );
     notes.push(`Token counts from the model tokenizer (${session.device}).`);
   } else {
     docTokens = docTexts.map(estimateTextTokens);
@@ -175,7 +208,9 @@ export async function runMeasurement(
 
   // --- 2. text: cold first call, batched docs, warm single query -----------------------------
   const tCold = now();
-  const first = await session.embedTexts([docTexts[0] as string]);
+  const first = await guarded("cold first text embed", () =>
+    session.embedTexts([docTexts[0] as string]),
+  );
   const coldFirstMs = now() - tCold;
   const rawDocVectors: Float32Array[] = [first[0] as Float32Array];
 
@@ -188,7 +223,9 @@ export async function runMeasurement(
       const rest = batch.slice(1);
       if (rest.length === 0) continue;
       const started = now();
-      const vectors = await session.embedTexts(rest.map((index) => docTexts[index] as string));
+      const vectors = await guarded(`text batch (${rest.length} docs)`, () =>
+        session.embedTexts(rest.map((index) => docTexts[index] as string)),
+      );
       const ms = now() - started;
       docTotalMs += ms;
       for (let i = 0; i < rest.length; i += 1) rawDocVectors[rest[i] as number] = vectors[i] as Float32Array;
@@ -196,7 +233,9 @@ export async function runMeasurement(
       continue;
     }
     const started = now();
-    const vectors = await session.embedTexts(batch.map((index) => docTexts[index] as string));
+    const vectors = await guarded(`text batch (${batch.length} docs)`, () =>
+      session.embedTexts(batch.map((index) => docTexts[index] as string)),
+    );
     const ms = now() - started;
     docTotalMs += ms;
     for (let i = 0; i < batch.length; i += 1) rawDocVectors[batch[i] as number] = vectors[i] as Float32Array;
@@ -211,7 +250,9 @@ export async function runMeasurement(
     const samples: number[] = [];
     for (let i = 0; i < textRepeats; i += 1) {
       const started = now();
-      await session.embedTexts([queryTexts[0] as string]);
+      await guarded(`warm single query ${i + 1}/${textRepeats}`, () =>
+        session.embedTexts([queryTexts[0] as string]),
+      );
       samples.push(now() - started);
     }
     // The first sample pays the kernel warm-up; report it but exclude it from median/p90.
@@ -223,7 +264,9 @@ export async function runMeasurement(
   const queryVectors: number[][] = [];
   for (let start = 0; start < queryTexts.length; start += 4) {
     const slice = queryTexts.slice(start, start + 4);
-    const vectors = await session.embedTexts(slice);
+    const vectors = await guarded(`text query batch (${slice.length})`, () =>
+      session.embedTexts(slice),
+    );
     for (const vector of vectors) queryVectors.push(truncateAndNormalize(vector, dims));
   }
 
@@ -240,7 +283,9 @@ export async function runMeasurement(
     for (let i = 0; i < repeats; i += 1) {
       const image = images[i % images.length] as ImageInput;
       const started = now();
-      await session.embedImages([[image.handle]]);
+      await guarded(`warm single image ${i + 1}/${repeats}`, () =>
+        session.embedImages([[image.handle]]),
+      );
       singleSamples.push(now() - started);
     }
     imageSingle = timingOf(singleSamples.length > 1 ? singleSamples.slice(1) : singleSamples);
@@ -249,8 +294,8 @@ export async function runMeasurement(
     const firstBatch = plans[0] ?? [];
     if (firstBatch.length > 0) {
       const started = now();
-      const vectors = await session.embedImages(
-        firstBatch.map((index) => [(images[index] as ImageInput).handle]),
+      const vectors = await guarded(`image batch (${firstBatch.length})`, () =>
+        session.embedImages(firstBatch.map((index) => [(images[index] as ImageInput).handle])),
       );
       const ms = now() - started;
       imageBatch = {
@@ -276,8 +321,15 @@ export async function runMeasurement(
   if (images.length >= 2 && session.embedImagesFlat) {
     const firstImage = images[0] as ImageInput;
     const secondImage = images[1] as ImageInput;
-    const nested = await session.embedImages([[firstImage.handle], [secondImage.handle]]);
-    const flat = await session.embedImagesFlat([firstImage.handle, secondImage.handle]);
+    const nested = await guarded("trap: nested image pair", () =>
+      session.embedImages([[firstImage.handle], [secondImage.handle]]),
+    );
+    const flat = await guarded("trap: flat image pair", () =>
+      (session.embedImagesFlat as (images: ImageHandle[]) => Promise<Float32Array>)([
+        firstImage.handle,
+        secondImage.handle,
+      ]),
+    );
     const flatVector = truncateAndNormalize(flat, dims);
     const nestedVectors = nested.map((vector) => truncateAndNormalize(vector, dims));
     const flatCosineVsNested = nestedVectors.map((vector) => cosine(flatVector, vector));

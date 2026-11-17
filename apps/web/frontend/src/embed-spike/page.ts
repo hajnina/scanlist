@@ -27,6 +27,8 @@ interface RunOptions {
   maxImages?: number;
   textRepeats?: number;
   imageRepeats?: number;
+  /** Per-model-call watchdog in seconds (0 = off); headless runs set it to fail fast. */
+  callTimeoutSec?: number;
 }
 
 interface C7Api {
@@ -171,6 +173,8 @@ const api: C7Api = {
       {
         textRepeats: options.textRepeats ?? 5,
         imageRepeats: options.imageRepeats ?? 3,
+        onStage: log,
+        callTimeoutMs: (options.callTimeoutSec ?? 0) * 1000,
         environment: {
           userAgent: navigator.userAgent,
           device: session.device,
@@ -215,6 +219,9 @@ if (params.get("autorun") === "1") {
       dtype: params.get("dtype") ?? "q4",
       textOnly: params.get("textOnly") === "1",
       maxImages: Number(params.get("maxImages") ?? "3"),
+      textRepeats: Number(params.get("textRepeats") ?? "5"),
+      imageRepeats: Number(params.get("imageRepeats") ?? "3"),
+      callTimeoutSec: Number(params.get("callTimeoutSec") ?? "0"),
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);

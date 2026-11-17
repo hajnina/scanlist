@@ -596,3 +596,37 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Low RISK noted: build-tools auto-pick is "newest dir", only checks -x; `SCANLIST_BUILD_TOOLS` env overrides — revisit if the toolchain gains a non-version dir.
 - NDK native builds cannot run on this aarch64 host (NDK prebuilts are x86_64-only) → CMake/NDK-dependent cards must verify via CI (ubuntu runners are x86_64). Added to AGENTS.md.
 - AGP end-to-end unproven until first app card; watch B1/A1 PRs for the gradle-vs-CI interplay.
+
+## 2026-11-17 — RN shippability: standalone release + launch proof + real icon
+- **Root cause of the user-facing "Metro can't load the script"**: the rolling APK was built by
+  `assembleDebug`, which contains no `assets/index.android.bundle`. `assembleRelease` bundles and
+  Hermes-compiles the JS, so it runs standalone. The debug APK was never a shippable artifact.
+- **PR #47 (CI release + emulator smoke) merged 22:14:42Z (`8303e77`)** — `rn` builds
+  `assembleRelease`, hard-fails unless the APK has `assets/index.android.bundle` >100 kB and only
+  `lib/arm64-v8a`, uploads `ScanList-rn-release.apk`; `rn-smoke` rebuilds the same release for
+  x86_64, installs on API 34, requires `Status: ok` + live pid + no `FATAL EXCEPTION`, taps
+  `Paste JSON` / `Cancel` / `Settings` via uiautomator, and uploads `rn-screens`.
+- **PR #48 (release docs) merged 22:14:52Z (`29e7cbd`)** — BUILD/README/RELEASE document the
+  release-vs-debug split and the #47 merge order. **PR #49 (adaptive icon) merged 20:43:45Z
+  (`d1953c9`)** — shopping-list card + scan brackets + tick + amber spark; vector foreground,
+  monochrome layer, 10 legacy PNGs replaced.
+- **Final main run 44188142594 green**: `standalone OK: JS bundle 1524428 bytes, arm64-v8a only`;
+  `SMOKE PASS: pid=3929`; three required screenshots (Lists, Paste a list, Settings).
+- **Rolling asset replaced**: `ScanList-rn-release.apk` **92,831,023 B** (88.5 MiB), JS bundle
+  **1,524,428 B**, only `lib/arm64-v8a`, label `ScanList`, icon resources
+  `mipmap/ic_launcher{,_round}` + `drawable/ic_launcher_{foreground,monochrome}` +
+  `color/ic_launcher_background`, `usesCleartextTraffic=false`, sha256
+  `da159260017c5364eb0ff8e6023a0582e73c9feb7cc88bd75c7619cfe1e44eec`; download URL 200.
+  The Metro-only `ScanList-rn-debug.apk` (118,964,153 B) is gone from the release.
+- **Screens reviewed lead-side from the shipping commit**: Lists (`Shopping list`, 0 items,
+  Import/Paste), the `Paste a list` dialog, and Settings (Auto/GPU/CPU/NPU chips, `E_NO_MODEL` for
+  the absent 484 MB bundle — expected; the weights are not in the APK, and this smoke did not wait
+  for the first-open download). M3 Expressive layout matches the style guide; no crash.
+- **Deadline honesty (2-hour box ended 21:49Z)**: the technical fix was proven at 20:50Z
+  (`rn-smoke` pass), but a harness/server restart 20:50–22:13Z blocked the merge; PRs landed
+  22:14Z and the final asset published 22:30:58Z. Users did not have the APK by 21:49Z —
+  ~41 min late, caused by the restart, not by an unresolved blocker.
+- **CI trap to keep**: under `set -o pipefail`, `unzip -l APK | grep -q ...` and
+  `adb logcat -d | grep -q ...` fail/miss on SIGPIPE because `grep -q` exits at the first match.
+  Capture to a file first. This false-failed a green build ("no JS bundle" with a 1.5 MB bundle
+  present) and would have hidden a real `FATAL EXCEPTION`.

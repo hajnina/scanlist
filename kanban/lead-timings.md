@@ -48,3 +48,22 @@ All times UTC. "Delivered" = the subagent's completion notification.
 - **Always measure the artifact's contents, not its zip size.** The 107 MB artifact contained the unchanged
   304 MB APK; one wrong merge and one wrong user-facing number came from that.
 - One ABI also cuts RN CI from 16–19 min to **~6.5 min**, which materially changes future estimates.
+
+## Live milestone (2026-11-17, 2-hour box at 19:49Z): standalone RN release + launch proof + icon
+| Lane | Started | Delivered | Duration | Outcome |
+|---|---|---|---|---|
+| Icon (subagent, parallel) | 19:55 | 20:12 | **17 min** | PR #49, preview approved lead-side |
+| Release docs + audit (subagent, parallel) | 19:55 | 20:10 | **15 min** | PR #48; 5 review fixes by 20:42 |
+| CI release + smoke (lead) | 19:55 | 20:50 | **55 min** | PR #47 rn green; smoke failed twice (inline-shell vars, then pipefail/SIGPIPE false negative), PASS 20:50 |
+| Merge + final main release | 22:14 | 22:30 | **16 min** | 92,831,023 B release asset live |
+
+**What the numbers say**
+- The fix was **proven inside the box** (20:50Z); the shipping step was not. An ~83 min harness/server
+  restart (20:50–22:13Z) landed between "CI green" and "merge", so the 21:49Z deadline was missed by
+  ~41 min. No code or CI work was outstanding at the deadline — the artifact was green and reviewed.
+- The emulator smoke is the only honest launch proof available here (aarch64 laptop, no phone, and
+  the shipped arm64 APK cannot install on x86_64 runners). It caught two real script defects that a
+  green gradle build hid: the emulator action runs `script:` line-by-line in separate shells, and
+  `pipefail` + `grep -q` false-fails on SIGPIPE.
+- Final release is **92.8 MB vs 118.9 MB debug at the same 1.52 MB bundle** — the debug build carried
+  dev-support code. The icon adds ~7 KB. Inspect the APK, not the artifact zip.

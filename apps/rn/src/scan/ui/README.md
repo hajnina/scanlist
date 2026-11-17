@@ -35,7 +35,7 @@ lead can wire it in two edits:
    gets:
 
    ```tsx
-   import {ScanScreen} from '../scan/ui';
+   import {ScanScreen} from '../../scan/ui';
 
    if (stored !== null && scanning) {
      return (

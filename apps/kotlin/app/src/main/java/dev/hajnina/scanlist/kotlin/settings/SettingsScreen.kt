@@ -2,10 +2,10 @@ package dev.hajnina.scanlist.kotlin.settings
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +23,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -243,17 +244,20 @@ private fun LatencyCard(state: SettingsState) {
 
             if (state.phase != ProbePhase.RUNNING) {
                 val haptic = LocalHapticFeedback.current
-                Text(
-                    "TEST AGAIN",
-                    modifier = Modifier
-                        .padding(top = 4.dp)
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
-                            state.rerun()
-                        }
-                        .padding(vertical = 6.dp),
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = Heavy, letterSpacing = 1.5.sp),
-                )
+                // Card B7: a real TextButton instead of a bare clickable Text — ripple, minimum touch
+                // target and the "button" accessibility role come for free (style guide §4).
+                TextButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                        state.rerun()
+                    },
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        "TEST AGAIN",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = Heavy, letterSpacing = 1.5.sp),
+                    )
+                }
             }
         }
     }
@@ -265,19 +269,21 @@ private fun LatencyCard(state: SettingsState) {
 private fun ModelCard(state: SettingsState) {
     val cs = MaterialTheme.colorScheme
     val status = state.model
-    val statusColor = when {
-        status.isReady -> cs.primary
-        status is ModelStatus.Present -> cs.tertiary
-        else -> cs.error
-    }
+    val ready = status.isReady
+    // Card B7 (style guide §3): a warning recolours the SAME card — the model card is neutral while
+    // the bundle is ready and errorContainer the moment E_NO_MODEL/wrong-size/unreadable is true.
+    val container = if (ready) cs.surfaceContainerHigh else cs.errorContainer
+    val content = if (ready) cs.onSurface else cs.onErrorContainer
+    // Ready reads as the app's primary state; anything else is already on the error container.
+    val statusColor = if (ready) cs.primary else content
 
     Card(
         modifier = Modifier.fillMaxWidth().springIn(3),
         shape = Shapes.leafMirror,
-        colors = CardDefaults.cardColors(containerColor = cs.surfaceContainerHigh, contentColor = cs.onSurface),
+        colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
     ) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionLabel("Model")
+            SectionLabel("Model", color = content.copy(alpha = 0.75f))
             Text(
                 "EmbeddingGemma 2 · 740M",
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = Heavy),
@@ -285,9 +291,9 @@ private fun ModelCard(state: SettingsState) {
             Text(
                 "Text + image in one 768-d space, Matryoshka to 256.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = cs.onSurfaceVariant,
+                color = content.copy(alpha = 0.75f),
             )
-            SectionLabel("File", color = cs.onSurfaceVariant)
+            SectionLabel("File", color = content.copy(alpha = 0.75f))
             MonospaceLine(status.path)
             Text(
                 ModelProbe.line(status),
@@ -295,11 +301,11 @@ private fun ModelCard(state: SettingsState) {
                 color = statusColor,
             )
             MonospaceLine("sha256 (expected) ${ModelProbe.EXPECTED_SHA256}")
-            if (!status.isReady) {
+            if (!ready) {
                 Text(
                     ModelProbe.PUSH_HINT,
                     style = MaterialTheme.typography.bodySmall,
-                    color = cs.onSurfaceVariant,
+                    color = content.copy(alpha = 0.85f),
                 )
             }
         }
@@ -429,7 +435,13 @@ private fun LiveRankingCard(haptics: HapticFeedback) {
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = Heavy),
                 )
                 Text(
-                    if (liveRanking) "Re-rank every 400 ms, EMA-smoothed" else "Paused: list stays in JSON order",
+                    if (liveRanking) {
+                        "Scan tab re-ranks every 400 ms, EMA-smoothed"
+                    } else {
+                        // Card B7: the old copy ("Paused: list stays in JSON order") was a promise this
+                        // switch cannot keep — ranking is wired in rank/** and runs live regardless.
+                        "Preview only — the scan tab keeps ranking live"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

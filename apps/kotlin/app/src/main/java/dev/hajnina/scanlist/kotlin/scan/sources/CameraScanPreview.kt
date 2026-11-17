@@ -33,7 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -52,12 +55,22 @@ import java.util.concurrent.Executors
  *    `STRATEGY_KEEP_ONLY_LATEST` (card B4: never queue frames — a stale frame is worse than none);
  *  - hands frames to [CameraScanAnalyzer] on a single background executor, and tears everything
  *    down in `onDispose` (provider unbind, executor shutdown, ML Kit clients closed).
+ *
+ * Card B7 additions (polish pass, both optional so B4's call sites compile unchanged):
+ *  - [onPermission] reports the live CAMERA state (null is never reported: the first value is the
+ *    truth at entry), so the scan screen can show the "camera off" banner and offer app settings;
+ *  - [onLuma] forwards the mean luma of each analysed frame to the low-light detector;
+ *  - the denied state is a proper M3 Expressive card (caps label, Black title, actionable button)
+ *    instead of two plain centred lines, and it can re-ask: the launcher is re-armed on every resume,
+ *    so returning from the system settings page starts the preview.
  */
 @Composable
 fun CameraScanPreview(
     modifier: Modifier = Modifier,
     core: ScanFrameCore = remember { ScanFrameCore(jpegEncoder = AndroidJpegEncoder) },
     onSignal: (ScanSignal) -> Unit = {},
+    onPermission: (Boolean) -> Unit = {},
+    onLuma: (Double) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -80,28 +93,54 @@ fun CameraScanPreview(
         onPauseOrDispose { }
     }
 
+    // Card B7: report the live permission state (latest lambda, so the caller may pass a new one on
+    // every recomposition without a stale-capture bug).
+    val latestOnPermission by rememberUpdatedState(onPermission)
+    LaunchedEffect(granted) { latestOnPermission(granted) }
+
     if (!granted) {
         // Same visual slot as the preview so B5's layout does not jump when permission is refused.
+        // Card B7: an actionable M3 Expressive state (caps label, Black title, button), not just text.
         Box(
             modifier = modifier
-                .clip(RoundedCornerShape(44.dp))
+                .clip(RoundedCornerShape(44.dp)) // STYLE_GUIDE §3 hero radius
                 .background(cs.surfaceContainerHighest),
             contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(horizontal = 24.dp),
             ) {
                 Text(
-                    "Camera permission needed",
-                    style = MaterialTheme.typography.titleMedium,
+                    "CAMERA OFF",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black, letterSpacing = 1.5.sp),
                     color = cs.onSurfaceVariant,
                 )
                 Text(
-                    "Grant camera access to scan products.",
+                    "Camera permission needed",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                    color = cs.onSurface,
+                )
+                Text(
+                    "Grant camera access to scan products. Barcodes, text and image matching all need it.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = cs.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp),
+                    textAlign = TextAlign.Center,
+                )
+                androidx.compose.material3.Button(
+                    onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                ) {
+                    Text(
+                        "ALLOW CAMERA",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                    )
+                }
+                Text(
+                    "No prompt? Enable Camera for this app in system settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                 )
             }
         }
@@ -119,9 +158,15 @@ fun CameraScanPreview(
     // once by the DisposableEffect, so the analyzer could keep calling a stale lambda. The effect now
     // reads the latest value through a state holder and is not keyed on it (no camera re-bind).
     val latestOnSignal by rememberUpdatedState(onSignal)
+    // Card B7: same treatment for the luma callback (the detector state lives in the screen).
+    val latestOnLuma by rememberUpdatedState(onLuma)
 
     DisposableEffect(granted, previewView, lifecycleOwner) {
-        val analyzer = CameraScanAnalyzer(core = core, onSignal = { signal -> latestOnSignal(signal) })
+        val analyzer = CameraScanAnalyzer(
+            core = core,
+            onSignal = { signal -> latestOnSignal(signal) },
+            onLuma = { luma -> latestOnLuma(luma) },
+        )
         val executor = Executors.newSingleThreadExecutor()
         val providerFuture = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null

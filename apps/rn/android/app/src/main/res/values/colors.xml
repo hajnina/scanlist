@@ -1,0 +1,4 @@
+<resources>
+    <!-- Solid launcher-icon background, same value as the Kotlin sibling app and the Bonsai style guide. -->
+    <color name="ic_launcher_background">#10261C</color>
+</resources>

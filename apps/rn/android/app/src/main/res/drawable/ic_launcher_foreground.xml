@@ -1,0 +1,47 @@
+<!-- ScanList launcher icon foreground: a shopping-list card (three items, the last one ticked) framed by
+     camera-scan corner brackets, with a small amber "magic scan" spark. 108x108 adaptive-icon viewport;
+     all artwork sits inside the 66dp safe circle (centre 54,54) so no launcher mask clips it.
+     Colours match references/bonsai-ui/STYLE_GUIDE.md: deep green #10261C, mint #8CF0DC, paper #E9FFF8,
+     amber #FFB86B. Hand-written vector like the Kotlin sibling's icon (no bitmap, no icon library). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Camera-scan corner brackets, outer tips at r~33 from centre. -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#8CF0DC"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M44,31 H32 V43 M64,31 H76 V43 M44,77 H32 V65 M64,77 H76 V65" />
+
+    <!-- Shopping-list card. -->
+    <path
+        android:fillColor="#E9FFF8"
+        android:pathData="M42,34 H66 A5,5 0 0 1 71,39 V70 A5,5 0 0 1 66,75 H42 A5,5 0 0 1 37,70 V39 A5,5 0 0 1 42,34 Z" />
+
+    <!-- Two open items, as bold rounded bars. -->
+    <path
+        android:fillColor="#10261C"
+        android:pathData="M44.75,40.5 H55.25 A2.75,2.75 0 0 1 58,43.25 A2.75,2.75 0 0 1 55.25,46 H44.75 A2.75,2.75 0 0 1 42,43.25 A2.75,2.75 0 0 1 44.75,40.5 Z" />
+    <path
+        android:fillColor="#10261C"
+        android:pathData="M44.75,49.5 H63.25 A2.75,2.75 0 0 1 66,52.25 A2.75,2.75 0 0 1 63.25,55 H44.75 A2.75,2.75 0 0 1 42,52.25 A2.75,2.75 0 0 1 44.75,49.5 Z" />
+
+    <!-- Third item: ticked off. -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#10261C"
+        android:strokeWidth="4.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M43,66 L47,70 L57,61.5" />
+
+    <!-- Magic-scan spark. -->
+    <path
+        android:fillColor="#FFB86B"
+        android:pathData="M64.2,36.6 Q65.2,40.2 68.8,41.2 Q65.2,42.2 64.2,45.8 Q63.2,42.2 59.6,41.2 Q63.2,40.2 64.2,36.6 Z" />
+</vector>

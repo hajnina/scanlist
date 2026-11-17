@@ -553,6 +553,17 @@ describe("highlight decision is isolated (decideTop, RANK.md §6.1–§6.3)", ()
     expect(decideTop(ranked(0.68, 0.6), null, confirmed)?.id).toBe("y");
   });
 
+  it("floors the hysteresis crown, not the sorted top-1 (§6.1 order)", () => {
+    // y 0.68 is top-1; x 0.665 is the previous hero and sits inside the 0.02 crown, so hysteresis
+    // keeps x and the gate floors *x* (0.665 < T_image 0.68) -> no hero. Flooring the top-1 first
+    // would pass (0.68 is at the floor) and wrongly highlight y.
+    const ranked: RankedCandidate[] = [
+      { id: "y", raw: 0.68, smoothed: 0.68, done: false, order: 1, source: "image" },
+      { id: "x", raw: 0.665, smoothed: 0.665, done: false, order: 0, source: "image" },
+    ];
+    expect(decideTop(ranked, "x", new Set(["x", "y"]))).toBeNull();
+  });
+
   it("requires accept-list confirmation for an image-driven hero only (§6.3)", () => {
     expect(decideTop(imageCandidates(0.9, 0.8), null, new Set())).toBeNull();
     expect(decideTop(imageCandidates(0.9, 0.8), null, new Set(["b"]))?.id).toBe("b");

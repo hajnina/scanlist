@@ -10,12 +10,12 @@
  * `modelStatus.ts`, `prefix.ts`, `store.ts` and `state.ts` and is unit-tested. This file only lays
  * the snapshot out and routes taps to the controller.
  *
- * Mounting (`App.tsx` is outside this card's `owns`): pass one controller and a back handler —
+ * Mounting (card A6-followup: `App.tsx` now does this):
  *
  *   const settings = useMemo(() => createNativeSettingsController(), []);
- *   <SettingsScreen controller={settings} onBack={() => setScreen('list')} />
+ *   <SettingsScreen controller={settings} onBack={() => setScreen('lists')} />
  *
- * or omit `controller` and the screen builds the device one itself.
+ * or omit `controller` and the screen builds the device one itself (tests / a standalone embed).
  */
 import React, {useMemo} from 'react';
 import {ScrollView, StyleSheet, View} from 'react-native';

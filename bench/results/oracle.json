@@ -1,0 +1,112 @@
+{
+  "generatedAt": "2026-11-17T06:14:21.270Z",
+  "track": "oracle",
+  "implementation": "shared/ref/scanlist_ref.py — the normative Python reference (numpy), ships in no app",
+  "provenance": [
+    "rank: bench/scripts/rank-oracle.py over the same 200-item fixture as the ts-core and Kotlin runs",
+    "loc: bench/scripts/loc.py over shared/ (ts-core + oracle + android-embed + spec/fixtures)",
+    "cost: shared/S-cards are foundation work, reported but not a track"
+  ],
+  "headline": "The reference every track is graded against: 1.59 ms p50 for 200 items with numpy matmul — slower than the Kotlin port, faster than nothing, and the only implementation whose output is normative.",
+  "measurements": {
+    "rank200": {
+      "n": 300,
+      "min": 1.5536049904767424,
+      "p50": 1.587666993145831,
+      "p95": 1.6140739899128675,
+      "max": 1.6552720044273883,
+      "mean": 1.586057696986245,
+      "unit": "ms"
+    },
+    "rank200.coldFirstTick": {
+      "status": "measured",
+      "ms": 8.792250999249518
+    },
+    "decideTop200": {
+      "n": 300,
+      "min": 0.0004680041456595063,
+      "p50": 0.0006249902071431279,
+      "p95": 0.000676998752169311,
+      "max": 0.0019790022633969784,
+      "mean": 0.0006047070201020688,
+      "unit": "ms"
+    },
+    "rank200.label": "oracle datum, not a track: nothing ships this. It exists so the two real rankers can be read against the reference.",
+    "loc": {
+      "path": "shared",
+      "what": "Shared spec, fixtures, ts-core, oracle, android-embed (S-cards)",
+      "files": 44,
+      "lines": 8121,
+      "code": 6246,
+      "source": {
+        "files": 27,
+        "code": 4124
+      },
+      "test": {
+        "files": 17,
+        "code": 2122
+      },
+      "byExt": {
+        ".py": 2386,
+        ".ts": 2174,
+        ".kt": 1648,
+        ".kts": 38
+      }
+    },
+    "agentCost": {
+      "status": "measured",
+      "sessions": 23,
+      "tokensOutput": 418830,
+      "tokensInput": 3230666,
+      "cacheRead": 67135808,
+      "costUsd": 0,
+      "cards": {
+        "total": 10,
+        "done": 10,
+        "doing": 0,
+        "todo": 0,
+        "syncRounds": 0,
+        "ids": [
+          "S1",
+          "S10",
+          "S2",
+          "S3",
+          "S4",
+          "S5",
+          "S6",
+          "S7",
+          "S8",
+          "S9"
+        ]
+      },
+      "mergedPrs": 5,
+      "requestChangesVerdicts": 5,
+      "tokensOutputPerMergedPr": 83766,
+      "method": "bench/scripts/agent-cost.py — opencode session ledger (tokens/cost, attributed by card id in the session title) + committed kanban/lead-log evidence (merged PRs, REQUEST-CHANGES verdicts, sync rounds, infra deaths).",
+      "honestLimits": [
+        "tokens measure agent output, not human wall-clock; cost 0.00 on the free tier makes tokens the only comparable unit",
+        "sessions without a card id in the title are reported as `unattributed` — project-wide cost, not one track's",
+        "the ledger is a lower bound: it only holds sessions this machine still has (see sessions.coverage)",
+        "lead-log counts are regex over prose; the log is the evidence, the numbers are an index into it"
+      ]
+    },
+    "sanity": {
+      "topId": null,
+      "entries": 200,
+      "top3": [
+        {
+          "id": "x1:0008",
+          "smoothed": 0.922101
+        },
+        {
+          "id": "x1:0096",
+          "smoothed": 0.920626
+        },
+        {
+          "id": "x1:0184",
+          "smoothed": 0.919466
+        }
+      ]
+    }
+  }
+}

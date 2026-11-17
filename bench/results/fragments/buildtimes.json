@@ -1,0 +1,115 @@
+{
+  "generatedAt": "2026-11-17T06:13:46.808Z",
+  "method": "bench/scripts/buildtimes.mjs — wall clock around the real build command (includes JVM/daemon and npm/npx startup). gradle 'warm' = incremental assembleDebug with the Gradle build cache; 'cold' = `clean … --no-build-cache` (all tasks executed). Dependency download time is excluded: node_modules and the Gradle home were already populated.",
+  "note": "This laptop is aarch64 and uses the hand-built toolchain in scripts/android-env.sh (aapt2 override). CI is x86_64 and uses the Maven aapt2; CI numbers are per-job durations from the PR runs that produced the artifacts measured in sizes.json.",
+  "tracks": {
+    "kotlin": {
+      "gradleWarm": {
+        "status": "measured",
+        "wallMs": 799,
+        "exitCode": 0,
+        "command": "source scripts/android-env.sh && ./gradlew :scanlistKotlin:assembleDebug --console=plain",
+        "cwd": "/home/martin/projects/scanlist-wt/X1",
+        "tail": " | BUILD SUCCESSFUL in 612ms | 54 actionable tasks: 54 up-to-date"
+      },
+      "gradleCold": {
+        "status": "measured",
+        "wallMs": 6863,
+        "exitCode": 0,
+        "command": "source scripts/android-env.sh && ./gradlew clean :scanlistKotlin:assembleDebug --no-build-cache --console=plain",
+        "cwd": "/home/martin/projects/scanlist-wt/X1",
+        "tail": "qemu-x86_64: Could not open '/lib64/ld-linux-x86-64.so.2': No such file or directory |  | qemu-x86_64: Could not open '/lib64/ld-linux-x86-64.so.2': No such file or directory"
+      },
+      "unitTests": {
+        "status": "measured",
+        "wallMs": 1423,
+        "exitCode": 0,
+        "command": "source scripts/android-env.sh && ./gradlew :scanlistKotlin:testDebugUnitTest --rerun --console=plain",
+        "cwd": "/home/martin/projects/scanlist-wt/X1",
+        "tail": " | BUILD SUCCESSFUL in 1s | 36 actionable tasks: 4 executed, 2 from cache, 30 up-to-date"
+      }
+    },
+    "rn": {
+      "metroBundle": {
+        "status": "measured",
+        "wallMs": 1286,
+        "exitCode": 0,
+        "command": "npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/x1-index.android.bundle --assets-dest /tmp/x1-rn-assets",
+        "cwd": "apps/rn",
+        "tail": " | LOG:Writing bundle output to: /tmp/x1-index.android.bundle | LOG:Done writing bundle output"
+      },
+      "metroBundleCold": {
+        "status": "measured",
+        "wallMs": 9073,
+        "exitCode": 0,
+        "command": "npx react-native bundle --reset-cache --platform android --dev false --entry-file index.js --bundle-output /tmp/x1-index-cold.android.bundle --assets-dest /tmp/x1-rn-assets-cold",
+        "cwd": "apps/rn",
+        "tail": " | LOG:Writing bundle output to: /tmp/x1-index-cold.android.bundle | LOG:Done writing bundle output"
+      },
+      "jest": {
+        "status": "measured",
+        "wallMs": 1752,
+        "exitCode": 0,
+        "command": "npx jest --ci --silent",
+        "cwd": "apps/rn",
+        "tail": "Tests:       146 passed, 146 total | Snapshots:   0 total | Time:        0.969 s, estimated 5 s"
+      },
+      "jestCold": {
+        "status": "measured",
+        "wallMs": 6389,
+        "exitCode": 0,
+        "command": "npx jest --ci --silent --no-cache",
+        "cwd": "apps/rn",
+        "tail": "Tests:       146 passed, 146 total | Snapshots:   0 total | Time:        5.486 s"
+      },
+      "apkLocal": {
+        "status": "n/a",
+        "reason": "not built on this aarch64 laptop by design (native NDK/CMake prebuilts are x86_64-only) — APK comes from CI, see ciJobs"
+      }
+    },
+    "web": {
+      "viteBuild": {
+        "status": "measured",
+        "wallMs": 2365,
+        "exitCode": 0,
+        "command": "npm run build",
+        "cwd": "apps/web/frontend",
+        "tail": "dist/assets/index-DzAEBmS5.js   166.93 kB │ gzip: 42.52 kB │ map: 493.39 kB |  | ✓ built in 213ms"
+      },
+      "vitest": {
+        "status": "measured",
+        "wallMs": 2079,
+        "exitCode": 0,
+        "command": "npx vitest run --reporter=dot",
+        "cwd": "apps/web/frontend",
+        "tail": " | stderr | tests/app.test.ts | Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information."
+      }
+    },
+    "ci": {
+      "kotlin": {
+        "status": "measured",
+        "runId": "44026921235",
+        "job": "kotlin",
+        "conclusion": "success",
+        "seconds": 93,
+        "source": "gh api .../actions/runs/44026921235/jobs"
+      },
+      "rn": {
+        "status": "measured",
+        "runId": "44023804443",
+        "job": "rn",
+        "conclusion": "success",
+        "seconds": 1142,
+        "source": "gh api .../actions/runs/44023804443/jobs"
+      },
+      "web": {
+        "status": "measured",
+        "runId": "44024925977",
+        "job": "web",
+        "conclusion": "success",
+        "seconds": 23,
+        "source": "gh api .../actions/runs/44024925977/jobs"
+      }
+    }
+  }
+}

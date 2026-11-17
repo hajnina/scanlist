@@ -1,0 +1,133 @@
+{
+  "generatedAt": "2026-11-17T06:14:21.145829+00:00",
+  "method": "bench/scripts/loc.py \u2014 cloc stand-in (find+read, blank/comment-line excluded); see README",
+  "note": "`code` excludes blank lines and line-leading comments but does not track block comments, so it is slightly higher than cloc's code count. `test` is split out because the Kotlin track's parity suite is a large share of its bytes.",
+  "areas": {
+    "kotlin": {
+      "path": "apps/kotlin",
+      "what": "Kotlin/Compose app (track B)",
+      "files": 54,
+      "lines": 7179,
+      "code": 5448,
+      "source": {
+        "files": 34,
+        "code": 3347
+      },
+      "test": {
+        "files": 20,
+        "code": 2101
+      },
+      "byExt": {
+        ".kt": 5348,
+        ".kts": 63,
+        ".sh": 37
+      }
+    },
+    "rn": {
+      "path": "apps/rn",
+      "what": "React Native app (track A), excluding android/ Gradle glue counted separately",
+      "files": 87,
+      "lines": 8397,
+      "code": 6486,
+      "source": {
+        "files": 69,
+        "code": 4338
+      },
+      "test": {
+        "files": 18,
+        "code": 2148
+      },
+      "byExt": {
+        ".ts": 3835,
+        ".tsx": 2171,
+        ".kt": 319,
+        ".sh": 91,
+        ".js": 70
+      }
+    },
+    "web.frontend": {
+      "path": "apps/web/frontend",
+      "what": "Web frontend (track C, Preact + ts-core)",
+      "files": 26,
+      "lines": 3952,
+      "code": 3049,
+      "source": {
+        "files": 19,
+        "code": 2188
+      },
+      "test": {
+        "files": 7,
+        "code": 861
+      },
+      "byExt": {
+        ".ts": 1255,
+        ".tsx": 784,
+        ".css": 700,
+        ".mjs": 164,
+        ".js": 64,
+        ".py": 57,
+        ".html": 25
+      }
+    },
+    "web.server": {
+      "path": "apps/web/server",
+      "what": "Web embedding server (track C, Python/torch)",
+      "files": 13,
+      "lines": 3066,
+      "code": 2342,
+      "source": {
+        "files": 6,
+        "code": 1153
+      },
+      "test": {
+        "files": 7,
+        "code": 1189
+      },
+      "byExt": {
+        ".py": 2342
+      }
+    },
+    "shared": {
+      "path": "shared",
+      "what": "Shared spec, fixtures, ts-core, oracle, android-embed (S-cards)",
+      "files": 44,
+      "lines": 8121,
+      "code": 6246,
+      "source": {
+        "files": 27,
+        "code": 4124
+      },
+      "test": {
+        "files": 17,
+        "code": 2122
+      },
+      "byExt": {
+        ".py": 2386,
+        ".ts": 2174,
+        ".kt": 1648,
+        ".kts": 38
+      }
+    },
+    "bench": {
+      "path": "bench",
+      "what": "This harness (card X1)",
+      "files": 12,
+      "lines": 1977,
+      "code": 1599,
+      "source": {
+        "files": 12,
+        "code": 1599
+      },
+      "test": {
+        "files": 0,
+        "code": 0
+      },
+      "byExt": {
+        ".mjs": 926,
+        ".py": 455,
+        ".java": 140,
+        ".sh": 78
+      }
+    }
+  }
+}

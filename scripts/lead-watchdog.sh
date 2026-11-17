@@ -39,6 +39,10 @@ else
 fi
 rm -f "$NEW"
 
+echo "== closed-unmerged audit (lead incident lesson: a closeout isn't a closeout until mergedAt != null) =="
+gh pr list --state closed --limit 10 --json number,mergedAt \
+  --jq '.[] | select(.mergedAt == null) | "ALARM: #\(.number) CLOSED-UNMERGED"' 2>/dev/null || true
+
 echo "== tag plague + release job =="
 echo "refs/tags/main count: $(git ls-remote --tags origin 'refs/tags/main' | wc -l) (0 = clean)"
 gh release list --limit 5 2>/dev/null | sed 's/^/   /'

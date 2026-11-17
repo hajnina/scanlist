@@ -23,9 +23,10 @@ import java.util.Locale
 // contains exactly the code points where the two differ (164 entries; 75 multi-code-point folds).
 // The same exhaustive comparison is a unit test (`CaseFoldTest`), plus random-string fuzzing, so a
 // JDK Unicode update that adds mappings is caught instead of silently changing `BARCODE_MATCH`.
-// S8-sync's `shared/ts-core/src/casefold.ts` implements the same contract from CaseFolding.txt; its
-// table is not on main yet (branch `card/S8-sync`), so this port was derived independently from the
-// oracle. Cross-check that the two produce identical output once S8-sync merges.
+// S8-sync's `shared/ts-core/src/casefold.ts` implements the same contract from CaseFolding.txt and
+// is on main since the S8-sync merge; this port was derived independently from the oracle. The
+// cross-check that both produce identical output is CaseFoldTest (Kotlin side) plus ts-core's fuzz
+// suite (TS side).
 
 /** `lowercase(cp) -> casefold(cp)` for every code point where full folding differs. */
 private val FOLD_EXCEPTIONS: Map<String, String> = mapOf(

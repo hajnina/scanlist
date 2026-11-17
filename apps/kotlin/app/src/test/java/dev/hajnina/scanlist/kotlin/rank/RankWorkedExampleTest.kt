@@ -167,6 +167,25 @@ class RankWorkedExampleTest {
     }
 
     @Test
+    fun `gate floors the hysteresis crown, not the sorted top-1 (S10 6-1 order)`() {
+        // Mirror of ts-core tests/rank.test.ts "floors the hysteresis crown" (S8-sync) — the B3-sync
+        // review found this flip mutant survived all 48 Kotlin rank tests. y 0.68 is top-1; x 0.665
+        // is the previous hero inside the 0.02 crown, so hysteresis keeps x and the gate floors *x*
+        // (0.665 < T_image 0.68) → no hero. Flooring the top-1 first would pass (0.68 sits exactly
+        // at the inclusive floor) and wrongly return a hero.
+        assertNull(
+            decideTop(
+                listOf(
+                    RankCandidate("y", 1, 0.68, 0.68, RankSource.IMAGE),
+                    RankCandidate("x", 0, 0.665, 0.665, RankSource.IMAGE),
+                ),
+                "x",
+                setOf("x", "y"),
+            ),
+        )
+    }
+
+    @Test
     fun `per-source gate boundaries are inclusive and q6-rounded`() {
         fun text(id: String, score: Double) = RankCandidate(id, 0, score, score, RankSource.TEXT)
         fun image(id: String, score: Double) = RankCandidate(id, 0, score, score, RankSource.IMAGE)

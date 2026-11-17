@@ -24,6 +24,7 @@
     "image": "raw image, no prefix (see imagePrefix, always empty)",
     "prefixIsPartOfCacheKey": true
   },
+  "note": "Card S10 (margin rule, no-match floor, image accept-list guard) changes the HIGHLIGHT decision only — RANK.md §6.2/§6.3 — and nothing in this file: 'active' stays 'mnemothera' as card S3 set it, both prefix sets and imagePrefix are unchanged, and the doc/query/image strings above remain the only ones ever embedded. Embedding inputs are untouched, so golden.json's vectors and expectedTop3 stay valid.",
   "provenance": {
     "mnemothera": "references/embeddinggemma/RECIPE.md §5 (Therapy_local config/AppConfig.kt, litertlm path)",
     "modelcard": "EmbeddingGemma 2 model card (ai.google.dev/gemma/docs/embeddinggemma/model_card_2); title: none when absent; the one Google trains with"

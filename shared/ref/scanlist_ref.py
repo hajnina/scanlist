@@ -4,7 +4,8 @@ Normative sources (read these, not this file, when in doubt):
 
 * ``shared/spec/FLATTEN.md`` — traversal order, item ids, ``docText`` (§4/§6).
 * ``shared/spec/RANK.md`` — truncation, q6, fusion, barcode boost, EMA, hysteresis,
-  output order, degraded states, 400 ms cadence (§1–§9), worked example (§10).
+  the margin / no-match / image-guard HIGHLIGHT gates (§6.2/§6.3), output order,
+  degraded states, 400 ms cadence (§1–§9), worked example (§10).
 
 This module is pure Python + numpy: no model, no I/O beyond :func:`load_list`.
 It is the oracle the Kotlin / React Native / Web tracks are compared against
@@ -34,7 +35,7 @@ import math
 import os
 import time
 import unicodedata
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence, Set as AbstractSet
 from typing import Any, Optional
 
 import numpy as np
@@ -46,6 +47,10 @@ __all__ = [
     "MIN_INTERVAL_MS",
     "BARCODE_BOOST",
     "MAX_TEXT_QUERIES",
+    "MARGIN_TEXT",
+    "NO_MATCH_TEXT",
+    "MARGIN_IMAGE",
+    "NO_MATCH_IMAGE",
     "q6",
     "cosine",
     "truncate_and_normalize",
@@ -75,6 +80,14 @@ MIN_INTERVAL_MS = 400      # §7
 BARCODE_BOOST = 0.15       # §3
 MAX_TEXT_QUERIES = 16      # §2.2 barcode + OCR lines per tick
 _CACHE_KEY_SALT = "scanlist-item-vector/1\n"
+
+# --- §6.2/§6.3 highlight gates (card S10, calibrated on S3's measured data) ---
+# The ranking order never uses these; only `decide_top()` does. Values and the
+# evidence behind them are in RANK.md §6.2/§6.3 and fixtures/PREFIX_AB.md §4.
+MARGIN_TEXT = 0.05         # M_text: top1 − top2 must be >= this
+NO_MATCH_TEXT = 0.79       # T_text: nothing highlights below this smoothed score
+MARGIN_IMAGE = 0.005       # M_image: image margins are structurally tiny
+NO_MATCH_IMAGE = 0.68      # T_image: floor above the image-distractor band
 
 
 # ---------------------------------------------------------------------------
@@ -382,29 +395,64 @@ def sort_candidates(candidates: Sequence[Mapping[str, Any]]) -> list[dict[str, A
 
 def decide_top(
     candidates: Sequence[Mapping[str, Any]],
-    current_top_id: Optional[str],
+    current_top_id: Optional[str] = None,
+    *,
+    barcode_confirmed_ids: AbstractSet[str] = frozenset(),
 ) -> Optional[dict[str, Any]]:
-    """Pick the highlighted entry: hysteresis, or None when there is no candidate.
+    """Decide whether (and which) candidate is shown as the hero, per RANK.md §6.
 
-    ``candidates`` must already be sorted by :func:`sort_candidates`.
+    ``candidates`` must already be sorted by :func:`sort_candidates` (index 0 =
+    top1, index 1 = top2). Returns the entry to highlight, or ``None`` for "no
+    highlight": the caller then renders the ranked order with ``topId = null``.
 
-    This is deliberately the *only* place the highlight is decided. Card S10
-    (post-S3 calibration) adds the margin rule (``top1 - top2 >= M``) and the
-    no-match threshold (``top1 >= T``) here and nowhere else — ranking order,
-    scores and state must not change, only whether a hero card is shown.
+    This is deliberately the *only* place the highlight is decided, in this
+    order (RANK.md §6.1–§6.3):
+
+    1. **Hysteresis** picks the candidate (the previous hero stays while a
+       challenger is ahead by at most ``HYSTERESIS``).
+    2. **Evidence gate** on the sorted top pair: ``q6(top1 − top2) >= M`` and
+       ``hero >= T``, with ``(M, T)`` = ``(MARGIN_TEXT, NO_MATCH_TEXT)`` for a
+       text-driven hero and ``(MARGIN_IMAGE, NO_MATCH_IMAGE)`` for an
+       image-driven one. The driving source is the entry's ``source`` key
+       (``"text"`` when absent); a tie between the two sources counts as text,
+       the stricter gate.
+    3. **Image guard** (v1 = accept-list): an image-driven hero additionally
+       requires an exact barcode/OFF-name confirmation (§3.1) of *that* item.
+       Unconfirmed image matches are shown in ranked order without a hero.
     """
     if not candidates:
         return None
+
     best = candidates[0]
-    if current_top_id is None:
-        return best
-    current = next((e for e in candidates if e["id"] == current_top_id), None)
-    if current is None:
-        # Current top was ticked, removed or unscored: first candidate wins now.
-        return best
-    if best["id"] != current["id"] and q6(best["smoothed"] - current["smoothed"]) > HYSTERESIS:
-        return best
-    return current
+    runner_up = candidates[1] if len(candidates) > 1 else None
+
+    # 1. hysteresis (§6.1): the previous hero is sticky inside the dead band.
+    hero = best
+    if current_top_id is not None:
+        current = next((e for e in candidates if e["id"] == current_top_id), None)
+        if current is not None and not (
+            best["id"] != current["id"]
+            and q6(best["smoothed"] - current["smoothed"]) > HYSTERESIS
+        ):
+            hero = current
+
+    # 2. evidence gate (§6.2): decisive? and plausible on its own?
+    if hero.get("source", "text") == "image":
+        margin_required, floor_required = MARGIN_IMAGE, NO_MATCH_IMAGE
+    else:
+        margin_required, floor_required = MARGIN_TEXT, NO_MATCH_TEXT
+    # Fewer than two candidates: nothing to beat, so the margin is vacuously met
+    # (the floor still has to be cleared). Otherwise compare q6(top1 − top2),
+    # exactly like the hysteresis rule, so 0.05 clears and 0.0499 does not.
+    if runner_up is not None and q6(best["smoothed"] - runner_up["smoothed"]) < margin_required:
+        return None
+    if q6(hero["smoothed"]) < floor_required:
+        return None
+
+    # 3. image guard (§6.3): an image-only match needs accept-list confirmation.
+    if hero.get("source", "text") == "image" and hero["id"] not in barcode_confirmed_ids:
+        return None
+    return hero
 
 
 def _public_entry(entry: Mapping[str, Any]) -> dict[str, Any]:
@@ -485,8 +533,10 @@ def rank(
     "vectors still missing" row returns (first tick: flatten order).
     ``dims`` is 256 in production and 4 in the §10 toy example.
 
-    Returns ``{ranked, topId, entries, state}``; ``entries`` is top first, then
-    the remaining candidates, then every checked item in flatten order.
+    Returns ``{ranked, topId, entries, state}``; ``entries`` is the hero first
+    (when there is one), then the remaining candidates, then every checked item
+    in flatten order. With a closed §6.2 gate or an unconfirmed image winner
+    (§6.3), ``topId`` is ``None`` and ``entries`` is exactly the ranked order.
     """
     items = list(items)
     prev_smoothed, prev_top_id = _normalise_prev(prev)
@@ -540,24 +590,31 @@ def rank(
 
     # §3: cosine per (item, query) pair, then q6 per cosine, then max within a
     # source and max across the sources that are present (never a mean/sum).
+    # The per-source maxima are kept too: §6.2 needs to know which source drove
+    # the winner (a text gate is much stricter than the image gate).
     item_matrix = np.stack([vec for _, vec in evaluated])
-    base = np.full(len(evaluated), -np.inf, dtype=np.float64)
+    neg_inf = np.full(len(evaluated), -np.inf, dtype=np.float64)
+    source_max = {"text": neg_inf.copy(), "image": neg_inf.copy()}
     with np.errstate(invalid="ignore", over="ignore"):
-        for query_group in (text_queries, image_queries):
+        for kind, query_group in (("text", text_queries), ("image", image_queries)):
             if not query_group:
                 continue
             dots = item_matrix @ np.stack(query_group).T
             np.clip(dots, -1.0, 1.0, out=dots)
-            group_max = _q6_array(dots).max(axis=1)
-            base = np.maximum(base, group_max)
+            source_max[kind] = _q6_array(dots).max(axis=1)
+    base = np.maximum(source_max["text"], source_max["image"])
 
     barcode_target = norm_barcode_text(barcode_name) if barcode_name else ""
     smoothed_by_id: dict[str, float] = {}
+    confirmed_ids: set[str] = set()
     candidates: list[dict[str, Any]] = []
     for row, (item, _vec) in enumerate(evaluated):
-        boost = BARCODE_BOOST if (
+        confirmed = bool(
             barcode_target and _matches_normalised(item, barcode_target)
-        ) else 0.0
+        )
+        boost = BARCODE_BOOST if confirmed else 0.0
+        if confirmed:
+            confirmed_ids.add(item["id"])
         raw = q6(float(base[row]) + boost)
         prev_score = prev_smoothed.get(item["id"])
         smoothed = raw if prev_score is None else q6(EMA_ALPHA * raw + (1 - EMA_ALPHA) * prev_score)
@@ -568,10 +625,15 @@ def rank(
             "smoothed": smoothed,
             "done": False,
             "order": _order_of(item, row),
+            # Which source produced this item's base score; a tie (or text only)
+            # counts as text, i.e. the stricter §6.2 gate.
+            "source": (
+                "image" if source_max["image"][row] > source_max["text"][row] else "text"
+            ),
         })
 
     candidates = sort_candidates(candidates)
-    top = decide_top(candidates, prev_top_id)
+    top = decide_top(candidates, prev_top_id, barcode_confirmed_ids=confirmed_ids)
 
     if top is None:
         ordered = list(candidates)

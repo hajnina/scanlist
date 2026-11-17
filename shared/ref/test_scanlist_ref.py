@@ -358,13 +358,16 @@ class TestWorkedExample:
         assert out["topId"] == "a"
         assert scores(out["entries"]) == [("a", 0.8, 0.9), ("b", 0.96, 0.78), ("c", 0.0, 0.0)]
 
-    def test_tick3_hysteresis_exactly_002_keeps_top(self):
+    def test_tick3_hysteresis_band_closes_the_margin_gate(self):
         prev = tick(MILK_ITEMS, [0.8, 0.6, 0, 0], tick(MILK_ITEMS, [1, 0, 0, 0], None)["state"])
         out = tick(MILK_ITEMS, [0.8, 0.6, 0, 0], prev["state"])
         assert out["state"]["smoothed"] == {"a": 0.85, "b": 0.87, "c": 0.0}
         assert ref.q6(0.87 - 0.85) == 0.02
-        assert out["topId"] == "a"                      # 0.02 is NOT > 0.02
-        assert ids(out["entries"]) == ["a", "b", "c"]   # sticky top stays first
+        # §6.1 hysteresis keeps `a` as the anchor (0.02 is not > 0.02), but §6.2
+        # needs top1 − top2 >= 0.05: the hero is hidden instead of flickering.
+        assert out["topId"] is None
+        assert out["state"]["topId"] is None
+        assert ids(out["entries"]) == ["b", "a", "c"]   # pure ranked order, no hero
 
     def test_tick4_margin_009_switches_top(self):
         s1 = tick(MILK_ITEMS, [1, 0, 0, 0], None)["state"]
@@ -417,6 +420,20 @@ class TestWorkedExample:
         out = tick(MILK_ITEMS[:2], [0.6, 0.8, 0, 0], None, barcode_name="milk")
         # a: dot 0.6 + 0.15 = 0.75; b: dot 1.0, no match ("oat milk" != "milk")
         assert scores(out["entries"]) == [("b", 1.0, 1.0), ("a", 0.75, 0.75)]
+
+    def test_worked_example_image_tick_hysteresis_and_guard(self):
+        # RANK.md §10 image tick: both items confirmed by the same OFF name,
+        # y ahead by exactly the 0.005 image margin, hysteresis keeps x.
+        x = make_item("x", [0.700, 0, 0, 0], order=0, name="Milk")
+        y = make_item("y", [0.705, 0, 0, 0], order=1, name="Oats", aliases=["milk"])
+        image = {"text": [], "image": [[1.0, 0, 0, 0]]}
+        prev = {"smoothed": {"x": 0.850, "y": 0.855}, "topId": "x"}
+        out = ref.rank([x, y], image, prev, "milk", dims=4)
+        assert out["topId"] == "x"
+        assert scores(out["entries"]) == [("x", 0.85, 0.85), ("y", 0.855, 0.855)]
+        unconfirmed = ref.rank([x, y], image, prev, None, dims=4)
+        assert unconfirmed["topId"] is None                 # §6.3: no hero without OFF name
+        assert ids(unconfirmed["entries"]) == ["y", "x"]    # still ranked
 
     def test_barcode_boost_is_smoothed_like_any_evidence(self):
         first = tick(MILK_ITEMS[:2], [0.6, 0.8, 0, 0], None, barcode_name="milk")
@@ -511,7 +528,8 @@ class TestOrdering:
         # Passed out of order on purpose: `order`, not list position, breaks ties.
         out = ref.rank(items, text_queries([0, 1, 0, 0]), None, dims=4)
         assert ids(out["entries"]) == ["first", "second"]
-        assert out["topId"] == "first"
+        # A tie is margin 0: §6.2 closes the gate, so the list ranks with no hero.
+        assert out["topId"] is None
         assert out["entries"][0]["smoothed"] == out["entries"][1]["smoothed"] == 1.0
 
     def test_done_items_sink_and_are_unscored(self):
@@ -546,9 +564,10 @@ class TestOrdering:
         }
 
     def test_ticking_the_top_promotes_next_immediately(self):
+        # Both clear T=0.79 so the hero is observable at both steps.
         items = [
-            make_item("a", [1, 0, 0, 0], order=0, name="A"),
-            make_item("b", [0.6, 0.8, 0, 0], order=1, name="B"),
+            make_item("a", [0.98, 0, 0, 0], order=0, name="A"),
+            make_item("b", [0.90, 0, 0, 0], order=1, name="B"),
         ]
         first = ref.rank(items, text_queries([1, 0, 0, 0]), None, dims=4)
         assert first["topId"] == "a"
@@ -559,8 +578,8 @@ class TestOrdering:
         assert "a" not in out["state"]["smoothed"]
 
     def test_prev_top_that_is_no_longer_a_candidate_is_ignored(self):
-        items = [make_item("b", [0.6, 0.8, 0, 0], order=1)]
-        prev = {"smoothed": {"a": 1.0, "b": 0.6}, "topId": "a"}
+        items = [make_item("b", [1, 0, 0, 0], order=1)]
+        prev = {"smoothed": {"a": 1.0, "b": 1.0}, "topId": "a"}
         out = ref.rank(items, text_queries([1, 0, 0, 0]), prev, dims=4)
         assert out["topId"] == "b"
         assert set(out["state"]["smoothed"]) == {"b"}   # stale state is dropped
@@ -669,28 +688,91 @@ class TestDegraded:
 
 
 # ---------------------------------------------------------------------------
-# highlight decision is isolated (card S10 will edit this function only)
+# the highlight decision is isolated (card S10: margin + no-match + image guard)
 # ---------------------------------------------------------------------------
 class TestDecideTop:
-    def _candidates(self):
+    """§6.1–§6.3 through the isolated function: boundaries are exact here."""
+
+    @staticmethod
+    def _candidates(first=0.90, second=0.85, source="text"):
         return [
-            {"id": "b", "raw": 0.87, "smoothed": 0.87, "done": False, "order": 1},
-            {"id": "a", "raw": 0.85, "smoothed": 0.85, "done": False, "order": 0},
+            {"id": "b", "raw": first, "smoothed": first, "done": False,
+             "order": 1, "source": source},
+            {"id": "a", "raw": second, "smoothed": second, "done": False,
+             "order": 0, "source": source},
         ]
-
-    def test_keeps_current_top_at_exactly_two_hundredths(self):
-        assert ref.decide_top(self._candidates(), "a")["id"] == "a"
-
-    def test_switches_above_two_hundredths(self):
-        candidates = self._candidates()
-        candidates[0]["smoothed"] = 0.88
-        assert ref.decide_top(candidates, "a")["id"] == "b"
-
-    def test_no_current_top_returns_best(self):
-        assert ref.decide_top(self._candidates(), None)["id"] == "b"
 
     def test_no_candidates_returns_none(self):
         assert ref.decide_top([], "a") is None
+
+    def test_no_current_top_returns_best_when_the_gate_is_open(self):
+        assert ref.decide_top(self._candidates(), None)["id"] == "b"
+
+    def test_text_margin_boundary_exactly_005_highlights(self):
+        assert ref.decide_top(self._candidates(0.90, 0.85), None)["id"] == "b"
+
+    def test_text_margin_just_under_005_has_no_hero(self):
+        out = ref.decide_top(self._candidates(0.90, 0.8501), None)
+        assert out is None
+        assert ref.q6(0.90 - 0.8501) < ref.MARGIN_TEXT
+
+    def test_text_floor_boundary_at_079_highlights(self):
+        assert ref.decide_top(self._candidates(0.79, 0.70), None)["id"] == "b"
+
+    def test_text_floor_under_079_has_no_hero_even_with_a_wide_margin(self):
+        assert ref.decide_top(self._candidates(0.7899, 0.60), None) is None
+
+    def test_text_hysteresis_band_can_never_clear_the_margin_gate(self):
+        # Current hero "a" (0.85) is 0.02 behind "b": hysteresis would keep it,
+        # but the 0.05 margin gate is closed, so there is no hero at all.
+        assert ref.decide_top(self._candidates(0.87, 0.85), "a") is None
+
+    def test_image_hysteresis_is_sticky_above_the_image_margin(self):
+        # M_image = 0.005 < HYSTERESIS, so here the two rules *can* both apply.
+        got = ref.decide_top(
+            self._candidates(0.87, 0.85, source="image"), "a",
+            barcode_confirmed_ids={"a", "b"},
+        )
+        assert got["id"] == "a"
+        assert ref.q6(0.87 - 0.85) >= ref.MARGIN_IMAGE
+
+    def test_image_switches_when_the_challenger_leads_by_more_than_hysteresis(self):
+        got = ref.decide_top(
+            self._candidates(0.90, 0.85, source="image"), "a",
+            barcode_confirmed_ids={"a", "b"},
+        )
+        assert got["id"] == "b"
+
+    def test_image_gate_boundaries_are_inclusive(self):
+        confirmed = {"b"}
+        assert ref.decide_top(
+            self._candidates(0.70, 0.695, source="image"), None,
+            barcode_confirmed_ids=confirmed,
+        )["id"] == "b"
+        assert ref.decide_top(
+            self._candidates(0.70, 0.6951, source="image"), None,
+            barcode_confirmed_ids=confirmed,
+        ) is None
+        assert ref.decide_top(
+            self._candidates(0.68, 0.60, source="image"), None,
+            barcode_confirmed_ids=confirmed,
+        )["id"] == "b"
+        assert ref.decide_top(
+            self._candidates(0.6799, 0.60, source="image"), None,
+            barcode_confirmed_ids=confirmed,
+        ) is None
+
+    def test_image_guard_requires_accept_list_confirmation(self):
+        assert ref.decide_top(self._candidates(0.90, 0.70, source="image"), None) is None
+        assert ref.decide_top(
+            self._candidates(0.90, 0.70, source="image"), None, barcode_confirmed_ids={"b"},
+        )["id"] == "b"
+
+    def test_single_candidate_has_a_vacuous_margin(self):
+        only = [{"id": "a", "raw": 0.85, "smoothed": 0.85, "done": False, "order": 0}]
+        assert ref.decide_top(only, None)["id"] == "a"
+        low = [{"id": "a", "raw": 0.78, "smoothed": 0.78, "done": False, "order": 0}]
+        assert ref.decide_top(low, None) is None
 
 
 # ---------------------------------------------------------------------------
@@ -728,8 +810,11 @@ class TestCadence:
         ticker.submit(text=[np.asarray([0, 1, 0, 0], dtype=np.float64)])
         out = ticker.tick(MILK_ITEMS, at_ms=0)
         # text [0,1,0,0] gives b=0.8, image [1,0,0,0] gives a=1.0 -> a wins via max fusion
-        assert out["topId"] == "a"
+        assert ids(out["entries"])[0] == "a"
         assert out["state"]["smoothed"]["a"] == 1.0
+        # a's base came from the image source (1.0 > 0.0) and no barcode confirmed
+        # it, so §6.3 hides the hero while the ranked order still puts a first.
+        assert out["topId"] is None
 
     def test_tick_now_smooths_from_the_previous_state(self):
         ticker = ref.RankTicker(dims=4)
@@ -775,7 +860,13 @@ def test_rank_samples_with_synthetic_256d_vectors(sample_name):
     assert out["ranked"] is True
     assert len(out["entries"]) == len(items)
     assert {e["id"] for e in out["entries"]} == {it["id"] for it in items}
-    assert out["entries"][0]["id"] == out["topId"]
+    scored = [e for e in out["entries"] if not e["done"]]
+    if scored:
+        # Random unit vectors sit far below T_text=0.79: no hero, but the list is
+        # still ordered by smoothed score, and a hero (when present) is that row.
+        assert out["entries"][0]["smoothed"] == max(e["smoothed"] for e in scored)
+        assert out["topId"] is None
+        assert out["state"]["topId"] is None
 
     done_ids = {it["id"] for it in items if it["done"]}
     if len(done_ids) == len(items):
@@ -794,3 +885,188 @@ def test_rank_samples_with_synthetic_256d_vectors(sample_name):
     done_in_flatten_order = [it["id"] for it in items if it["done"]]
     if done_in_flatten_order:
         assert ids(out["entries"])[-len(done_in_flatten_order):] == done_in_flatten_order
+
+
+# ---------------------------------------------------------------------------
+# §6.2/§6.3 highlight gates through rank() (card S10)
+# ---------------------------------------------------------------------------
+class TestHighlightGate:
+    """The gates never change what is scored or how it is ordered — only the hero."""
+
+    @staticmethod
+    def _pair(first, second, *, source_items=None):
+        items = source_items or [
+            make_item("a", [first, 0, 0, 0], order=0, name="Alpha"),
+            make_item("b", [second, 0, 0, 0], order=1, name="Beta"),
+        ]
+        return items
+
+    def test_text_margin_at_the_boundary_highlights(self):
+        out = ref.rank(self._pair(0.90, 0.85), text_queries([1, 0, 0, 0]), None, dims=4)
+        assert out["topId"] == "a"
+        assert ids(out["entries"]) == ["a", "b"]
+
+    def test_text_margin_below_the_boundary_ranks_without_a_hero(self):
+        out = ref.rank(self._pair(0.90, 0.8501), text_queries([1, 0, 0, 0]), None, dims=4)
+        assert out["topId"] is None
+        assert out["state"]["topId"] is None
+        assert ids(out["entries"]) == ["a", "b"]          # order still ranked
+        assert [e["smoothed"] for e in out["entries"]] == [0.90, 0.8501]
+        assert out["state"]["smoothed"] == {"a": 0.90, "b": 0.8501}   # state unchanged
+
+    def test_no_match_floor_rejects_a_wide_margin_low_score(self):
+        out = ref.rank(self._pair(0.78, 0.70), text_queries([1, 0, 0, 0]), None, dims=4)
+        assert out["topId"] is None                       # margin 0.08 but top1 < 0.79
+
+    def test_floor_boundary_at_079_highlights(self):
+        out = ref.rank(self._pair(0.79, 0.70), text_queries([1, 0, 0, 0]), None, dims=4)
+        assert out["topId"] == "a"
+
+    def test_exact_tie_has_no_hero(self):
+        out = ref.rank(self._pair(0.95, 0.95), text_queries([1, 0, 0, 0]), None, dims=4)
+        assert out["topId"] is None
+
+    def test_single_candidate_has_a_vacuous_margin_but_still_needs_the_floor(self):
+        high = ref.rank(self._pair(0.85, 0.0)[:1], text_queries([1, 0, 0, 0]), None, dims=4)
+        assert high["topId"] == "a"
+        low = ref.rank(self._pair(0.78, 0.0)[:1], text_queries([1, 0, 0, 0]), None, dims=4)
+        assert low["topId"] is None
+
+    def test_barcode_boost_can_open_the_gate(self):
+        # 0.66 raw is below T; the +0.15 boost lifts the confirmed item to 0.81
+        # and it then clears the margin against the runner-up at 0.70.
+        out = ref.rank(
+            self._pair(0.66, 0.70), text_queries([1, 0, 0, 0]), None,
+            barcode_name="Alpha", dims=4,
+        )
+        assert out["entries"][0]["raw"] == 0.81
+        assert out["topId"] == "a"
+
+    def test_mixed_tick_text_driven_winner_uses_the_text_gate(self):
+        items = [
+            make_item("a", [0.95, 0.05, 0, 0], order=0, name="Alpha"),
+            make_item("b", [0.60, 0.80, 0, 0], order=1, name="Beta"),
+        ]
+        out = ref.rank(
+            items, {"text": [[1, 0, 0, 0]], "image": [[0, 0, 1, 0]]}, None, dims=4,
+        )
+        assert out["topId"] == "a"                        # image queries score 0 here
+
+    def test_image_only_tick_without_confirmation_has_no_hero(self):
+        out = ref.rank(
+            self._pair(0.75, 0.70), {"text": [], "image": [[1, 0, 0, 0]]}, None, dims=4,
+        )
+        # Passes T_image=0.68 and the 0.005 margin, but §6.3 needs confirmation.
+        assert out["topId"] is None
+        assert ids(out["entries"]) == ["a", "b"]
+
+    def test_accept_list_confirmation_highlights_an_image_winner(self):
+        out = ref.rank(
+            self._pair(0.75, 0.70), {"text": [], "image": [[1, 0, 0, 0]]}, None,
+            barcode_name="Alpha", dims=4,
+        )
+        assert out["entries"][0]["raw"] == 0.90           # 0.75 + 0.15 boost
+        assert out["topId"] == "a"
+
+    def test_image_floor_rejects_below_068_even_when_margin_passes(self):
+        # Confirmed, wide margin, but 0.60+0.15 = 0.75 ... use an unboosted path:
+        # confirmation is on a *different* item, so the image winner stays raw.
+        items = [
+            make_item("a", [0.60, 0, 0, 0], order=0, name="Alpha"),
+            make_item("b", [0.40, 0, 0, 0], order=1, name="Beta"),
+        ]
+        out = ref.rank(
+            items, {"text": [], "image": [[1, 0, 0, 0]]}, None, dims=4,
+        )
+        assert out["topId"] is None                       # 0.60 < T_image and unconfirmed
+
+
+# ---------------------------------------------------------------------------
+# golden.json — the gates on S3's measured queries (card S10)
+# ---------------------------------------------------------------------------
+GOLDEN_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "golden.json"
+_GOLDEN = json.loads(GOLDEN_PATH.read_text(encoding="utf-8"))
+
+
+def golden_rank(query, *, barcode_name=None):
+    """One tick of ``query`` against its list, exactly as golden.json contracts it."""
+    lst = next(l for l in _GOLDEN["lists"] if l["id"] == query["list"])
+    items = []
+    for item in lst["items"]:
+        clone = dict(item)
+        clone["vec"] = np.asarray(lst["itemVectors"][item["id"]], dtype=np.float64)
+        items.append(clone)
+    queries = {"text": [], "image": []}
+    queries[query["kind"]] = [np.asarray(query["vector"], dtype=np.float64)]
+    return ref.rank(items, queries, None, barcode_name)
+
+
+def golden_queries(kind=None, expect=None):
+    return [
+        q for q in _GOLDEN["queries"]
+        if (kind is None or q["kind"] == kind) and (expect is None or q["expect"] == expect)
+    ]
+
+
+@pytest.mark.parametrize("query", _GOLDEN["queries"], ids=lambda q: q["id"])
+def test_golden_ranked_order_is_unchanged(query):
+    """§6.2/§6.3 change only the hero: top-3 ids and scores stay as S3 measured."""
+    out = golden_rank(query)
+    ranked = [e for e in out["entries"] if not e["done"]][:3]
+    assert [e["id"] for e in ranked] == query["expectedTop3"]
+    assert [e["smoothed"] for e in ranked] == query["expectedScores"]
+
+
+class TestGoldenHighlight:
+    def test_every_text_distractor_produces_no_highlight(self):
+        for query in golden_queries("text", "nomatch"):
+            out = golden_rank(query)
+            assert out["topId"] is None, query["id"]
+            assert out["ranked"] is True
+            # ranking still works: the same row is first, with its measured score
+            assert out["entries"][0]["smoothed"] == query["expectedScores"][0], query["id"]
+
+    def test_text_hits_highlight_except_the_one_margin_failure(self):
+        highlighted = {}
+        for query in golden_queries("text", "hit"):
+            highlighted[query["id"]] = golden_rank(query)["topId"]
+        # t20 ("hovězí maso 500 g", margin 0.039765 < 0.05) fails safe: no hero.
+        assert {qid for qid, top in highlighted.items() if top is None} == {"t20"}
+        for query in golden_queries("text", "hit"):
+            if query["id"] != "t20":
+                assert highlighted[query["id"]] == query["expectedTop3"][0], query["id"]
+
+    def test_cheese_photo_never_highlights(self):
+        query = next(q for q in _GOLDEN["queries"] if q["id"] == "icheese")
+        out = golden_rank(query)
+        # The measured false positive is still ranked first (that is the point),
+        # but the accept-list guard keeps the hero off it.
+        assert out["entries"][0]["id"] == query["expectedTop3"][0]      # Greek yoghurt
+        assert out["entries"][0]["smoothed"] == 0.699416
+        assert out["topId"] is None
+
+    def test_eggs_and_bread_stay_suppressed(self):
+        for query_id in ("ieggs", "ibread"):
+            query = next(q for q in _GOLDEN["queries"] if q["id"] == query_id)
+            out = golden_rank(query)
+            margin = ref.q6(out["entries"][0]["smoothed"] - out["entries"][1]["smoothed"])
+            assert margin < ref.MARGIN_IMAGE, query_id          # 0.003758 / 0.003876
+            assert out["topId"] is None, query_id
+
+    def test_unconfirmed_image_ticks_never_highlight(self):
+        # v1 accept-list guard (RANK.md §6.3): the fixture ranks photo vectors
+        # without an OFF name, so no image tick has a confirmed winner. This is
+        # the documented trade-off — ranked order only, no hero for the camera.
+        for query in golden_queries("image"):
+            assert golden_rank(query)["topId"] is None, query["id"]
+
+    def test_off_name_confirmation_promotes_the_winner(self):
+        query = next(q for q in _GOLDEN["queries"] if q["id"] == "ihoney")
+        out = golden_rank(query, barcode_name="Honey")
+        assert out["topId"] == query["expectedTop3"][0]
+        assert out["entries"][0]["raw"] == 0.902869             # 0.752869 + 0.15
+        # The confirmation is stricter than the gate: even the cheese confusion
+        # becomes a correct highlight once the OFF name names the item.
+        cheese = next(q for q in _GOLDEN["queries"] if q["id"] == "icheese")
+        out = golden_rank(cheese, barcode_name="Cheese")
+        assert out["topId"] in cheese["accept"]

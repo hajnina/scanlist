@@ -75,6 +75,14 @@ class EmbedModule(reactContext: ReactApplicationContext) :
 
     override fun getName(): String = NAME
 
+    /**
+     * Card MODELDL: a fresh install has no bundle, so opening the app starts the resumable download
+     * once. `ModelDownloads` guards duplicate starts, so `getConstants()` + `status()` racing is safe.
+     */
+    init {
+        runCatching { ModelDownloads.get(reactApplicationContext) }
+    }
+
     override fun getConstants(): Map<String, Any> {
         val current = engine
         return mapOf(
@@ -179,6 +187,9 @@ class EmbedModule(reactContext: ReactApplicationContext) :
                 putDouble("modelBytes", (model?.length() ?: 0L).toDouble())
                 putBoolean("modelReadable", model?.canRead() == true)
                 putString("modelSha256", EmbedderConfig.DEFAULT_MODEL_SHA256)
+                // Card MODELDL: the in-app 484 MB download. Never throws into JS: a failed download
+                // is `state: failed` with the reason, and the model stays `modelPresent: false`.
+                putMap("download", downloadMap())
                 promptsMap()?.let { putMap("prompts", it) }
             }
         }
@@ -314,6 +325,27 @@ class EmbedModule(reactContext: ReactApplicationContext) :
                 "setBackend expects auto|gpu|cpu|npu, got '$choice'",
             )
         }
+
+    /** Card MODELDL: the bundle download's snapshot; starts it on first status() if not already. */
+    private fun downloadMap(): WritableMap {
+        val download = runCatching { ModelDownloads.get(reactApplicationContext) }.getOrNull()
+        val state = download?.status
+            ?: DownloadStatus(total = ModelDownload.MODEL_BYTES).copy(
+                state = DownloadState.FAILED,
+                error = "download manager unavailable",
+            )
+        val map = Arguments.createMap()
+        state.asMap().forEach { (key, value) ->
+            when (value) {
+                is String -> map.putString(key, value)
+                is Boolean -> map.putBoolean(key, value)
+                is Int -> map.putInt(key, value)
+                is Long -> map.putDouble(key, value.toDouble())
+                null -> map.putNull(key)
+            }
+        }
+        return map
+    }
 
     /** The active prefix set from the bundled prompts.json, or null when the asset is unusable. */
     private fun promptsMap(): WritableMap? =

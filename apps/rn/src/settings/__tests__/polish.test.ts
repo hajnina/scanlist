@@ -116,6 +116,7 @@ describe('useScanGuidance (card A6 review fixes: the quiet clock)', () => {
     activity: SourceActivity;
     tick?: {heroId: string | null; at: number} | null;
     modelMissing?: boolean;
+    modelDownload?: {state: string; pct?: number; error?: string | null} | null;
   }
 
   function GuidanceProbe(props: ProbeProps) {
@@ -289,6 +290,34 @@ describe('useScanGuidance (card A6 review fixes: the quiet clock)', () => {
     await ReactTestRenderer.act(async () => {
       tree.unmount();
     });
+  });
+
+  test('a download in progress replaces the adb push copy with live progress', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(10_000);
+    const tree = await mount({
+      hasPermission: true,
+      activity: {barcode: 0, ocr: 0, image: 100},
+      modelMissing: true,
+      modelDownload: {state: 'downloading', pct: 42},
+    });
+
+    expect(textOf(tree)).toContain('Downloading model… 42%');
+    expect(textOf(tree)).not.toContain('scripts/model.sh');
+
+    await ReactTestRenderer.act(async () => {
+      tree.unmount();
+    });
+  });
+
+  test('a failed download explains itself in the missing-model note', () => {
+    const guidance = scanGuidance({
+      hasPermission: true,
+      modelMissing: true,
+      modelDownload: {state: 'failed', pct: 3, error: 'HTTP 404'},
+    });
+
+    expect(guidance?.detail).toContain('Download failed: HTTP 404');
   });
 
   test('a missing bundle renders the model note (and wins over quiet time)', async () => {

@@ -155,7 +155,11 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Card MODELDL: JVM tests for the resumable model-download state machine (fake transport).
+    testImplementation("junit:junit:4.13.2")
 }
+
 
 /*
  * Card A6 (nit a): LiteRT-LM 0.18.1 is built with Kotlin 2.4 metadata while RN 0.88 compiles this app

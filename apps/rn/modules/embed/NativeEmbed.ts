@@ -67,6 +67,17 @@ export interface NativeEmbedStatus {
   modelSha256?: string;
   /** Card A6: the prefix set from the bundled prompts.json (null on an older binary). */
   prompts?: NativePrompts | null;
+  /** Card MODELDL: the in-app 484 MB bundle download (absent on older binaries). */
+  download?: NativeDownloadStatus;
+}
+
+/** `ModelDownload.DownloadStatus.asMap()` — the resumable bundle download. */
+export interface NativeDownloadStatus {
+  state: 'idle' | 'downloading' | 'verifying' | 'ready' | 'failed';
+  bytes: number;
+  total: number;
+  pct: number;
+  error: string | null;
 }
 
 /** The active prefix set (Prompts.kt serialised by `EmbedModule.status()`). */

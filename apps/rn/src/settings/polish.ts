@@ -74,6 +74,12 @@ export interface GuidanceInput {
   quietMs?: number | null;
   /** The bundle is missing/not ready (the settings probe already reports `E_NO_MODEL`). */
   modelMissing?: boolean;
+  /** Card MODELDL: the in-app download, when the bridge reports one. */
+  modelDownload?: {
+    state: string;
+    pct?: number;
+    error?: string | null;
+  } | null;
 }
 
 /**
@@ -86,6 +92,7 @@ export function scanGuidance({
   canRequestPermission = false,
   quietMs = null,
   modelMissing = false,
+  modelDownload = null,
 }: GuidanceInput): ScanGuidance | null {
   if (!hasPermission) {
     return canRequestPermission
@@ -101,12 +108,37 @@ export function scanGuidance({
           detail: 'Allow the camera in Android Settings, then return here.',
         };
   }
+  // Card MODELDL: a download in progress gets the note, so the 484 MB wait is visible and the
+  // "push it with adb" copy never appears on a fresh install that is fetching it itself.
+  if (
+    modelDownload !== null &&
+    (modelDownload.state === 'downloading' || modelDownload.state === 'verifying')
+  ) {
+    const pct =
+      typeof modelDownload.pct === 'number' && Number.isFinite(modelDownload.pct)
+        ? Math.min(100, Math.max(0, Math.floor(modelDownload.pct)))
+        : 0;
+    return {
+      kind: 'model',
+      title:
+        modelDownload.state === 'verifying'
+          ? 'Checking the model download…'
+          : `Downloading model… ${pct}%`,
+      detail:
+        modelDownload.state === 'verifying'
+          ? 'Verifying the 484 MB bundle, then ranking turns on.'
+          : 'One-time download over Wi-Fi; anything interrupted resumes where it stopped.',
+    };
+  }
   if (modelMissing) {
+    const failure =
+      modelDownload?.state === 'failed' && modelDownload.error
+        ? `Download failed: ${modelDownload.error}`
+        : 'Push it with scripts/model.sh push <package>.';
     return {
       kind: 'model',
       title: 'No embedding model on this phone',
-      detail:
-        'Barcode and OCR still work, but ranking needs the bundle. Push it with scripts/model.sh push <package>.',
+      detail: `Barcode and OCR still work, but ranking needs the bundle. ${failure}`,
     };
   }
   if (quietMs !== null && quietMs >= QUIET_GUIDANCE_MS) {

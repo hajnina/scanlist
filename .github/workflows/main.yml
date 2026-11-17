@@ -247,9 +247,32 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ls -la rel
-          git push origin :refs/tags/main || true
+          # Legacy cleanup runs FIRST and unconditionally: path-filtered jobs produce no
+          # artifacts on kanban/workflow-only pushes, and the old `ls -la rel` head meant
+          # bash -e aborted before any of this ever ran (job red, legacy `main` tag/release
+          # stranded). Cleanup is fully `|| true` guarded so it can never fail the job.
+          repo="${GITHUB_REPOSITORY:-hajnina/scanlist}"
+          # Tag `main` can carry TWO releases (a published one + a stale draft); by-tag
+          # deletes handle only one, so delete every release whose tag is `main` by id.
+          gh api --paginate "repos/${repo}/releases" \
+            --jq '.[] | select(.tag_name=="main") | .id' > main-ids.txt || true
+          while read -r rid; do
+            [ -n "$rid" ] && gh api -X DELETE "repos/${repo}/releases/${rid}" || true
+          done < main-ids.txt
           gh release delete main --yes --cleanup-tag || true
+          git push origin :refs/tags/main || true
+          git push origin :refs/tags/main || true
+
+          # Tolerate an empty/absent artifact dir (download-artifact creates nothing when
+          # every build job was skipped by the path filter).
+          mkdir -p rel
+          shopt -s nullglob
+          files=(rel/*)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::notice::no build artifacts on this push (path-filtered jobs skipped) - keeping the last good rolling release"
+            exit 0
+          fi
+          ls -la rel
           git push origin :refs/tags/rolling || true
           gh release delete rolling --yes --cleanup-tag || true
           {

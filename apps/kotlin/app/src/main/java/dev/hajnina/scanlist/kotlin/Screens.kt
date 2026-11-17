@@ -16,9 +16,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// The last remaining B1 stub screen (Scan). Cards B5/B6 replace them; card B6 moved Settings out of
-// this file into the `settings` package (SettingsScreen.kt: backend picker, live embed latency, model
-// status/path, prefix set) and App.kt now imports it — the only files this card touched outside its
+// The last remaining B1 stub screen (Scan). Card B5 replaces it; card B6 already moved Settings out
+// of this file into the `settings` package (SettingsScreen.kt: backend picker, live embed latency, model
+// status/path, prefix set) and App.kt now imports it — the only files B6 touched outside its
 // `owns:` directory. The stub used the same expressive styling as the rest of B1.
 // Styling follows references/bonsai-ui/STYLE_GUIDE.md §3–§5/§7: hero + leaf cards, Black display
 // type, 14dp round-capped progress bars, tonal containers carrying meaning, haptics on every action.

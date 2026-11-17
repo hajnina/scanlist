@@ -294,7 +294,7 @@ private fun ModelCard(state: SettingsState) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = statusColor,
             )
-            MonospaceLine("sha256 ${ModelProbe.EXPECTED_SHA256}")
+            MonospaceLine("sha256 (expected) ${ModelProbe.EXPECTED_SHA256}")
             if (!status.isReady) {
                 Text(
                     ModelProbe.PUSH_HINT,

@@ -12,6 +12,8 @@ import dev.hajnina.scanlist.embed.Prompts
 import dev.hajnina.scanlist.kotlin.rank.defaultModelFile
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Lifecycle of the settings self-test (idle before the first run, running, done with a result). */
@@ -98,15 +100,26 @@ class SettingsState internal constructor(
     /**
      * Run the self-test on [choice] off the main thread. Never throws: failures land in [result] as
      * [SelfTestResult.Failed] and are rendered with their status code.
+     *
+     * B6 review race: [SelfTestRunner.selfTest] is blocking (uncancellable), and a mid-run chip tap
+     * cancels the LaunchedEffect coroutine WITHOUT stopping the in-flight selfTest — two engines
+     * (~0.5 GB each) could be open at once. The mutex serializes runs: a new run waits for the
+     * in-flight one, then re-embeds with the CURRENT choice, so a switch mid-run still re-embeds
+     * (the Done-when is preserved, not swallowed — an early-return guard would strand phase=RUNNING
+     * forever once a cancelled run skips its DONE assignment).
      */
+    private val runMutex = Mutex()
+
     suspend fun run() {
-        phase = ProbePhase.RUNNING
-        val measured = withContext(Dispatchers.IO) {
-            runner.selfTest(choice, modelFile, modelIdProvider())
+        runMutex.withLock {
+            phase = ProbePhase.RUNNING
+            val measured = withContext(Dispatchers.IO) {
+                runner.selfTest(choice, modelFile, modelIdProvider())
+            }
+            result = measured
+            phase = ProbePhase.DONE
+            refreshModel()
         }
-        result = measured
-        phase = ProbePhase.DONE
-        refreshModel()
     }
 }
 

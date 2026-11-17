@@ -58,24 +58,37 @@ class SelfTestRunnerTest {
         val clock = FakeClock()
         val model = temp.newFile("model.litertlm").apply { writeBytes(ByteArray(8)) }
         val opened = mutableListOf<EmbedderConfig>()
+        val fakes = mutableListOf<FakeEmbedder>()
+        var fakeBackend = "gpu"
+        var callMillis = 35L
 
-        fun runnerFor(backend: String, callMillis: Long) = SelfTestRunner(
+        // ONE runner, reused — production reuses the remembered runner (B6 review: the old version
+        // built a FRESH runner per selfTest, so a memoizing mutant passed 8/8; this wiring must bite).
+        val runner = SelfTestRunner(
             openEmbedder = { config ->
                 opened += config
-                FakeEmbedder(clock = clock, backend = backend, callMillis = callMillis)
+                FakeEmbedder(clock = clock, backend = fakeBackend, callMillis = callMillis)
+                    .also { fakes += it }
             },
             nanoTime = clock::now,
         )
 
-        val gpu = runnerFor("gpu", callMillis = 35).selfTest(BackendChoice.GPU, model) as SelfTestResult.Ok
-        val cpu = runnerFor("cpu", callMillis = 90).selfTest(BackendChoice.CPU, model) as SelfTestResult.Ok
+        val gpu = runner.selfTest(BackendChoice.GPU, model) as SelfTestResult.Ok
+        fakeBackend = "cpu"
+        callMillis = 90L
+        val cpu = runner.selfTest(BackendChoice.CPU, model) as SelfTestResult.Ok
 
         assertEquals("gpu", gpu.report.backend)
         assertEquals(35.0, gpu.report.meanMillis, 0.0001)
         assertEquals("cpu", cpu.report.backend)
         assertEquals(90.0, cpu.report.meanMillis, 0.0001)
 
+        // Two opens with the two ladders, each engine embedded warm-up + the three samples,
+        // and each probe closed what it opened — through the SAME runner.
         assertEquals(listOf(listOf(EmbedBackend.GPU), listOf(EmbedBackend.CPU)), opened.map { it.backendOrder })
+        assertEquals(2, fakes.size)
+        assertTrue(fakes.all { it.embedded.size == 1 + SelfTestRunner.SAMPLE_TEXTS.size })
+        assertTrue(fakes.all { it.closed })
     }
 
     @Test

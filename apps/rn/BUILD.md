@@ -10,11 +10,25 @@ This file lists **every** local override and hack, and what is deliberately not 
 
 | Build | Command | Result |
 |---|---|---|
-| Laptop (aarch64 Linux) | `apps/rn/build.sh` | **see "Local build log" at the bottom** |
-| CI (x86_64 ubuntu runner) | `.github/workflows/pr.yml` → `rn` job: `cd apps/rn/android && ./gradlew --no-daemon assembleDebug` | see the PR |
+| **Shipping** (x86_64 host; CI after PR #47) | `cd apps/rn/android && ./gradlew assembleRelease` | `app/build/outputs/apk/release/app-release.apk` — bundles + Hermes-compiles the JS, runs standalone. **The only publishable artifact.** |
+| Dev, laptop (aarch64 Linux) | `apps/rn/build.sh` | `app/build/outputs/apk/debug/app-debug.apk` + Metro — **see "Local build log"** |
+| Dev, any host | `cd apps/rn/android && ./gradlew --no-daemon assembleDebug` | debug APK, dev-only — never publish |
 
 `apps/rn/build.sh` is the entry point on the laptop; plain `./gradlew assembleDebug` in
 `apps/rn/android` is the same project without the four aarch64-only `-P` flags.
+
+> **Merge-order note:** CI on `main` is debug-only until **PR #47**. That PR switches the `rn` job to
+> `assembleRelease`, uploads `ScanList-rn-release.apk` and gates on the bundle check; this file
+> describes the pipeline **after #47** and should land no earlier than #47. On an older commit the rn
+> job still uploads `ScanList-rn-debug.apk` and the rolling release is Metro-only.
+
+> **Debug ≠ shippable.** `assembleDebug` deliberately contains **no** `assets/index.android.bundle`:
+> it loads the JS from Metro. Installed without a reachable dev server it shows RN 0.88.1's red box,
+> *"Unable to load script. Make sure you're running Metro or that your bundle
+> 'index.android.bundle' is packaged correctly for release."* (`JSLoader.cpp:81`). That text alone is
+> **not** proof of a debug build — a release APK with a missing bundle shows exactly the same box.
+> Discriminate with the `unzip` check below, not with the screen. Never publish, rename-and-attach, or
+> hand out a `-debug.apk`. Details: [`docs/RELEASE.md`](docs/RELEASE.md).
 
 ## Versions
 
@@ -38,10 +52,30 @@ deleted (no Mac in this project, and every comparison target is an APK).
 
 ## How to build
 
+### Shipping build (the artifact you publish)
+
+```bash
+# x86_64 host or CI runner — NOT this aarch64 laptop (hermesc is linux-x86_64 only, see below)
+cd apps/rn/android
+./gradlew --no-daemon assembleRelease
+# -> app/build/outputs/apk/release/app-release.apk
+```
+
+`assembleRelease` runs Metro's bundler (`createBundleReleaseJsAndAssets`) and compiles the bundle to
+Hermes bytecode, so the APK carries `assets/index.android.bundle` and starts without a dev server.
+It is signed by the `release` build type, which reuses the throwaway debug keystore
+(`android/app/build.gradle:141` → `signingConfigs.debug`, generated on demand by
+`scripts/make-debug-keystore.sh`); ProGuard/minify is off (`enableProguardInReleaseBuilds = false`,
+`android/app/build.gradle:60`). That is enough for side-loading, **not** for Play/store distribution
+(identity is the public Android debug key).
+
+Add `-Pscanlist.ndkVersion=<ndk>` only on an aarch64 host that has such an NDK; CI passes nothing.
+
+### Dev build (Metro, never publish)
+
 ```bash
 # laptop (aarch64): sources scripts/android-env.sh itself
 apps/rn/build.sh                 # assembleDebug -> android/app/build/outputs/apk/debug/app-debug.apk
-apps/rn/build.sh assembleRelease # not on this laptop, see "Not done here"
 
 # CI / x86_64 host: stock toolchain, RN's own defaults
 cd apps/rn/android && ./gradlew --no-daemon assembleDebug
@@ -50,8 +84,27 @@ cd apps/rn/android && ./gradlew --no-daemon assembleDebug
 cd apps/rn && npm install && npm run typecheck && npm test
 ```
 
-Install: `adb install -r apps/rn/android/app/build/outputs/apk/debug/app-debug.apk`
-then `npm start` (Metro) in `apps/rn` for the dev bundle.
+Install the **dev** APK: `adb install -r apps/rn/android/app/build/outputs/apk/debug/app-debug.apk`,
+then `npm start` (Metro) in `apps/rn` **and** make port 8081 reachable over USB:
+`adb reverse tcp:8081 tcp:8081`. Without Metro, or without the reverse, this build shows the red box
+*"Unable to load script…"*. `npm run android` (`react-native run-android`) does all three for you:
+install, `adb reverse`, Metro.
+Install the **shipping** APK: `adb install -r apps/rn/android/app/build/outputs/apk/release/app-release.apk`
+— no Metro, no dev server, works offline (network only for OpenFoodFacts lookups and the model download).
+Because both build types use the same package id **and the same debug key**, `-r` replaces one with the
+other cleanly.
+
+### Verify an APK before publishing
+
+```bash
+apk=app/build/outputs/apk/release/app-release.apk
+unzip -l "$apk" | grep assets/index.android.bundle   # must print one line
+unzip -Z1 "$apk" 'lib/*' | cut -d/ -f2 | sort -u     # must print only arm64-v8a
+```
+
+A debug APK fails the first check: it has no `assets/index.android.bundle` at all (the ABI check only
+catches a build where the ABI filter was widened, which is why it must not be the only check). Also
+confirm the package: `aapt2 dump badging "$apk" | head -1` → `package: name='dev.hajnina.scanlist.rn'`.
 
 ## Overrides and hacks (all of them)
 
@@ -62,12 +115,21 @@ then `npm start` (Metro) in `apps/rn` for the dev bundle.
 | 3 | `-PreactNativeArchitectures=arm64-v8a` | the debug APK only needs the phone's ABI; CMake otherwise builds 4 ABIs (4× the native work) | `build.sh` only | no — `reactNativeArchitectures=arm64-v8a` in `android/gradle.properties` already limits CI (and every local build) to one ABI; the flag is now redundant but harmless |
 | 4 | `-Dorg.gradle.jvmargs=-Xmx3g …` | the shared Gradle slot lock (`~/projects/martins-whisper/owner/tools/gradle-slot.sh`) caps the daemon at 1.5 GB, which is not enough for AGP 9 + Kotlin + codegen | `build.sh` only | no |
 | 5 | Throwaway debug keystore generated on demand | AGENTS.md: keystores never in git. RN's template signs with `android/app/debug.keystore` | `scripts/make-debug-keystore.sh` (keytool, alias `androiddebugkey`, password `android`, RSA 2048, 10 000 days, PKCS12); called by `android/app/build.gradle` when the file is missing **and** by `build.sh` | **yes** — the file is gitignored, so the Gradle call is what keeps CI signing; nothing secret is committed |
-| 6 | `npm install` from `android/settings.gradle` when `node_modules` is missing | the lead-owned CI workflow builds `apps/rn/android` with a bare `./gradlew assembleDebug` and has no npm step, but RN autolinking + the included `:react-native` Gradle plugin live in `node_modules` (gitignored) | `android/settings.gradle` (first 20 lines) — idempotent one-off | **yes** |
+| 6 | `npm install` from `android/settings.gradle` when `node_modules` is missing | the lead-owned CI workflow builds `apps/rn/android` with a bare `./gradlew` (assembleRelease after PR #47, assembleDebug before it) and has no npm step, but RN autolinking + the included `:react-native` Gradle plugin live in `node_modules` (gitignored) | `android/settings.gradle` (first 20 lines) — idempotent one-off | **yes** |
 | 7 | Shared SDK packages installed for RN 0.88 | RN 0.88 needs `platforms;android-37.0` + `build-tools;37.0.0`; the shared toolchain only had platform 35 / build-tools 35.0.1 | installed with `sdkmanager` into `~/projects/martins-whisper/android-toolchain/sdk` (additive; nothing else changes) | no |
 | 8 | Gradle slot lock | host-wide memory discipline (max 2 concurrent Gradle builds across agents) | `scripts/android-env.sh` (`GRADLE_SLOT_SH`), honoured by `build.sh` | no |
 
 Nothing above is baked into `android/build.gradle`, `android/app/build.gradle` or
 `gradle.properties` as a laptop path: on CI the same project builds with RN's stock versions.
+
+### Release configuration (audited 2026-11-17)
+
+No release-specific override exists, and none is needed for a standalone APK: `debuggableVariants`
+keeps its RN default (`debug`, `debugOptimized`), so `release` runs the bundle + Hermes tasks;
+`hermesEnabled=true` (`android/gradle.properties:42`) compiles the bundle; ProGuard is off
+(`android/app/build.gradle:60`); and `android:usesCleartextTraffic` is resolved by the RN Gradle
+plugin (`true` debug / `false` release). Full findings, file:line, and the CI gap that **PR #47** fixes
+(published debug APK): [`docs/RELEASE.md`](docs/RELEASE.md).
 
 ## Something for the lead (outside this card's `owns`)
 
@@ -89,7 +151,13 @@ Nothing above is baked into `android/build.gradle`, `android/app/build.gradle` o
 * **`modules/embed`** — directory + `Embedder` contract only; no TurboModule, no model weights
   (weights live in `~/models/scanlist/` and are gitignored anyway).
 * **Release builds on this laptop** — `assembleRelease` bundles JS through `hermesc`, which RN
-  downloads as a **linux-x86_64** binary; it cannot run on aarch64. Release is a CI job.
+  downloads as a **linux-x86_64** binary; it cannot run on aarch64. Release is built on an x86_64
+  host / CI runner. `apps/rn/build.sh assembleRelease` is **not** a supported release path either:
+  it passes the aarch64 `-P` flags (fine) but its report step hardcodes
+  `app/build/outputs/apk/debug/app-debug.apk` (`build.sh:103-108`), so a successful release build is
+  reported as "FAILED — no APK" (or a stale debug APK is reported as `OK`). Run `./gradlew
+  assembleRelease` in `apps/rn/android` directly. `build.sh` has no release handling in this card;
+  see [`docs/RELEASE.md`](docs/RELEASE.md).
 * **iOS** — deleted, see above.
 
 ## Layout

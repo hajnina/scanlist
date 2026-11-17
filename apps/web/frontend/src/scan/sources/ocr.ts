@@ -158,7 +158,7 @@ export function extractOcrLines(
   }
 
   // Cap AFTER filtering/dedupe: RANK.md §2.2 drops extra OCR lines in detection order.
-  return maxLines >= 0 ? lines.slice(0, maxLines) : lines;
+  return lines.slice(0, Math.max(0, maxLines));
 }
 
 export interface OcrLineDeduper {

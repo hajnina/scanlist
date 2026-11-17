@@ -90,9 +90,11 @@ export function SectionBlock({section, depth, onToggle}: Props) {
               onToggle={onToggle}
             />
           ))}
-          {section.sections.map(child => (
+          {section.sections.map((child, childIndex) => (
             <SectionBlock
-              key={child.path.join('\u0000')}
+              // LIST.md:38 allows sibling sections to share a name — path alone would
+              // duplicate React keys. The sibling index disambiguates (A2 review nit).
+              key={`${child.path.join('\u0000')}#${childIndex}`}
               section={child}
               depth={depth + 1}
               onToggle={onToggle}

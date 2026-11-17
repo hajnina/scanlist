@@ -6,8 +6,8 @@
  * "magic scan" highlight on top of it. Every row's id comes from `@scanlist/ts-core`'s flatten (see
  * `../view`), so ticking a row cannot hit the wrong item when names repeat.
  */
-import React, {useMemo, useState} from 'react';
-import {ScrollView, StyleSheet, View} from 'react-native';
+import React, {useEffect, useMemo, useState} from 'react';
+import {BackHandler, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Button, Text, useTheme} from 'react-native-paper';
 import {CapsLabel, ExpressiveCard, HeroNumeral, MachineText, SpringIn} from '../../ui';
@@ -33,6 +33,16 @@ export function ListDetailScreen({repository, stored, onBack, onChanged}: Props)
   const theme = useTheme<ScanListTheme>();
   const tree = useMemo(() => buildListTree(stored.list), [stored.list]);
   const [note, setNote] = useState<Note | null>(null);
+
+  // Android hardware back returns to Lists (A2 review nit): without this, back from the
+  // detail screen exits the app — the on-screen '‹ Lists' button was the only way back.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onBack]);
 
   const left = tree.total - tree.done;
   const progress = tree.total === 0 ? 0 : tree.done / tree.total;
@@ -156,7 +166,8 @@ export function ListDetailScreen({repository, stored, onBack, onChanged}: Props)
         ) : null}
 
         {tree.sections.map((section, index) => (
-          <SpringIn key={section.path.join('\u0000')} index={2 + index}>
+          // Sibling sections may share a name (LIST.md:38) — include the index in the key.
+          <SpringIn key={`${section.path.join('\u0000')}#${index}`} index={2 + index}>
             <SectionBlock section={section} depth={0} onToggle={toggle} />
           </SpringIn>
         ))}

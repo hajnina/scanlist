@@ -71,7 +71,9 @@ class ScanController(
     private val lock = Any()
     private val tasks = ArrayDeque<() -> Unit>()
     private var pumping = false
-    private var imageQueued = false
+    /** Newest frame waiting for the embed lane; older ones are overwritten (RANK.md §7 latest wins). */
+    private var pendingImage: ScanSignal? = null
+    private var imageDraining = false
     private val journal = OffJournal()
 
     /** Compose entered the Scan tab: frame an empty scan session (immediate first ranking). */
@@ -86,22 +88,39 @@ class ScanController(
     /** One live signal from the camera (any thread). */
     fun onSignal(signal: ScanSignal) {
         if (signal.kind == ScanKind.IMAGE) {
-            val drop = synchronized(lock) {
-                if (imageQueued) true else {
-                    imageQueued = true
-                    false
+            // Newest-frame-wins coalescing: a frame that arrives while an embed is in flight (or
+            // still queued) replaces the older pending frame, so the next embed is the freshest
+            // picture, never the stale one the camera moved past.
+            val startDrain = synchronized(lock) {
+                pendingImage = signal
+                if (imageDraining) false else {
+                    imageDraining = true
+                    true
                 }
             }
-            if (drop) return
-            enqueue {
-                synchronized(lock) { imageQueued = false }
-                publish(session.signal(signal))
-            }
+            if (startDrain) enqueue { drainImages() }
             return
         }
         enqueue {
             publish(session.signal(signal))
             if (signal.kind == ScanKind.BARCODE) lookupBarcode(session.barcode)
+        }
+    }
+
+    /** Embeds the newest pending frame, then loops if more arrived while that embed was running. */
+    private fun drainImages() {
+        while (true) {
+            val next = synchronized(lock) {
+                val queued = pendingImage
+                if (queued == null) {
+                    imageDraining = false
+                    null
+                } else {
+                    pendingImage = null
+                    queued
+                }
+            } ?: return
+            publish(session.signal(next))
         }
     }
 
@@ -164,12 +183,17 @@ class ScanController(
             }
             journal.end(digits)
             enqueue {
-                barcodeUi = BarcodeUi(
-                    barcode = digits,
-                    state = stateFor(result),
-                    text = result?.text,
-                    note = result?.note,
-                )
+                // A slow answer for barcode A must not repaint the strip after the user scanned B:
+                // the strip describes the barcode in view, exactly like the ranking-side guard in
+                // ScanSession.barcodeText(). A superseded answer still warms the OFF cache.
+                if (session.barcode == digits) {
+                    barcodeUi = BarcodeUi(
+                        barcode = digits,
+                        state = stateFor(result),
+                        text = result?.text,
+                        note = result?.note,
+                    )
+                }
                 // Applies to the barcode it was asked for, even if the response came back late.
                 publish(session.barcodeText(result?.text, forBarcode = digits, nowMs = clock.nowMs()))
             }

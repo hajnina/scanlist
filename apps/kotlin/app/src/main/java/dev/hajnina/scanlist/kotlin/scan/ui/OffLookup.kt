@@ -2,6 +2,7 @@ package dev.hajnina.scanlist.kotlin.scan.ui
 
 import java.io.InputStream
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -83,32 +84,88 @@ fun interface OffTransport {
 }
 
 /**
- * `HttpURLConnection` transport: 3 s connect / 10 s read budget (OFF.md §2), redirects followed (the
- * JDK default allows up to 20 for HTTP; only HTTPS is ever built here), the fixed User-Agent, and a
- * `Retry-After` read for 429. Any exception degrades to status 0, which [OffResponse] calls transient.
+ * OFF.md §2 redirect policy: follow at most [MAX_HOPS] redirects and never leave HTTPS.
+ *
+ * The JDK default (20 hops, every scheme) is both too permissive and an SSRF-shaped footgun; OFF's
+ * own documentation only ever promises HTTPS. A rejected target makes the transport degrade to its
+ * status-0 "transient" answer, so the camera and the ranking loop are unaffected.
+ */
+object OffRedirect {
+    const val MAX_HOPS: Int = 3
+
+    /**
+     * Resolve [location] against [current], or return `null` when the hop budget is exhausted (the
+     * caller then surfaces the 3xx itself as a transient failure). Throws for a non-HTTPS target.
+     */
+    fun resolve(current: String, location: String?, followed: Int): String? {
+        val target = location?.trim()
+        if (target.isNullOrEmpty() || followed >= MAX_HOPS) return null
+        val resolved = URL(URL(current), target).toString()
+        require(URI(resolved).scheme.equals("https", ignoreCase = true)) {
+            "OFF redirects must stay on HTTPS (got $resolved)"
+        }
+        return resolved
+    }
+}
+
+/** One HTTP hop before [OffRedirect] has a say: status, body, Retry-After and Location. */
+private data class OffHop(
+    val status: Int,
+    val body: String?,
+    val retryAfterSeconds: Long?,
+    val location: String?,
+)
+
+/**
+ * `HttpURLConnection` transport: 3 s connect / 10 s read budget (OFF.md §2), [OffRedirect]'s
+ * ≤3-hop HTTPS-only policy, the fixed User-Agent, and a `Retry-After` read for 429. Any exception
+ * degrades to status 0, which [OffResponse] calls transient.
  */
 class HttpUrlConnectionTransport(
     private val connectTimeoutMs: Int = 3_000,
     private val readTimeoutMs: Int = 10_000,
 ) : OffTransport {
 
-    override fun get(url: String, userAgent: String): OffHttp = runCatching {
+    override fun get(url: String, userAgent: String): OffHttp =
+        runCatching { fetch(url, userAgent) }.getOrDefault(OffHttp(0, null))
+
+    private fun fetch(url: String, userAgent: String): OffHttp {
+        var current = url
+        var followed = 0
+        while (true) {
+            val hop = requestOnce(current, userAgent)
+            if (hop.status !in 300..399) {
+                return OffHttp(hop.status, hop.body, hop.retryAfterSeconds)
+            }
+            current = OffRedirect.resolve(current, hop.location, followed)
+                ?: return OffHttp(hop.status, null)
+            followed += 1
+        }
+    }
+
+    private fun requestOnce(url: String, userAgent: String): OffHop {
         val connection = URL(url).openConnection() as HttpURLConnection
-        try {
+        return try {
             connection.connectTimeout = connectTimeoutMs
             connection.readTimeout = readTimeoutMs
             connection.requestMethod = "GET"
             connection.setRequestProperty("User-Agent", userAgent)
             connection.setRequestProperty("Accept", "application/json")
-            connection.instanceFollowRedirects = true
+            // Redirects are followed by hand so OffRedirect enforces the hop/scheme policy.
+            connection.instanceFollowRedirects = false
             val status = connection.responseCode
             val stream: InputStream? = if (status in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.let { input -> input.bufferedReader(Charsets.UTF_8).use { it.readText() } }
-            OffHttp(status, body, retryAfterSeconds(connection.getHeaderField("Retry-After")))
+            OffHop(
+                status = status,
+                body = body,
+                retryAfterSeconds = retryAfterSeconds(connection.getHeaderField("Retry-After")),
+                location = connection.getHeaderField("Location"),
+            )
         } finally {
             connection.disconnect()
         }
-    }.getOrDefault(OffHttp(0, null))
+    }
 
     /** Seconds from `Retry-After` (the delta form; the HTTP-date form is treated as the 60 s default). */
     private fun retryAfterSeconds(header: String?): Long? =
@@ -134,10 +191,21 @@ data class OffLookupResult(
     }
 }
 
+/** OFF.md §4.4/§5 retry policy: Retry-After wins; otherwise 1 s, 2 s, 4 s … capped at 60 s. */
+private const val HTTP_TOO_MANY_REQUESTS = 429
+private const val RETRY_AFTER_DEFAULT_MS = 60_000L
+private const val BACKOFF_BASE_MS = 1_000L
+private const val BACKOFF_CAP_MS = 60_000L
+private const val MAX_TRANSIENT_ATTEMPTS = 3
+
 /**
  * OFF.md §4 resolution: fresh cache → answer without a request; expired/absent → one request; a
  * transient failure → keep using the stale text (stale-while-revalidate) but **never** extend
  * `fetchedAt`; an invalid barcode makes no request and writes no cache entry.
+ *
+ * OFF.md §4.4/§5 backoff lives here, per barcode: a 429 waits `Retry-After` (60 s when absent), a
+ * 5xx/timeout backs off 1 s → 2 s → 4 s (cap 60 s), and at most three attempts are made. While a
+ * barcode is backing off, the lookup answers from the cache instead of re-requesting on every tick.
  */
 class OffResolver(
     private val cache: OffCache,
@@ -146,6 +214,12 @@ class OffResolver(
     /** Wall clock in **milliseconds**; the cache works in seconds (OFF.md §4 `fetchedAt`). */
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
+
+    /** Per-barcode retry schedule: transient failures seen and the earliest next request. */
+    private data class Retry(val failures: Int, val nextAttemptAtMs: Long)
+
+    private val retries = HashMap<String, Retry>()
+    private val retryLock = Any()
 
     fun lookup(barcode: String, nowMs: Long = clock()): OffLookupResult {
         if (!OffRequest.isValidBarcode(barcode)) {
@@ -163,6 +237,10 @@ class OffResolver(
             )
         }
 
+        // OFF.md §4.4/§5: a barcode that just failed waits out its Retry-After/backoff window; the
+        // scan tick keeps ranking from the cache instead of hammering a struggling service.
+        retryGate(barcode, nowMs)?.let { note -> return degraded(cached, note = note) }
+
         if (!throttle.tryAcquire(nowMs)) {
             return degraded(cached, note = "OFF rate limit reached — using the cache")
         }
@@ -171,6 +249,7 @@ class OffResolver(
         val classification = OffResponse.classify(http.status, http.body)
         return when (classification.outcome) {
             OffOutcome.HIT, OffOutcome.MISS -> {
+                noteSuccess(barcode)
                 val hit = classification.outcome == OffOutcome.HIT
                 cache.put(barcode, classification.text, hit, nowSeconds)
                 OffLookupResult(
@@ -182,12 +261,50 @@ class OffResolver(
                     retryAfterSeconds = http.retryAfterSeconds,
                 )
             }
-            OffOutcome.TRANSIENT -> degraded(
-                cached,
-                note = "OFF unavailable — offline ranking keeps working",
-                retryAfterSeconds = http.retryAfterSeconds,
-            )
+            OffOutcome.TRANSIENT -> {
+                noteTransient(barcode, nowMs, http)
+                degraded(
+                    cached,
+                    note = "OFF unavailable — offline ranking keeps working",
+                    retryAfterSeconds = http.retryAfterSeconds,
+                )
+            }
         }
+    }
+
+    /** Null while a request may go ahead; otherwise the honest reason the tick uses the cache. */
+    private fun retryGate(barcode: String, nowMs: Long): String? = synchronized(retryLock) {
+        val state = retries[barcode] ?: return null
+        when {
+            state.failures >= MAX_TRANSIENT_ATTEMPTS ->
+                "OFF retry budget exhausted — using the cache"
+            nowMs < state.nextAttemptAtMs ->
+                "OFF backing off — using the cache"
+            else -> null
+        }
+    }
+
+    private fun noteTransient(barcode: String, nowMs: Long, http: OffHttp) {
+        synchronized(retryLock) {
+            val failures = (retries[barcode]?.failures ?: 0) + 1
+            retries[barcode] = Retry(failures, nowMs + retryDelayMs(http, failures))
+        }
+    }
+
+    private fun noteSuccess(barcode: String) {
+        synchronized(retryLock) { retries.remove(barcode) }
+    }
+
+    /**
+     * OFF.md §4.4/§5: `Retry-After` when OFF sent one (429), 60 s for a 429 without it, otherwise
+     * exponential 1 s, 2 s, 4 s … capped at 60 s. The third failure's 4 s value is recorded but the
+     * attempt budget stops the fourth request.
+     */
+    private fun retryDelayMs(http: OffHttp, failures: Int): Long {
+        http.retryAfterSeconds?.let { return it * 1_000L }
+        if (http.status == HTTP_TOO_MANY_REQUESTS) return RETRY_AFTER_DEFAULT_MS
+        val shift = (failures - 1).coerceIn(0, 16)
+        return (BACKOFF_BASE_MS shl shift).coerceAtMost(BACKOFF_CAP_MS)
     }
 
     /** Transient failure: the stale text still ranks this tick, and nothing is written (OFF.md §4.3). */

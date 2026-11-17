@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -216,6 +217,101 @@ class OffLookupTest {
         assertTrue(second.note!!.contains("rate limit"))
         assertEquals("the second request was not sent", 1, transport.urls.size)
         assertEquals("and not cached either", 1, store.size)
+    }
+
+    // ---------------------------------------------------------------- OFF.md §4.4/§5 backoff
+
+    @Test
+    fun `a 429 is not retried before its Retry-After elapses`() {
+        val store = cache()
+        val transport = FakeTransport(
+            OffHttp(429, "", retryAfterSeconds = 30),
+            OffHttp(200, nutellaBody),
+        )
+        val resolver = OffResolver(store, transport, RequestThrottle(minSpacingMs = 0))
+
+        assertEquals(OffOutcome.TRANSIENT, resolver.lookup("3017620422003", nowMs = 0).outcome)
+        val early = resolver.lookup("3017620422003", nowMs = 29_999)
+        assertEquals(OffOutcome.TRANSIENT, early.outcome)
+        assertTrue("the tick says it is backing off", early.note!!.contains("backing off"))
+        assertEquals("no request inside Retry-After", 1, transport.urls.size)
+
+        val retried = resolver.lookup("3017620422003", nowMs = 30_000)
+        assertEquals(OffOutcome.HIT, retried.outcome)
+        assertEquals("Nutella", retried.text)
+        assertEquals(2, transport.urls.size)
+    }
+
+    @Test
+    fun `a 429 without Retry-After waits the 60 s default`() {
+        val store = cache()
+        val transport = FakeTransport(OffHttp(429, ""), OffHttp(200, nutellaBody))
+        val resolver = OffResolver(store, transport, RequestThrottle(minSpacingMs = 0))
+
+        resolver.lookup("3017620422003", nowMs = 0)
+        resolver.lookup("3017620422003", nowMs = 59_999)
+        assertEquals(1, transport.urls.size)
+        assertEquals(OffOutcome.HIT, resolver.lookup("3017620422003", nowMs = 60_000).outcome)
+        assertEquals(2, transport.urls.size)
+    }
+
+    @Test
+    fun `a 500 backs off 1 s then 2 s and stops after the third attempt`() {
+        val store = cache()
+        val transport = FakeTransport(OffHttp(500, "down")) // every answer is a 5xx
+        val resolver = OffResolver(store, transport, RequestThrottle(minSpacingMs = 0))
+
+        assertEquals(OffOutcome.TRANSIENT, resolver.lookup("3017620422003", nowMs = 0).outcome)
+        assertEquals(1, transport.urls.size)
+
+        resolver.lookup("3017620422003", nowMs = 999)
+        assertEquals("the first retry waits 1 s", 1, transport.urls.size)
+        assertEquals(OffOutcome.TRANSIENT, resolver.lookup("3017620422003", nowMs = 1_000).outcome)
+        assertEquals(2, transport.urls.size)
+
+        resolver.lookup("3017620422003", nowMs = 2_999)
+        assertEquals("the second retry waits 2 s", 2, transport.urls.size)
+        assertEquals(OffOutcome.TRANSIENT, resolver.lookup("3017620422003", nowMs = 3_000).outcome)
+        assertEquals(3, transport.urls.size)
+
+        // The third failure schedules 4 s, but the three-attempt budget refuses a fourth request.
+        val exhausted = resolver.lookup("3017620422003", nowMs = 7_000)
+        assertTrue("the tick says why it stopped", exhausted.note!!.contains("retry budget"))
+        resolver.lookup("3017620422003", nowMs = 120_000)
+        assertEquals("no fourth attempt", 3, transport.urls.size)
+    }
+
+    // ---------------------------------------------------------------- OFF.md §2 redirects
+
+    @Test
+    fun `redirects are capped at three hops`() {
+        var url = OffRequest.url("3017620422003")
+        var followed = 0
+        while (followed < OffRedirect.MAX_HOPS) {
+            val next = OffRedirect.resolve(url, "https://world.openfoodfacts.org/hop${followed + 1}", followed)
+            assertNotNull("hop ${followed + 1} is allowed", next)
+            url = next!!
+            followed += 1
+        }
+        assertNull(
+            "a fourth redirect is refused",
+            OffRedirect.resolve(url, "https://world.openfoodfacts.org/hop4", followed),
+        )
+    }
+
+    @Test
+    fun `a redirect target must stay on HTTPS`() {
+        val thrown = assertThrows(IllegalArgumentException::class.java) {
+            OffRedirect.resolve("https://world.openfoodfacts.org/x", "http://world.openfoodfacts.org/y", 0)
+        }
+        assertTrue(thrown.message!!.contains("HTTPS"))
+
+        assertEquals(
+            "a relative redirect resolves against the HTTPS request",
+            "https://world.openfoodfacts.org/next",
+            OffRedirect.resolve("https://world.openfoodfacts.org/x", "/next", 0),
+        )
+        assertNull("a 3xx without Location is not followed", OffRedirect.resolve("https://world.openfoodfacts.org/x", null, 0))
     }
 
     // ---------------------------------------------------------------- etiquette + single-flight

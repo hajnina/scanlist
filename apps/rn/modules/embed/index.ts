@@ -28,6 +28,7 @@ import {
   resetNativeEmbedCache,
   type NativeEmbedModule,
   type NativeEmbedStatus,
+  type NativePrompts,
 } from './NativeEmbed';
 
 export type EmbedBackend = 'npu' | 'gpu' | 'cpu' | 'none';
@@ -87,6 +88,14 @@ export interface EmbedStatus {
   open: boolean;
   /** The command that fixes a missing model (`scripts/model.sh push <package>`). */
   hint: string;
+  /** Size of the bundle on disk (0 when absent). Card A6's model card. */
+  modelBytes: number;
+  /** Whether this process can read the bundle (false for a shell-owned adb push). */
+  modelReadable: boolean;
+  /** Pinned sha256, shown as EXPECTED — never recomputed on the device. */
+  modelSha256: string;
+  /** The prefix set from the bundled prompts.json, or null when unavailable. */
+  prompts: NativePrompts | null;
 }
 
 /** Stable error codes crossing the bridge (Kotlin `EmbedModule.codeOf`). */
@@ -364,6 +373,10 @@ export async function embedStatus(): Promise<EmbedStatus> {
       modelFile: 'embeddinggemma-2-740m.litertlm',
       open: false,
       hint: 'Rebuild apps/rn/android with card A3 (EmbedPackage) — this binary has no embed module.',
+      modelBytes: 0,
+      modelReadable: false,
+      modelSha256: '',
+      prompts: null,
     };
   }
   try {
@@ -372,7 +385,16 @@ export async function embedStatus(): Promise<EmbedStatus> {
       supportsImages: status.supportsImages,
       modelId: status.modelId,
     });
-    return {...status, backend, linked: true};
+    return {
+      ...status,
+      backend,
+      linked: true,
+      // Card A6 added these to the bridge; an older binary simply omits them.
+      modelBytes: status.modelBytes ?? 0,
+      modelReadable: status.modelReadable === true,
+      modelSha256: status.modelSha256 ?? '',
+      prompts: status.prompts ?? null,
+    };
   } catch (error) {
     throw wrapError(error);
   }
@@ -384,6 +406,56 @@ export async function closeEmbed(): Promise<void> {
   try {
     await native.close();
     known = null;
+  } catch (error) {
+    throw wrapError(error);
+  }
+}
+
+/** The picker ids this bridge accepts (`SettingsController` persists the same strings). */
+export const BACKEND_CHOICES = ['auto', 'gpu', 'cpu', 'npu'] as const;
+
+/**
+ * Card A6: persist the backend policy and unload any open engine, so the next call opens on the
+ * chosen ladder. `auto` is the shipped GPU → CPU fallback; `gpu`/`cpu`/`npu` are strict, so a strict
+ * choice can fail honestly instead of silently measuring another backend.
+ */
+export async function setBackend(choice: string): Promise<void> {
+  if (!(BACKEND_CHOICES as readonly string[]).includes(choice)) {
+    throw new EmbedError(
+      EMBED_ERROR.input,
+      `setBackend expects one of ${BACKEND_CHOICES.join(', ')}, got ${JSON.stringify(choice)}`,
+    );
+  }
+  const native = requireNative();
+  if (typeof native.setBackend !== 'function') {
+    throw new EmbedError(
+      EMBED_ERROR.unavailable,
+      'This binary predates the settings picker (card A6) — rebuild apps/rn/android.',
+    );
+  }
+  try {
+    await native.setBackend(choice);
+    known = null;
+  } catch (error) {
+    throw wrapError(error);
+  }
+}
+
+/**
+ * Card A6: delete a temp JPEG the scanner captured (`saveToTemporaryFileAsync`). The native side
+ * refuses anything outside the app cache. This is the bridge's only file-system verb because the RN
+ * app has no file-system dependency (AGENTS.md) and A4's capture loop produced ~30 MB/min of them.
+ */
+export async function deleteTempFile(
+  path: string,
+): Promise<{deleted: boolean; path: string}> {
+  const native = requireNative();
+  if (typeof native.deleteTempFile !== 'function') {
+    // An older binary cannot delete: report "not deleted" instead of throwing on every frame.
+    return {deleted: false, path};
+  }
+  try {
+    return await native.deleteTempFile(path);
   } catch (error) {
     throw wrapError(error);
   }

@@ -5,5 +5,13 @@
 export {ExpressiveCard} from './components/ExpressiveCard';
 export {SpringIn} from './components/SpringIn';
 export {ScanButton} from './components/ScanButton';
+export {ChoiceChips, type ChoiceOption} from './components/ChoiceChips';
+export {FactRow} from './components/FactRow';
+export {GuidanceNote, type GuidanceTone} from './components/GuidanceNote';
 export {BigState, CapsLabel, HeroNumeral, MachineText} from './components/Typography';
-export {haptic, type HapticIntent} from './haptics';
+export {
+  haptic,
+  hapticsEnabled,
+  setHapticsEnabled,
+  type HapticIntent,
+} from './haptics';

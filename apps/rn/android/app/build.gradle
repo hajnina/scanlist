@@ -135,13 +135,34 @@ android {
     }
 }
 
+// Card A6 (nit a): resolved outside `dependencies {}` — that closure's delegate does not expose
+// Project properties such as `rootDir`/`settingsDir`.
+def scanlistEmbedModule = new File(rootDir, '../../../shared/android-embed/build.gradle.kts')
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+
+    // Card A6 (nit a): the shared on-device embedding engine, included by path in settings.gradle.
+    // The guard mirrors that file's include-if-exists (a checkout without shared/android-embed fails
+    // later with an explicit message instead of a confusing "project not found" here).
+    if (scanlistEmbedModule.isFile()) {
+        implementation project(':android-embed')
+    }
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
     }
+}
+
+/*
+ * Card A6 (nit a): LiteRT-LM 0.18.1 is built with Kotlin 2.4 metadata while RN 0.88 compiles this app
+ * with Kotlin 2.2 (shared/android-embed/README.md §"LiteRT-LM version decision"). The library passes
+ * this flag to its own compiler; the app compiles against the same AAR (an `api` dependency) and needs
+ * it too. Compile-time only, no runtime effect. Moved here from settings.gradle's `beforeProject` hook.
+ */
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    compilerOptions.freeCompilerArgs.add('-Xskip-metadata-version-check')
 }

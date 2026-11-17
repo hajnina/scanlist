@@ -1,29 +1,115 @@
 /**
- * Settings (backend choice: NPU → GPU → CPU, precedence, smoothing α, hysteresis).
+ * Settings barrel (card A6) — the screen plus the tested rules behind it.
  *
- * Card A1: the defaults from docs/ARCHITECTURE.md as a typed shape; no persistence yet.
+ *   <SettingsScreen onBack={…} />                       // device controller, the app path
+ *   <SettingsScreen controller={ctl} onBack={…} />      // tests / a provided controller
+ *
+ * Every rule (backend mapping, latency maths, model file status, prefix formatting, persistence,
+ * the serialised self-test) is a plain module below; the screen and the hook only lay state out.
  */
-export type EmbedBackend = 'auto' | 'npu' | 'gpu' | 'cpu';
-
-export interface Settings {
-  /** Preferred embedding backend; `auto` = NPU → GPU → CPU ladder. */
-  backend: EmbedBackend;
-  /** Matryoshka truncation (768 / 512 / 256 / 128). */
-  dims: 768 | 512 | 256 | 128;
-  /** EMA smoothing for scan scores. */
-  smoothingAlpha: number;
-  /** The top item only changes when its smoothed score beats the current top by this margin. */
-  hysteresis: number;
-  /** Theme follows the system (style guide §2) unless this is switched off in a later card. */
-  followSystemDarkMode: boolean;
-}
-
-export const defaultSettings: Settings = {
-  backend: 'auto',
-  dims: 256,
-  smoothingAlpha: 0.5,
-  hysteresis: 0.02,
-  followSystemDarkMode: true,
-};
-
-export const settingsPlaceholder = 'settings screen lands in a later card';
+export {
+  BACKEND_OPTIONS,
+  DEFAULT_BACKEND,
+  backendCandidates,
+  backendOption,
+  backendSummary,
+  isBackendChoice,
+  isNativeBackend,
+  ladderLabel,
+  matchesChoice,
+  parseBackendChoice,
+  parseNativeBackend,
+  type BackendChoice,
+  type BackendOption,
+  type NativeBackend,
+} from './backend';
+export {
+  E_EMBEDDER,
+  E_NO_BACKEND,
+  E_NO_MODEL,
+  SAMPLE_TEXTS,
+  WARMUP_TEXT,
+  createSelfTestRunner,
+  formatMean,
+  formatMillis,
+  latencyHeadline,
+  meanMillis,
+  sampleRange,
+  supportsLine,
+  type EngineProbe,
+  type LatencyReport,
+  type LatencySample,
+  type SelfTestOutcome,
+  type SelfTestRunner,
+  type SelfTestRunnerOptions,
+} from './latency';
+export {
+  EXPECTED_MODEL_BYTES,
+  EXPECTED_MODEL_SHA256,
+  PUSH_HINT,
+  factsFromNativeStatus,
+  formatBytes,
+  isModelReady,
+  modelStatusFromFacts,
+  modelStatusLine,
+  pushHint,
+  sha256Label,
+  sizeMatches,
+  sizeNote,
+  type ModelFileFacts,
+  type ModelStatus,
+} from './modelStatus';
+export {
+  describePrefix,
+  docPrefixLine,
+  imagePrefixLine,
+  prefixInfoFromNative,
+  prefixSummary,
+  queryPrefixLine,
+  type NativePrompts,
+  type PrefixInfo,
+} from './prefix';
+export {
+  QUIET_GUIDANCE_MS,
+  quietFor,
+  scanGuidance,
+  type GuidanceInput,
+  type GuidanceKind,
+  type ScanGuidance,
+  type ScanProgress,
+  type SourceActivity,
+} from './polish';
+export {
+  SETTINGS_KEY,
+  SETTINGS_VERSION,
+  SettingsRepository,
+  defaultStoredSettings,
+  parseStoredSettings,
+  serializeStoredSettings,
+  type SettingsKeyValueStore,
+  type StoredSettings,
+} from './store';
+export {
+  SettingsController,
+  type SettingsDeps,
+  type SettingsPhase,
+  type SettingsSnapshot,
+} from './state';
+export {useSettings, type UseSettingsResult} from './useSettings';
+export {
+  SettingsScreen,
+  type SettingsScreenProps,
+} from './SettingsScreen';
+export {
+  createNativeSettingsController,
+} from './device';
+export {
+  asyncStorageSettingsStore,
+  createSettingsRepository,
+} from './asyncStorage';
+export {
+  useModelStatus,
+  useScanGuidance,
+  type ModelProbeState,
+  type ScanGuidanceInput,
+} from './useScanGuidance';

@@ -27,8 +27,12 @@ takes `Photo.getFileDataAsync()` from a `CameraPhotoOutput`, and the same sweep 
 - no Reanimated/worklets Babel plugin, no `frame.dispose()` lifetime bugs in app code;
 - the JPEG needed for image embedding comes for free.
 
-Cost: the preview can hitch while a capture runs, and every sampled frame leaves a JPEG in the app
-cache (Android clears it; the scan screen is only open while scanning).
+Cost: the preview can hitch while a capture runs. Every sampled frame also saves a JPEG in the app
+cache (~100–200 KB at 2.5 fps), so card A6 added the temp-file lifecycle: the capturer's frame
+carries `release()`, and the feed calls it **10 s after capture** (`DEFAULT_FRAME_RELEASE_GRACE_MS`,
+long enough for ML Kit/embedder to open the path) or **immediately on `releaseAll()`** (camera
+stopped / screen unmounted). A long scan therefore holds only the last few frames, not 30 MB/min.
+`feed.pendingReleases()` is the escape hatch for the `__DEV__` footer.
 
 ## API (what card A5 uses)
 
@@ -71,6 +75,13 @@ state) for a UI that owns its own `<Camera>`; `<ScanCamera>` renders the preview
 camera permission on first mount. Frames always travel through the feed (never a second
 `onFrame` callback), so a frame is processed exactly once.
 
+The capture loop follows `active && hasPermission` in an effect (card A6): the loop starts/stops on
+the same condition as `<Camera isActive>`, not on VisionCamera's optional `onStarted`/`onStopped`
+callbacks. Unmounting also calls `feed.releaseAll()`, which deletes every temp JPEG still waiting
+for its grace period. The screen's `__DEV__` footer exposes `listeners`, `dropped`, `skipped` and
+`pendingReleases` from `useScanSession().diagnostics()` — `listenerCount()` is a developer
+observation, not something `adb logcat` can see.
+
 ### OCR is per line (RANK.md §2.2)
 
 `shared/spec/RANK.md` mandates **one text query per OCR line** (`queryPrefix + trim(line)`, line =
@@ -100,13 +111,15 @@ dropped, never queued.
 | same-barcode debounce inside N seconds | `dedupe.ts` | `__tests__/dedupe.test.ts` |
 | product vs QR selection, confidence | `barcode.ts` | `__tests__/barcode.test.ts` |
 | OCR lines → one signal per line, per-line confidence, 16-line cap, repeat window | `ocr.ts` | `__tests__/ocr.test.ts` |
-| frame fan-out, listener isolation | `frames.ts` | `__tests__/frames.test.ts` |
-| source gating / single-flight / stop | `feedSource.ts`, `*Source.ts` | `__tests__/sources.test.ts` |
-| Photo → JPEG base64 frame (+ dispose) | `frameCapturer.ts` | `__tests__/frameCapturer.test.ts` |
+| frame fan-out, listener isolation, temp-JPEG grace/`releaseAll` | `frames.ts` | `__tests__/frames.test.ts` |
+| source gating / single-flight / stop / restart epoch | `feedSource.ts`, `*Source.ts` | `__tests__/sources.test.ts` |
+| Photo → JPEG base64 frame (+ dispose, `release()`) | `frameCapturer.ts` | `__tests__/frameCapturer.test.ts` |
+| camera wiring: `isActive`, permission, effect start/stop, unmount release | `camera.tsx` | `__tests__/camera.test.tsx` (VisionCamera mocked) |
 | base64 of JPEG bytes | `base64.ts` | `__tests__/base64.test.ts` |
 
-Not testable here: the camera itself and ML Kit (they need a device). `./camera.tsx` and the
-`processImage*` calls in `./native.ts` are thin glue over the vendor APIs.
+Not testable here: the real Camera/ML Kit vendor APIs (they need a device); `./camera.tsx` is tested
+with `react-native-vision-camera` mocked, and `./native.ts`'s `processImage*` calls are thin glue
+over ML Kit.
 
 ## Manual test on a phone
 
@@ -126,8 +139,9 @@ running (`npm start`).
    emits nothing; an unchanged label goes quiet for 4 s and then re-emits.
 6. **Image** — the image chip lights on every sampled frame; log the base64 length in `onImage`
    (expected ~100–200 KB for a 720p JPEG at quality 0.7).
-7. **Lifecycle** — leave the scan screen: captures stop (`feed.listenerCount() === 0`, no more
-   temp JPEGs stop appearing in `adb shell ls $TMPDIR`), return: they resume.
+7. **Lifecycle** — leave the scan screen: captures stop, the `__DEV__` footer's `pending` counter
+   drops to 0 (unmount calls `releaseAll()`), and `adb shell ls` on the app cache no longer grows.
+   Return: captures resume and the counter tracks the newest frames.
 8. **Failure isolation** — airplane mode / an embedder that throws: the image chip reports the
    error through `onError` while barcode and OCR keep working.
 

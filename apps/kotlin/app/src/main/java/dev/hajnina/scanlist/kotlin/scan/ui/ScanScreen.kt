@@ -1,6 +1,9 @@
 package dev.hajnina.scanlist.kotlin.scan.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.os.SystemClock
+import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -25,6 +28,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -59,10 +63,19 @@ import dev.hajnina.scanlist.kotlin.list.flatIndex
 import dev.hajnina.scanlist.kotlin.list.StoredList
 import dev.hajnina.scanlist.kotlin.rank.ListEmbeddingState
 import dev.hajnina.scanlist.kotlin.rank.RANK_DIMS_ACTIVE
+import dev.hajnina.scanlist.kotlin.rank.defaultModelFile
 import dev.hajnina.scanlist.kotlin.rank.rememberListEmbedding
 import dev.hajnina.scanlist.kotlin.scan.sources.CameraScanPreview
 import dev.hajnina.scanlist.kotlin.scan.sources.Clock
+import dev.hajnina.scanlist.kotlin.settings.ModelProbe
 import dev.hajnina.scanlist.kotlin.springIn
+import dev.hajnina.scanlist.kotlin.ui.LowLightSession
+import dev.hajnina.scanlist.kotlin.ui.LowLightState
+import dev.hajnina.scanlist.kotlin.ui.ScanBanner
+import dev.hajnina.scanlist.kotlin.ui.ScanBannerAction
+import dev.hajnina.scanlist.kotlin.ui.ScanBannerKind
+import dev.hajnina.scanlist.kotlin.ui.ScanBannerState
+import dev.hajnina.scanlist.kotlin.ui.scanBanner
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 
@@ -123,6 +136,42 @@ fun ScanScreen(listState: ListState) {
     )
     val view = controller.view
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+
+    // ---------------------------------------------------------------- card B7 state matrix
+    //
+    // The three environmental states the polish pass owes this screen, all decided by pure,
+    // unit-tested helpers (`ui/ScanBanner`, `ui/LowLight`); this screen only holds them:
+    //  - cameraGranted: reported by CameraScanPreview (null until it has looked),
+    //  - modelStatus: one filesystem stat of the bundle the pipeline opens, per tab entry,
+    //  - lowLight: debounced mean-luma stream from the analysed frames, scoped to the selected list
+    //    so a DIM reading never survives a list switch.
+    // OFF's "offline" is the barcode strip's own state (a lookup that could not reach the network).
+    var cameraGranted by remember { mutableStateOf<Boolean?>(null) }
+    val modelStatus = remember(context) { ModelProbe.status(defaultModelFile(context)) }
+    val lowLightSession = remember { LowLightSession() }
+    var lowLight by remember { mutableStateOf(LowLightState.UNKNOWN) }
+    val banner = scanBanner(
+        ScanBannerState(
+            cameraGranted = cameraGranted,
+            modelStatus = modelStatus,
+            lowLight = lowLight,
+            offline = controller.barcodeUi.state == OffUiState.OFFLINE,
+            embedError = view.error,
+        ),
+    )
+    // The only banner action: the permission is permanently denied (no dialog any more), so the fix
+    // lives in the system app settings page.
+    val openAppSettings: () -> Unit = {
+        haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
+        runCatching {
+            context.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.fromParts("package", context.packageName, null))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
 
     // A new hero is a self-triggered state change: style guide §4 asks for a haptic on those too.
     var lastHeroId by remember { mutableStateOf<String?>(null) }
@@ -149,6 +198,12 @@ fun ScanScreen(listState: ListState) {
                 .clip(Shapes.hero)
                 .background(cs.surfaceContainerHighest),
             onSignal = controller::onSignal,
+            onPermission = { cameraGranted = it },
+            onLuma = { luma ->
+                val next = lowLightSession.sample(stored.id, luma)
+                // Only touch Compose state when the debounced answer actually changes.
+                if (next != lowLight) lowLight = next
+            },
         )
 
         Column(
@@ -165,7 +220,7 @@ fun ScanScreen(listState: ListState) {
                 },
             )
             Spacer(Modifier.height(8.dp))
-            RankedList(view)
+            RankedList(view, banner, onBannerAction = openAppSettings)
         }
     }
 }
@@ -459,12 +514,17 @@ private fun NoHeroCard(view: ScanView, embedding: ListEmbeddingState) {
 // ---------------------------------------------------------------- ranked rows
 
 @Composable
-private fun RankedList(view: ScanView) {
+private fun RankedList(view: ScanView, banner: ScanBanner?, onBannerAction: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // Card B7: the degraded-state banner rides at the top of the scrollable list, so a small
+        // screen is never squeezed (the camera 45 % / list 55 % split is fixed by B5).
+        banner?.let { current ->
+            item(key = "banner") { ScanBannerCard(current, onBannerAction) }
+        }
         items(view.rows, key = { it.id }) { row ->
             RankRow(row, leftFirst = true, modifier = Modifier.animateItem(placementSpec = Motion.spatial()))
         }
@@ -486,6 +546,50 @@ private fun RankedList(view: ScanView) {
                 color = cs.onSurfaceVariant.copy(alpha = 0.8f),
                 modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 12.dp),
             )
+        }
+    }
+}
+
+/**
+ * Card B7 — one tonal banner for the scan screen's degraded states. The colour *is* the message, in
+ * the style guide's vocabulary (§3): errorContainer for a missing model/embedder, tertiaryContainer
+ * for advice (low light), secondaryContainer for the informational offline note, and the neutral
+ * surfaceContainerHigh for a permission that is simply off.
+ */
+@Composable
+private fun ScanBannerCard(banner: ScanBanner, onAction: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val container = when (banner.kind) {
+        ScanBannerKind.CAMERA -> cs.surfaceContainerHigh
+        ScanBannerKind.MODEL, ScanBannerKind.EMBED -> cs.errorContainer
+        ScanBannerKind.LOW_LIGHT -> cs.tertiaryContainer
+        ScanBannerKind.OFFLINE -> cs.secondaryContainer
+    }
+    val content = when (banner.kind) {
+        ScanBannerKind.CAMERA -> cs.onSurface
+        ScanBannerKind.MODEL, ScanBannerKind.EMBED -> cs.onErrorContainer
+        ScanBannerKind.LOW_LIGHT -> cs.onTertiaryContainer
+        ScanBannerKind.OFFLINE -> cs.onSecondaryContainer
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = Shapes.leafMirror,
+        colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
+    ) {
+        Column(
+            Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            SectionLabel(banner.title, color = content.copy(alpha = 0.75f))
+            Text(banner.body, style = MaterialTheme.typography.bodySmall, color = content)
+            if (banner.action == ScanBannerAction.OPEN_SETTINGS) {
+                TextButton(onClick = onAction) {
+                    Text(
+                        "APP SETTINGS",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = Heavy, letterSpacing = 1.sp),
+                    )
+                }
+            }
         }
     }
 }

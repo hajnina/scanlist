@@ -5,11 +5,12 @@
  * *when* and *what* a source emits is the real code.
  */
 import {createBarcodeSource} from '../barcodeSource';
+import {createFeedSource} from '../feedSource';
 import {createFrameFeed} from '../frames';
 import {createImageSource, IMAGE_QUERY_MARKER} from '../imageSource';
 import {createOcrSource} from '../ocrSource';
 import {createScanPipeline, createScanSources} from '../index';
-import type {CameraFrame} from '../types';
+import type {CameraFrame, ScanSignal} from '../types';
 
 function frame(capturedAt: number): CameraFrame {
   return {
@@ -477,5 +478,82 @@ describe('createScanSources + pipeline', () => {
     );
     warn.mockRestore();
     await pipeline.stop();
+  });
+});
+
+describe('feed source restart epoch (card A6, A4 review nit)', () => {
+  test('a stale in-flight answer is dropped and a restart does not overlap a second read', async () => {
+    const feed = createFrameFeed();
+    let resolveProcess: ((signal: ScanSignal) => void) | undefined;
+    const process = jest.fn(
+      () =>
+        new Promise<ScanSignal>(resolve => {
+          resolveProcess = resolve;
+        }),
+    );
+    const source = createFeedSource({name: 'ocr', feed, process});
+    const oldSession = jest.fn();
+    const newSession = jest.fn();
+
+    await source.start(oldSession);
+    feed.push(frame(0));
+    await flush();
+    expect(process).toHaveBeenCalledTimes(1);
+
+    // Stop and restart while ML Kit is still reading the old frame.
+    await source.stop();
+    await source.start(newSession);
+
+    // busy is intentionally not reset by stop(): a second read must not overlap the first.
+    feed.push(frame(100));
+    await flush();
+    expect(process).toHaveBeenCalledTimes(1);
+    expect(source.droppedWhileBusy()).toBe(1);
+
+    resolveProcess?.({source: 'ocr', text: 'old session words', confidence: 0.9});
+    await flush();
+    expect(oldSession).not.toHaveBeenCalled();
+    expect(newSession).not.toHaveBeenCalled();
+
+    // Once that call settles the new session gets the next frame normally.
+    process.mockImplementation(async () => ({
+      source: 'ocr' as const,
+      text: 'new session words',
+      confidence: 0.8,
+    }));
+    feed.push(frame(200));
+    await flush();
+    expect(newSession).toHaveBeenCalledWith({
+      source: 'ocr',
+      text: 'new session words',
+      confidence: 0.8,
+    });
+    expect(oldSession).not.toHaveBeenCalled();
+    await source.stop();
+  });
+
+  test('an error from a stopped session is not reported as the new session error', async () => {
+    const feed = createFrameFeed();
+    let rejectProcess: ((error: unknown) => void) | undefined;
+    const process = jest.fn(
+      () =>
+        new Promise<ScanSignal>((_, reject) => {
+          rejectProcess = reject;
+        }),
+    );
+    const onError = jest.fn();
+    const source = createFeedSource({name: 'ocr', feed, process, onError});
+
+    await source.start(jest.fn());
+    feed.push(frame(0));
+    await flush();
+
+    await source.stop();
+    await source.start(jest.fn());
+    rejectProcess?.(new Error('old ml kit failure'));
+    await flush();
+
+    expect(onError).not.toHaveBeenCalled();
+    await source.stop();
   });
 });

@@ -11,6 +11,7 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
+import dev.hajnina.scanlist.embed.EmbedBackend
 import dev.hajnina.scanlist.embed.Embedder
 import dev.hajnina.scanlist.embed.EmbedderConfig
 import dev.hajnina.scanlist.embed.EmbedderException
@@ -58,6 +59,13 @@ class EmbedModule(reactContext: ReactApplicationContext) :
 
     /** Model-open cost the *next* result should report: set when the ladder runs, consumed once. */
     @Volatile private var pendingOpenMs: Double = 0.0
+
+    /**
+     * Card A6 settings picker: null = the shipped ladder (GPU → CPU); a list = that exact order.
+     * Set by [setBackend], consumed by [engine] on the next open. Strict choices must fail honestly
+     * rather than silently measuring another backend.
+     */
+    @Volatile private var backendOrder: List<EmbedBackend>? = null
 
     /** `prompts.json` `dims.active` (256 today) without opening the model; the library's default on failure. */
     private val specDims: Int by lazy {
@@ -145,6 +153,10 @@ class EmbedModule(reactContext: ReactApplicationContext) :
     /**
      * Model/engine state without opening the model: `{backend, dims, supportsImages, modelId,
      * modelPresent, modelPath, open}`. Never rejects for a missing model — that is a state, not an error.
+     *
+     * Card A6 added the settings screen's facts: the bundle's byte size and readability, the pinned
+     * sha256 as a display label, and the active prefix set from `prompts.json` (never recomputed here:
+     * a 484 MB hash per settings visit would be dishonest about "instant").
      */
     @ReactMethod
     fun status(promise: Promise) {
@@ -164,6 +176,47 @@ class EmbedModule(reactContext: ReactApplicationContext) :
                 putString("modelFile", EmbedModel.FILE_NAME)
                 putBoolean("open", current != null)
                 putString("hint", EmbedModel.pushHint(reactApplicationContext))
+                putDouble("modelBytes", (model?.length() ?: 0L).toDouble())
+                putBoolean("modelReadable", model?.canRead() == true)
+                putString("modelSha256", EmbedderConfig.DEFAULT_MODEL_SHA256)
+                promptsMap()?.let { putMap("prompts", it) }
+            }
+        }
+    }
+
+    /**
+     * Card A6: persist the settings picker's backend policy and unload the engine, so the next call
+     * opens on exactly that ladder. `auto` restores the shipped GPU → CPU fallback; `gpu`/`cpu`/`npu`
+     * are strict; `npu` is experimental (RECIPE.md §7).
+     */
+    @ReactMethod
+    fun setBackend(choice: String, promise: Promise) {
+        run(promise) {
+            backendOrder = orderFor(choice)
+            engine?.close()
+            engine = null
+            pendingOpenMs = 0.0
+            null
+        }
+    }
+
+    /**
+     * Card A6: delete one of the scanner's temp JPEGs (the capture loop writes ~100-200 KB per
+     * sampled frame). This is the bridge's only filesystem verb, and it refuses anything outside the
+     * app cache, so it cannot be used to delete arbitrary files.
+     */
+    @ReactMethod
+    fun deleteTempFile(path: String, promise: Promise) {
+        run(promise) {
+            val cacheRoot = reactApplicationContext.cacheDir.canonicalFile
+            val file = File(path).canonicalFile
+            if (!file.path.startsWith(cacheRoot.path + File.separator)) {
+                throw BadInputException("deleteTempFile refuses a path outside the app cache: $path")
+            }
+            val deleted = !file.exists() || file.delete()
+            Arguments.createMap().apply {
+                putBoolean("deleted", deleted)
+                putString("path", file.path)
             }
         }
     }
@@ -180,8 +233,18 @@ class EmbedModule(reactContext: ReactApplicationContext) :
     }
 
     override fun invalidate() {
-        engine?.close()
+        // Card A6 (A4/A3 review nit): close through the worker queue, not from the caller's thread.
+        // `engine()` only runs on the worker, so enqueueing the close serialises it after any in-flight
+        // embed instead of pulling the native engine out from under it. `shutdown()` lets the queued
+        // close run, then refuses further work.
+        val current = engine
         engine = null
+        pendingOpenMs = 0.0
+        if (current != null) {
+            runCatching {
+                worker.execute { runCatching { current.close() } }
+            }
+        }
         worker.shutdown()
         super.invalidate()
     }
@@ -209,20 +272,63 @@ class EmbedModule(reactContext: ReactApplicationContext) :
                     "no ${EmbedModel.FILE_NAME} in ${EmbedModel.candidates(reactApplicationContext).joinToString(", ") { it.absolutePath }} " +
                         "— provision it with: ${EmbedModel.pushHint(reactApplicationContext)}",
                 )
+            val order = backendOrder
             val started = SystemClock.elapsedRealtime()
             val created = Embedders.create(
                 reactApplicationContext,
-                EmbedderConfig(modelFile = model),
+                EmbedderConfig(
+                    modelFile = model,
+                    backendOrder = order,
+                    allowNpu = order?.contains(EmbedBackend.NPU) == true,
+                ),
             )
             // create() only reads the bundled prompts/golden assets; the ladder (and the 484 MB
             // model load + self-test) runs on the first embed. `open()` does that now, on the worker
             // thread, so `openMs` can report it separately from the first call's `latencyMs`.
-            (created as? LiteRtEmbedder)?.open()
+            try {
+                (created as? LiteRtEmbedder)?.open()
+            } catch (t: Throwable) {
+                // Card A6 (A3 review nit): a failed open must not leak the engine it built, or the
+                // retry would hold two ~0.5 GB native engines. Close it before rethrowing.
+                runCatching { created.close() }
+                pendingOpenMs = 0.0
+                throw t
+            }
             pendingOpenMs = (SystemClock.elapsedRealtime() - started).toDouble()
             engine = created
             return created
         }
     }
+
+    /**
+     * The settings picker's id → the exact ladder to try. Unknown ids are rejected rather than
+     * silently mapped, so a typo in the JS layer is visible (the picker only sends these four).
+     */
+    private fun orderFor(choice: String): List<EmbedBackend>? =
+        when (choice.trim().lowercase()) {
+            "auto" -> null // shipped ladder: GPU → CPU
+            "gpu" -> listOf(EmbedBackend.GPU)
+            "cpu" -> listOf(EmbedBackend.CPU)
+            "npu" -> listOf(EmbedBackend.NPU)
+            else -> throw BadInputException(
+                "setBackend expects auto|gpu|cpu|npu, got '$choice'",
+            )
+        }
+
+    /** The active prefix set from the bundled prompts.json, or null when the asset is unusable. */
+    private fun promptsMap(): WritableMap? =
+        runCatching { Prompts.load(reactApplicationContext) }.getOrNull()?.let { prompts ->
+            Arguments.createMap().apply {
+                putString("active", prompts.active)
+                putInt("version", prompts.version)
+                putString("model", prompts.model)
+                putString("doc", prompts.docPrefix)
+                putString("query", prompts.queryPrefix)
+                putString("image", prompts.imagePrefix)
+                putInt("dims", prompts.activeDims)
+                putInt("nativeDims", prompts.nativeDims)
+            }
+        }
 
     private fun backendId(): String = engine?.backend ?: Embedder.BACKEND_NONE
 

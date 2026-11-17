@@ -1,7 +1,9 @@
 buildscript {
     ext {
         buildToolsVersion = "37.0.0"
-        minSdkVersion = 24
+        // Card A6 (nit a): the shared embedding engine needs Android 12. This used to be injected by
+        // a `gradle.beforeProject` hook in settings.gradle; it is a real project fact, so it lives here.
+        minSdkVersion = 31
         compileSdkVersion = 37
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"

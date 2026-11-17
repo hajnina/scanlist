@@ -124,6 +124,12 @@ class CameraScanAnalyzer(
     private val textReader: TextReader = MlKitTextReader(),
     private val clock: Clock = Clock { android.os.SystemClock.elapsedRealtime() },
     private val onSignal: (ScanSignal) -> Unit = {},
+    /**
+     * Card B7: mean luma of each frame that passed [ScanFrameCore]'s 2.5 fps gate, for the low-light
+     * advice banner. Runs on the analysis thread, must be cheap and must not throw; the gate means it
+     * fires at most 2.5 times a second, not at preview rate.
+     */
+    private val onLuma: (Double) -> Unit = {},
 ) : ImageAnalysis.Analyzer {
 
     /** Frames between analyze() and both ML Kit callbacks finishing (see close()). */
@@ -164,7 +170,14 @@ class CameraScanAnalyzer(
             // The JPEG is SENSOR-oriented: rotationDegrees is carried on the signal (card B5 rotates
             // the frame upright before embedding) as well as handed to ML Kit.
             core.onFrame(clock.nowMs(), image.imageInfo.rotationDegrees) {
-                runCatching { ImageProxyFrames.toYuv420(image) }.getOrNull()
+                runCatching { ImageProxyFrames.toYuv420(image) }
+                    .getOrNull()
+                    ?.also { frame ->
+                        // Card B7: only frames the scan gate accepted are measured, so the luma
+                        // sampler has the same cadence as the ranking work and never adds a
+                        // per-preview-frame cost. A luma failure must not lose the frame.
+                        runCatching { onLuma(Luma.mean(frame)) }
+                    }
             }?.let(onSignal)
 
             try {

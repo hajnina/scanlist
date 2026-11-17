@@ -21,6 +21,23 @@ export type ScanActivity = Readonly<
   Record<'barcode' | 'ocr' | 'image', number>
 >;
 
+/**
+ * Card A6 dev counters (A4 review nit: `feed.listenerCount()` was documented as adb-observable and
+ * is not). Read on demand by the scan screen's `__DEV__` footer, so a debug build can show what the
+ * feed/sources are doing without a debugger: three listeners is healthy, a non-zero `dropped` means
+ * ML Kit is slower than the 2.5 fps capture, and `pendingReleases` is the temp-JPEG backlog.
+ */
+export interface ScanDiagnostics {
+  /** Sources attached to the frame feed (3 when running). */
+  listeners: number;
+  /** Frames skipped because a source's previous ML Kit call was still in flight. */
+  dropped: number;
+  /** Frames skipped by a source's own sample interval (OCR is slower than the camera). */
+  skipped: number;
+  /** Captured frames whose temp JPEG has not been deleted yet. */
+  pendingReleases: number;
+}
+
 export interface ScanSession {
   /** Last completed rank tick, `null` until the first one. */
   tick: ScanTick | null;
@@ -31,6 +48,8 @@ export interface ScanSession {
   /** Ask for a tick now (still respecting the 400 ms interval) — used after committing an item. */
   scheduleTick: () => void;
   dismissError: () => void;
+  /** Live feed/source counters for the dev footer (no state, no re-render on read). */
+  diagnostics: () => ScanDiagnostics;
 }
 
 function messageOf(error: unknown): string {
@@ -53,6 +72,12 @@ export function useScanSession(
   const queued = useRef(false);
   const mounted = useRef(true);
   const runRef = useRef<() => void>(() => undefined);
+  const diagnosticsRef = useRef<() => ScanDiagnostics>(() => ({
+    listeners: 0,
+    dropped: 0,
+    skipped: 0,
+    pendingReleases: 0,
+  }));
 
   const run = useCallback(async () => {
     if (busy.current) {
@@ -106,7 +131,7 @@ export function useScanSession(
   useEffect(() => {
     mounted.current = true;
     const readers = createMlKitReaders();
-    const {sources} = createScanSources(feed, {
+    const {sources, barcode, ocr, image} = createScanSources(feed, {
       readers,
       onImage: frame => {
         // The image query is the frame's embedding (no prefix), not the JPEG itself.
@@ -126,6 +151,17 @@ export function useScanSession(
       },
     });
     const pipeline = createScanPipeline(sources);
+
+    diagnosticsRef.current = () => ({
+      listeners: feed.listenerCount(),
+      dropped:
+        barcode.droppedWhileBusy() +
+        ocr.droppedWhileBusy() +
+        image.droppedWhileBusy(),
+      skipped:
+        barcode.skippedByGate() + ocr.skippedByGate() + image.skippedByGate(),
+      pendingReleases: feed.pendingReleases(),
+    });
 
     pipeline
       .start((signal: ScanSignal) => {
@@ -156,5 +192,6 @@ export function useScanSession(
     error,
     scheduleTick,
     dismissError: () => setError(null),
+    diagnostics: () => diagnosticsRef.current(),
   };
 }

@@ -34,8 +34,23 @@ const PATTERNS: Record<HapticIntent, number[]> = {
 
 const supported = Platform.OS === 'android' || Platform.OS === 'ios';
 
+/**
+ * Settings' haptics switch (card A6). Module-level so every caller (scan tick, card press, tabs)
+ * obeys one preference without threading a prop through the tree; `SettingsController` applies the
+ * persisted value at start-up, so the very first tap already respects it.
+ */
+let enabled = true;
+
+export function setHapticsEnabled(value: boolean): void {
+  enabled = value;
+}
+
+export function hapticsEnabled(): boolean {
+  return enabled;
+}
+
 export function haptic(intent: HapticIntent): void {
-  if (!supported) {
+  if (!supported || !enabled) {
     return;
   }
   Vibration.vibrate(PATTERNS[intent]);

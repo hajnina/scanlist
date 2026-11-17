@@ -18,6 +18,7 @@ jobs:
       kotlin: ${{ steps.f.outputs.kotlin }}
       rn: ${{ steps.f.outputs.rn }}
       web: ${{ steps.f.outputs.web }}
+      ci: ${{ steps.f.outputs.ci }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -32,6 +33,8 @@ jobs:
               - 'apps/rn/**'
             web:
               - 'apps/web/**'
+            ci:
+              - '.github/workflows/**'
 
   shared:
     needs: changes
@@ -131,7 +134,7 @@ jobs:
 
   rn:
     needs: changes
-    if: needs.changes.outputs.rn == 'true'
+    if: needs.changes.outputs.rn == 'true' || needs.changes.outputs.ci == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -154,24 +157,127 @@ jobs:
           npm ci --no-audit --no-fund || npm install --no-audit --no-fund
           npm run typecheck
           npm test -- --ci
-      - name: Build APK
+      - name: Build release APK (bundled JS — the only shippable artifact)
+        # assembleDebug is a Metro-only dev build: it contains NO assets/index.android.bundle and
+        # shows "Metro can't load the script" on a fresh install. assembleRelease bundles and
+        # Hermes-compiles the JS, so it runs standalone. The release type signs with the
+        # repo's generated debug keystore (rolling builds only; never a production secret).
         working-directory: apps/rn/android
         run: |
           if [ ! -f gradlew ]; then echo "::error::apps/rn changed but has no android gradle wrapper - card not done"; exit 1; fi
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+          ./gradlew --no-daemon assembleRelease
+      - name: Verify APK is standalone (JS bundle present, arm64 only)
+        # This is the gate that was missing when a Metro-only debug APK reached a phone.
+        # A release APK without the bundle, or with foreign ABIs, can never be published.
+        run: |
+          apk=apps/rn/android/app/build/outputs/apk/release/app-release.apk
+          test -f "$apk" || { echo "::error::release APK not found at $apk"; exit 1; }
+          unzip -l "$apk" | grep -q 'assets/index.android.bundle' || {
+            echo "::error::APK has no assets/index.android.bundle - it needs Metro and cannot ship"; exit 1; }
+          bundle_bytes=$(unzip -l "$apk" | awk '/assets\/index.android.bundle/{print $1}')
+          test "$bundle_bytes" -gt 100000 || { echo "::error::JS bundle suspiciously small: ${bundle_bytes} bytes"; exit 1; }
+          if unzip -l "$apk" | grep -qE 'lib/(x86|x86_64|armeabi-v7a)/'; then
+            echo "::error::non-arm64 ABIs packaged into the shipping APK"; exit 1; fi
+          echo "standalone OK: JS bundle ${bundle_bytes} bytes, arm64-v8a only"
       - name: Rename APK
         # Direct path (A2 CI diagnosis): the '**' variant made hashFiles walk the whole
         # android build tree (A4's deps made it big) and hit GitHub's 120 s template limit.
-        # The APK's location is deterministic — apps/rn/android/app/build/outputs/apk/debug/.
-        if: hashFiles('apps/rn/android/app/build/outputs/apk/debug/*.apk') != ''
-        run: mv apps/rn/android/app/build/outputs/apk/debug/*.apk ScanList-rn-debug.apk
+        if: hashFiles('apps/rn/android/app/build/outputs/apk/release/*.apk') != ''
+        run: mv apps/rn/android/app/build/outputs/apk/release/*.apk ScanList-rn-release.apk
       - uses: actions/upload-artifact@v4
-        if: hashFiles('ScanList-rn-debug.apk') != ''
+        if: hashFiles('ScanList-rn-release.apk') != ''
         with:
           name: scanlist-rn-apk
-          path: ScanList-rn-debug.apk
+          path: ScanList-rn-release.apk
           if-no-files-found: error
+
+  rn-smoke:
+    # Proves the shipping shape actually LOADS: a release APK built for x86_64 is installed on an
+    # emulator, launched, checked for a live process and FATAL EXCEPTION, and screenshotted. The
+    # shipped arm64 APK cannot install on the x86_64 runner, so this builds the same release
+    # variant with -PreactNativeArchitectures=x86_64; everything except the ABI is identical.
+    needs: changes
+    if: needs.changes.outputs.rn == 'true' || needs.changes.outputs.ci == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build x86_64 release APK for the emulator
+        working-directory: apps/rn
+        run: |
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease -PreactNativeArchitectures=x86_64
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install, launch, screenshot the real screens
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            set -e
+            apk=apps/rn/android/app/build/outputs/apk/release/app-release.apk
+            adb install -r "$apk"
+            adb shell pm grant dev.hajnina.scanlist.rn android.permission.CAMERA || true
+            adb logcat -c
+            adb shell am start -W -n dev.hajnina.scanlist.rn/.MainActivity | tee launch.txt
+            grep -q "Status: ok" launch.txt
+            sleep 15
+            pid=$(adb shell pidof dev.hajnina.scanlist.rn)
+            test -n "$pid" || { echo "::error::app process not running after launch"; exit 1; }
+            adb exec-out screencap -p > screen-1-lists.png
+            if adb logcat -d | grep -q "FATAL EXCEPTION"; then
+              echo "::error::app crashed on launch"; adb logcat -d | tail -150; exit 1; fi
+            tap_text() {
+              adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || return 1
+              adb pull /sdcard/window.xml . >/dev/null 2>&1 || return 1
+              python3 - "$1" <<'PY'
+            import re, subprocess, sys, xml.etree.ElementTree as ET
+            needle = sys.argv[1].lower()
+            root = ET.parse('window.xml').getroot()
+            for node in root.iter('node'):
+                label = ((node.get('text') or '') + ' ' + (node.get('content-desc') or '')).strip()
+                if needle in label.lower():
+                    x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds')))
+                    subprocess.run(['adb', 'shell', 'input', 'tap',
+                                    str((x1 + x2) // 2), str((y1 + y2) // 2)], check=True)
+                    print('tapped:', label)
+                    sys.exit(0)
+            sys.exit(1)
+            PY
+            }
+            tap_text "Settings" && { sleep 3; adb exec-out screencap -p > screen-2-settings.png; adb shell input keyevent 4; sleep 3; } || true
+            tap_text "Magic scan" && { sleep 4; adb exec-out screencap -p > screen-3-scan.png; adb shell input keyevent 4; sleep 2; } || true
+            if adb logcat -d | grep -q "FATAL EXCEPTION"; then
+              echo "::error::app crashed during navigation"; adb logcat -d | tail -150; exit 1; fi
+            echo "SMOKE PASS: pid=$pid"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rn-screens
+          path: |
+            screen-*.png
+            launch.txt
+          if-no-files-found: warn
+          retention-days: 7
 
   web:
     needs: changes

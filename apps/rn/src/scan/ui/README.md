@@ -97,10 +97,18 @@ cap:              1000 entries; expired/unreadable entries evicted first, then o
 request:          GET https://world.openfoodfacts.org/api/v2/product/<barcode>.json
                   ?fields=code,product_name,brands,generic_name,categories
                   User-Agent: ScanList/0.1, Accept: application/json
-behaviour:        10 s timeout, ≤ 3 transient attempts per scan session, 429 Retry-After,
+behaviour:        3 s connect / 10 s total timeout, ≤ 3 redirect hops (HTTPS only),
+                  per-barcode retry: Retry-After wins, 429 → 60 s, 5xx/timeout → 1/2/4 s
+                  (cap 60 s), ≤ 3 transient attempts per barcode per scan session, then
+                  cache-only with an honest note; success clears the state,
                   ≥ 100 ms between requests, single-flight per barcode,
                   stale-while-offline (a stale hit is better than no name)
 ```
+
+The retry/redirect semantics mirror the Kotlin track's `OffResolver`/`OffRedirect`
+(`apps/kotlin/.../scan/ui/OffLookup.kt`) rule for rule: per-key retry state so a failing barcode
+never delays another barcode's first attempt, and a pure `resolveOffRedirect` (3 hops, HTTPS only,
+relative targets resolved).
 
 `deriveProductText` follows OFF.md §3 exactly (status gate, `product_name` → `generic_name` →
 cleaned `brands`, NFC, whitespace collapse, 160-code-point truncation). `off.test.ts` replays every
@@ -113,7 +121,13 @@ recorded fixture in `shared/off/fixtures/`, so the app cannot drift from `check_
   springs; the style guide asks for expressive motion, not a specific library.
 - **No render test:** the camera/ML Kit/embedder glue (`ScanScreen`, `useScanSession`,
   `HeroCard`, `SourceChips`, `RankedRows`) is thin and untested, matching A4's precedent. The
-  logic that can go wrong is in `tick.ts` / `pool.ts` / `off.ts` and is covered by 62 tests.
+  logic that can go wrong is in `tick.ts` / `pool.ts` / `off.ts` and is covered by 74 tests.
+- **RN fetch limits on OFF.md §2:** RN's whatwg-fetch/XHR polyfill exposes no native connect
+  timeout and ignores `redirect: 'manual'` (XHR follows redirects itself). The 3 s connect budget
+  is an AbortController approximation; hop control runs whenever the runtime hands redirects back
+  (the tests' fake fetch, or a runtime that honours `'manual'`), and the HTTPS-only rule is always
+  enforced on the final `Response.url`, so a silent downgrade is refused. Documented at the top of
+  `off.ts`.
 - **Not mounted:** see "Mounting" above. The barrel is exported so the lead's wiring is two edits.
 
 ## Tests
@@ -121,7 +135,7 @@ recorded fixture in `shared/off/fixtures/`, so the app cannot drift from `check_
 ```sh
 cd apps/rn
 npm run typecheck                  # tsc --noEmit
-npm test                           # 21 suites / 225 tests
+npm test                           # 21 suites / 237 tests
 npx eslint .                       # 0 errors / 0 warnings
 npx react-native bundle --platform android --dev false \
   --entry-file index.js --bundle-output /tmp/a5-index.jsbundle
@@ -130,7 +144,8 @@ npx react-native bundle --platform android --dev false \
   --entry-file src/scan/ui/index.ts --bundle-output /tmp/a5-scan.jsbundle
 ```
 
-`__tests__/off.test.ts` (20) replays the OFF fixtures and the cache/client contract;
+`__tests__/off.test.ts` (32) replays the OFF fixtures, the cache/client contract, the per-barcode
+backoff/Retry-After ladder, the redirect policy and the in-flight/timeout rules;
 `__tests__/pool.test.ts` (18) pins the 16-query pool order, sticky barcode, OCR batches and the
 2000 ms / 4-frame image window; `__tests__/tick.test.ts` (24) covers barcode→OFF→query wiring,
 the item/query caches, all five tick reasons, the image accept-list guard, the text/image gate

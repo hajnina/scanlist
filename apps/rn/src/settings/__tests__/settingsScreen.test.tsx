@@ -185,6 +185,27 @@ describe('SettingsScreen', () => {
     );
   });
 
+  // A6-followup review: the `(choice, runToken)` guard lives on the controller, so leaving Settings
+  // and coming back (a real remount — new hook state) must not open the 484 MB model again.
+  test('a remount reuses the measured run instead of re-running the self-test', async () => {
+    const selfTest = jest.fn(fakeRunner().selfTest);
+    const ctl = controller({runner: {selfTest} as unknown as SelfTestRunner});
+
+    tree = await mount(ctl);
+    expect(selfTest).toHaveBeenCalledTimes(1);
+    expect(ctl.getSnapshot().phase).toBe('done');
+
+    await ReactTestRenderer.act(async () => {
+      tree?.unmount();
+    });
+    tree = undefined;
+
+    // Same controller as `App` keeps; a brand-new tree.
+    tree = await mount(ctl);
+    expect(selfTest).toHaveBeenCalledTimes(1);
+    expect(ctl.getSnapshot().phase).toBe('done');
+  });
+
   test('the haptics switch routes through the controller and persists', async () => {
     const ctl = controller();
     const mounted = await mount(ctl);

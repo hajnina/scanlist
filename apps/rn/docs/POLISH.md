@@ -1,14 +1,14 @@
 # POLISH — Track A (React Native) scan + settings
 
 Card A6 checklist, mirroring the Kotlin track's B7 pass. Each line says **what was actually
-verified**, not whether `App.tsx` already mounts the screen:
+verified**; where reachability in the running app matters, the line says which screen mounts it.
 
 Legend:
-- **✅ in code + test** — implemented and covered by a Jest test (a render test counts).
+- **✅ in code + test** — implemented, and reachable in the running app where the line says so.
 - **⏳ implemented + tested where noted, not reachable in the running app yet** — the component and
   its tests exist, but nothing mounts it yet. After the A6-followup wiring pass `App.tsx` mounts
-  `ListsScreen` and `SettingsScreen`; only the scan screen is still composed by a later pass. Do not
-  read ⏳ as "untested" or "not implemented".
+  `ListsScreen` **and** `SettingsScreen`; only the **scan screen** is still composed by a later
+  pass, so only scan-screen lines carry ⏳. Do not read ⏳ as "untested" or "not implemented".
 - **📱 device-gated** — needs a phone/emulator with a camera and the model bundle; see
   `apps/rn/BUILD.md` and the B0 provisioning note.
 - **♻️ existing from an earlier card (verified, not edited here)**.
@@ -53,19 +53,21 @@ npx eslint .           # clean
 
 ## Model missing
 
-- [x] ⏳ Settings' model card probes the file the pipeline actually opens and reports
+- [x] ✅ Settings' model card probes the file the pipeline actually opens and reports
   **`E_NO_MODEL` · no bundle at `<path>`** with the exact `scripts/model.sh push <package>` hint —
   never a fake size or a green check. `src/settings/modelStatus.ts` `modelStatusFromFacts` /
   `modelStatusLine` / `pushHint`; `__tests__/modelStatus.test.ts` (missing, directory, unreadable,
   empty, present) and `__tests__/settingsScreen.test.tsx` (renders `E_NO_MODEL` + push hint).
-  Settings is mounted by `App.tsx` (A6-followup).
-- [x] ⏳ A present-but-wrong bundle is called out: pinned size comparison
+  Reachable: `App.tsx` mounts `SettingsScreen` behind the lists header's **Settings** button
+  (`__tests__/App.test.tsx`).
+- [x] ✅ A present-but-wrong bundle is called out: pinned size comparison
   (`matches the pinned bundle size` vs `wrong or truncated bundle`), and the sha is labelled
-  **EXPECTED … · not recomputed here** rather than implying a live 484 MB hash. Same module/tests.
-- [x] ⏳ The self-test short-circuits with `E_NO_MODEL` and never opens the engine when the bundle is
+  **EXPECTED … · not recomputed here** rather than implying a live 484 MB hash. Same module/tests;
+  rendered by the mounted settings screen (`__tests__/App.test.tsx`).
+- [x] ✅ The self-test short-circuits with `E_NO_MODEL` and never opens the engine when the bundle is
   absent; a throwing model check is the same code, not an embedder crash.
-  `src/settings/latency.ts` + `__tests__/latency.test.ts`. Settings is mounted by `App.tsx`
-  (A6-followup).
+  `src/settings/latency.ts` + `__tests__/latency.test.ts`; the mounted screen shows the outcome
+  (`__tests__/App.test.tsx` mocks a bundle-less bridge and renders the card).
 - [x] ⏳ The scan screen derives `modelMissing` from the bridge (`embedStatus()` → `modelStatus.ts`
   facts → `modelStatusFromFacts`, via `useModelStatus` in `src/settings/useScanGuidance.ts`) and
   passes it into the guidance ladder, so a genuinely missing bundle renders the note (`No embedding
@@ -139,7 +141,7 @@ npx eslint .           # clean
   **‹ Lists** button does the same (single `onBack`, no double navigation).
   ♻️ `src/scan/ui/ScanScreen.tsx:120` (`BackHandler`) + header button; A5 behaviour, verified by
   code review here (no screen-level back test existed and A6 does not own `src/scan/ui`). The scan
-  screen is not mounted yet (see the known follow-up below).
+  screen is still not mounted, so this stays ⏳ (settings' own hardware back is ✅ below).
 - [x] ✅ Leaving the screen stops capture and deletes pending temp JPEGs (`camera.test.tsx` —
   *unmount releases every temp JPEG…*), so returning starts a clean session rather than stacking
   timers.
@@ -148,15 +150,22 @@ npx eslint .           # clean
 - [x] ✅ `SettingsScreen` has the same back contract (`onBack`) and its render test unmounts the
   tree and clears timers, so no `Animated` spring or probe is left running. The scan screen's quiet
   interval is likewise cleared on unmount (`polish.test.ts`).
-- [x] ⏳ **A6-followup (done):** `App.tsx` now owns a `lists | settings` screen flag and mounts
-  `SettingsScreen` (entry point: a text **Settings** button in the `ListsScreen` header — the one
-  disclosed touch outside `src/settings`), and applies the persisted backend choice + haptics switch
-  at start-up (`src/settings/startup.ts`, called from `App.tsx`). The scan screen is still composed
-  by the same later wiring pass, so its lines above stay ⏳.
+- [x] ✅ **Android hardware back from Settings returns to the lists screen** — `SettingsScreen`
+  registers `hardwareBackPress` and removes it on unmount, exactly like `ListDetailScreen` /
+  `ScanScreen` (A6-followup review: without it, system back exited the app). `__tests__/App.test.tsx`
+  spies `BackHandler.addEventListener`, fires the handler and asserts the lists screen, then asserts
+  the subscription is removed.
+- [x] ✅ **A6-followup (done):** `App.tsx` owns a `lists | settings` screen flag and mounts
+  `SettingsScreen` behind a text **Settings** button in the `ListsScreen` header (the one disclosed
+  touch outside `src/settings`), and applies the persisted backend choice + haptics switch at
+  start-up (`src/settings/startup.ts`, called from `App.tsx`). The controller's `(choice, runToken)`
+  guard now lives in `SettingsController.runIfNeeded`, so a remount reuses the measurement instead
+  of re-opening the model (`__tests__/settingsScreen.test.tsx`, `__tests__/state.test.ts`). The scan
+  screen is still composed by a later wiring pass, so its lines above stay ⏳.
 
 ## Haptics on / off
 
-- [x] ⏳ The **Haptics** switch persists through the same `SettingsStore` as the backend choice and
+- [x] ✅ The **Haptics** switch persists through the same `SettingsStore` as the backend choice and
   is applied at app start-up (`setHapticsEnabled` from `src/settings/startup.ts`, called by
   `App.tsx`), so the very first tap of a session already respects the saved value — before Settings
   is opened (`__tests__/state.test.ts`, `__tests__/store.test.ts`, `__tests__/startup.test.ts`,

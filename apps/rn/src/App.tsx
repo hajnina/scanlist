@@ -8,7 +8,9 @@
  * `ListsScreen` (a local screen flag, no navigation dependency): `App` owns `screen`, `ListsScreen`
  * gets one optional `onOpenSettings`, and `SettingsScreen` gets one `onBack`. The controller is
  * created here (`useMemo`) so leaving Settings and coming back shows the measurement it already
- * took instead of re-running a self-test that opens the 484 MB model.
+ * took instead of re-running a self-test that opens the 484 MB model — the `(choice, runToken)`
+ * guard lives in `SettingsController.runIfNeeded`, not in the unmounted screen's hook state
+ * (A6-followup review fix).
  *
  * Start-up: the persisted backend choice + haptics switch are applied once, fire-and-forget, so a
  * restart honours them before the first scan or tap (`src/settings/startup.ts`). It is deliberately

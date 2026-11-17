@@ -17,8 +17,8 @@
  *
  * or omit `controller` and the screen builds the device one itself (tests / a standalone embed).
  */
-import React, {useMemo} from 'react';
-import {ScrollView, StyleSheet, View} from 'react-native';
+import React, {useEffect, useMemo} from 'react';
+import {BackHandler, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
@@ -84,6 +84,20 @@ export function SettingsScreen({onBack, controller}: SettingsScreenProps) {
   const ctl = controller ?? fallback!;
   const {snapshot, select, rerun, setHaptics, activeBackend} = useSettings(ctl);
   const theme = useTheme<ScanListTheme>();
+
+  // Android hardware back returns to the lists screen, exactly as ListDetailScreen/ScanScreen do
+  // (A6-followup review): without this registration, back exits the app from Settings while the
+  // on-screen '‹ Back' button is the only way out. Only when a caller supplied `onBack`.
+  useEffect(() => {
+    if (onBack === undefined) {
+      return undefined;
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onBack]);
 
   const model = snapshot.model;
   const ready = model !== null && model.kind === 'present';

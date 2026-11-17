@@ -4,6 +4,7 @@
 
 import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {BackHandler} from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../src/App';
 import {SETTINGS_KEY, serializeStoredSettings} from '../src/settings';
@@ -179,4 +180,44 @@ test('lifts the lists screen into settings and back, showing the applied choice'
   const back = JSON.stringify(tree.toJSON());
   expect(back).toContain('Shopping list');
   expect(back).not.toContain('Backends, model, scanner.');
+});
+
+// Card A6-followup review: the on-screen Back button was the only way out of Settings — Android's
+// system back exited the app. Same BackHandler contract as ListDetailScreen/ScanScreen.
+test('Android hardware back from Settings returns to the lists screen', async () => {
+  const remove = jest.fn();
+  const handlers: Array<() => boolean | null | undefined> = [];
+  const add = jest.spyOn(BackHandler, 'addEventListener');
+  add.mockImplementation(((
+    event: string,
+    handler: () => boolean | null | undefined,
+  ) => {
+    if (event === 'hardwareBackPress') {
+      handlers.push(handler);
+    }
+    return {remove};
+  }) as unknown as typeof BackHandler.addEventListener);
+
+  tree = await mount();
+  await press(tree, 'Settings');
+  expect(add).toHaveBeenCalledWith('hardwareBackPress', expect.any(Function));
+  expect(handlers.length).toBeGreaterThan(0);
+
+  let handled: boolean | null | undefined;
+  await ReactTestRenderer.act(async () => {
+    handled = handlers[handlers.length - 1]();
+  });
+  // Consumed by Settings, not by the system (which would exit the app).
+  expect(handled).toBe(true);
+
+  const back = JSON.stringify(tree.toJSON());
+  expect(back).toContain('Shopping list');
+  expect(back).not.toContain('Backends, model, scanner.');
+
+  await ReactTestRenderer.act(async () => {
+    tree?.unmount();
+  });
+  tree = undefined;
+  expect(remove).toHaveBeenCalled();
+  add.mockRestore();
 });

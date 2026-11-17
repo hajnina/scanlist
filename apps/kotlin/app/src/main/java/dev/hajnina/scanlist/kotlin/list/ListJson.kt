@@ -227,8 +227,11 @@ object ListJson {
                         val text = amountValue.content.trim()
                         if (text.isEmpty()) null else Amount.Text(text)
                     }
-                    else -> amountValue.content.toDoubleOrNull()?.let { Amount.Num(it) } ?: run {
-                        fail("$pointer/amount", "expected a number or a string")
+                    else -> amountValue.content.toDoubleOrNull()?.takeIf { it.isFinite() }?.let { Amount.Num(it) } ?: run {
+                        // Non-finite guard: "1e999" parses as Double.POSITIVE_INFINITY, which the
+                        // encoder rejects later with an unhandled JsonEncodingException — the error
+                        // must surface here instead, as a pointered import error (LIST.md §5).
+                        fail("$pointer/amount", "expected a finite number or a string")
                         null
                     }
                 }

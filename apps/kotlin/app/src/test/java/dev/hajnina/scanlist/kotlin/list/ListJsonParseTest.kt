@@ -108,6 +108,19 @@ class ListJsonParseTest {
     }
 
     @Test
+    fun `numeric-only string amounts stay text, never coerced`() {
+        // Regression for the coercion mutation no sample covered (B2 review): every sample amount
+        // string has a non-digit char, so coercing "3" to Num(3.0) survived the suite. LIST.md §3:
+        // the union is by JSON TYPE, not value — a quoted 3 is text forever.
+        val numeric = readJson("""{"title":"T","sections":[{"name":"S","items":[
+            {"name":"Milk","amount":"3"},{"name":"Eggs","amount":" 12 "},{"name":"Jam","amount":"1e3"}
+        ]}]}""")
+        assertEquals(Amount.Text("3"), numeric.sections[0].items[0].amount)
+        assertEquals(Amount.Text("12"), numeric.sections[0].items[1].amount)
+        assertEquals(Amount.Text("1e3"), numeric.sections[0].items[2].amount)
+    }
+
+    @Test
     fun `empty amount string and blank unit are treated as absent`() {
         val list = readJson("""{"title":"T","sections":[{"name":"S","items":[
             {"name":"Milk","amount":"   ","unit":"  "},
@@ -139,7 +152,11 @@ class ListJsonParseTest {
             """{"title":"T","sections":[{"name":"S","items":[{"name":"M","done":"yes"}]}]}""" to
                 "/sections/0/items/0/done: expected a boolean",
             """{"title":"T","sections":[{"name":"S","items":[{"name":"M","amount":true}]}]}""" to
-                "/sections/0/items/0/amount: expected a number or a string",
+                "/sections/0/items/0/amount: expected a finite number or a string",
+            // 1e999 parses as +Infinity; the validator must reject it (the encoder would throw an
+            // unhandled JsonEncodingException at export — B2 review crash path).
+            """{"title":"T","sections":[{"name":"S","items":[{"name":"M","amount":1e999}]}]}""" to
+                "/sections/0/items/0/amount: expected a finite number or a string",
             """{"title":"T","sections":[{"name":"S","items":{}}]}""" to
                 "/sections/0/items: expected an array of items",
         )

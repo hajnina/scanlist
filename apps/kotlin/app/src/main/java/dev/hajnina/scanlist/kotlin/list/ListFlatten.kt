@@ -118,8 +118,9 @@ private const val HEX = "0123456789abcdef"
 
 /**
  * FLATTEN.md §5: trim, drop empties, dedupe case-insensitively after NFC normalisation, keeping the
- * first occurrence's spelling and order. Kotlin has no `str.casefold()`, so this uses
- * `lowercase(Locale.ROOT)` (the same approximation RANK.md §3.1 requires all tracks to share).
+ * first occurrence's spelling and order. RANK.md §3.1 specifies Python `str.casefold()`; Kotlin has
+ * no casefold, so this approximates with `lowercase(Locale.ROOT)` — B3's goldens will arbitrate
+ * whether the approximation holds (full case folding differs for ß, ﬁ, etc.).
  */
 fun normaliseAliases(aliases: List<String>): List<String> {
     val seen = HashSet<String>()

@@ -6,7 +6,7 @@ track that combines an on-device image-embedding path with a 142 MB artifact, a 
 to ship but its image scan costs **6.4–11.9 s per frame** on a server. **Provisional:** no phone has run
 the native image path (B0).
 
-*Snapshot: `origin/main` `28e7c7f`, 2026-11-17. A6 (RN polish) and B7 (Kotlin polish) were still open;
+*Snapshot: `origin/main` `7645a91`, 2026-11-17. A6 (RN polish) and B7 (Kotlin polish) were still open;
 the web C2-follow-up merged after the X1 benchmark and its deltas are folded in below.*
 
 ## Pick-a-track summary
@@ -15,7 +15,7 @@ the web C2-follow-up merged after the X1 benchmark and its deltas are folded in 
 |---|---|---|---|
 | Interactive image scan, offline | plausible, **unmeasured** | plausible, **unmeasured** (same engine) | **no** — server round-trip, 6.4–11.9 s/frame |
 | Barcode / OCR scan | yes | yes | yes |
-| Solo-dev loop | **0.8 s warm build / 93 s CI** | 19 min CI-only APK | **2.4 s build / 23 s CI** |
+| Solo-dev loop | **0.8 s warm build / 93 s CI** | 19 min CI-only APK | **2.4 s build (X1) / 42 s CI** |
 | Artifact | 142 MB APK + 462 MiB model | 291 MB APK + 462 MiB model | **211 kB** main JS + 1.93 GB server |
 | Own code | 5,448 lines‡ | 6,486 lines‡ | 5,391 lines‡ |
 | Tests on main | 296 | 237 | 291 (+150 shared ts-core, +130 server) |
@@ -41,11 +41,11 @@ Sources: `kotlin.json` / `rn.json` / `web.json` (`implementation`); `docs/ARCHIT
 | Measurement | Kotlin | React Native | Web |
 |---|---|---|---|
 | Rank 200 items, p50 / p95 | **0.66 / 0.80 ms** (JVM*) | 1.38 / 1.47 ms (node*) | 1.38 / 1.47 ms (node*) |
-| Cold start → list visible | n/a — no phone (B0) | n/a — no phone (B0) | **176 / 184 ms** (Chrome, n=7, localhost) |
+| Cold start → list visible | n/a — no phone (B0) | n/a — no phone (B0) | **176 / 184 ms**† (Chrome, n=7, localhost) |
 | Text embed | n/a — on-device LiteRT, no phone | n/a — same | **295 ms** miss / **0.04 ms** hit |
 | Image embed | n/a — on-device LiteRT, no phone | n/a — same | **7.2 s** median (6.4–11.9 s range) |
-| Build, warm / cold | 0.8 / 6.9 s | 1.3 / 9.1 s bundle (APK is CI-only) | 2.4 s |
-| CI job | **93 s** | **1,142 s** (19 min) | **23 s** |
+| Build, warm / cold | 0.8 / 6.9 s | 1.3 / 9.1 s bundle (APK is CI-only) | 2.4 s† |
+| CI job | **93 s** | **1,142 s** (19 min) | **42 s**† |
 
 \* JVM/node lower bounds, not ART/Hermes. The JVM ranker is faster than ts-core in node here; the phone
 numbers are unmeasured. The Kotlin snapshot predates B3-sync (stale `decideTop`), so its hero differs on
@@ -53,6 +53,10 @@ this fixture; `decideTop` is timed separately (<1 µs) and does not affect rank 
 All three are far inside the 400 ms tick budget — **ranking was never the bottleneck; embedding is.**
 Sources: `rank-kotlin.json`, `rank-ts-core.json`, `coldstart-web.json`, `buildtimes.json`; oracle reference
 1.59 ms p50 (`rank-oracle.json`).
+
+† Build and cold start are X1 branch-point (`e8b795c`) measurements, the only same-day controlled set;
+the web bundle/tests and CI are refreshed to the C2 follow-up (web CI 42 s, `lead-log.md`). Post-scan cold
+start/build were not re-measured.
 
 ## The headline: image embedding is the divergence
 
@@ -160,7 +164,7 @@ its X1-snapshot code is tests), RN on review rounds (2 merged RC + 1 open), web 
 
 ## Maintainability
 
-- **Build loop:** Kotlin 0.8 s warm / 6.9 s cold locally; web 2.4 s; RN 1.3 s for the bundle but the APK
+- **Build loop:** Kotlin 0.8 s warm / 6.9 s cold locally; web 2.4 s (X1); RN 1.3 s for the bundle but the APK
   is CI-only (NDK/CMake prebuilts are x86_64-only) at 19 min per run. Kotlin's local build needs the
   hand-built aarch64 setup in `scripts/android-env.sh` (aapt2 override); CI uses stock Maven aapt2. For a
   solo dev, RN's loop is the worst.
@@ -185,8 +189,8 @@ Kotlin wins for this project. The deciding requirement is offline phone-camera s
 only track that pairs the on-device engine with a 142 MB artifact, a local 0.8 s build, a 93 s CI job and
 a native M3 UI. RN wraps the same engine and pays 2× the APK, a 19-minute CI-only build and the most
 review traffic (2 merged RC verdicts, a third open at writing) for no measured advantage. Web is the best
-shipping experience — 211 kB, 176 ms cold start, 23 s CI — and the worst scan experience: 6.4–11.9 s per
-image, server required.
+shipping experience — 211 kB, 176 ms cold start (X1), 42 s CI — and the worst scan experience: 6.4–11.9 s
+per image, server required.
 
 **Strongest counter-argument — and it is not RN, it is web.** Kotlin's core advantage is unmeasured. No
 phone has run the native image path, and `docs/ARCHITECTURE.md` calls on-device image embedding

@@ -239,15 +239,21 @@ jobs:
           pattern: scanlist-*
           merge-multiple: true
           path: rel
-      - name: Overwrite rolling release (tag main)
+      - name: Overwrite rolling release (tag rolling)
+        # The rolling release tag must never be named after a branch: a tag refs/tags/main
+        # shadow-aliases refs/heads/main repo-wide ("refname 'main' is ambiguous") and broke
+        # every ancestry/merge check. The rolling tag is now `rolling`; the leftover `main`
+        # tag/release is deleted here (no-op once gone) so it cannot spring back.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -la rel
           git push origin :refs/tags/main || true
           gh release delete main --yes --cleanup-tag || true
+          git push origin :refs/tags/rolling || true
+          gh release delete rolling --yes --cleanup-tag || true
           {
-            echo "Rolling \`main\` build - replaces the previous \`main\` release."
+            echo "Rolling build from \`main\` - replaces the previous \`rolling\` release."
             echo
             echo "- Commit: ${GITHUB_SHA::7}"
             echo "- Built: $(date -u '+%Y-%m-%d %H:%M UTC')"
@@ -256,4 +262,4 @@ jobs:
             echo "Recent main history:"
             git log --oneline -5 | sed 's/^/- /'
           } > notes.md
-          gh release create main rel/* --title "ScanList (main)" --notes-file notes.md --latest
+          gh release create rolling rel/* --title "ScanList (rolling)" --notes-file notes.md --latest

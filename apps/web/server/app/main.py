@@ -9,14 +9,21 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException, Request
+import anyio
+from fastapi import Body, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import httpx
 from pydantic import BaseModel, Field
 
-from .embedder import DEFAULT_DIMS, Embedder, build_embedder
+from .embedder import DEFAULT_DIMS, Embedder
 from .off import OffClient, OffUpstreamError, is_valid_barcode
+
+# Card C3 owns apps/web/server/embedder_gemma.py (top-level module next to the
+# `app` package, not inside it), so it is imported absolutely: apps/web/server is
+# on sys.path for uvicorn (cwd), pytest (pythonpath in pyproject.toml) and the
+# Docker image (WORKDIR /app).
+from embedder_gemma import NoModelError, build_configured_embedder  # noqa: E402
 
 VERSION = "0.1.0"
 SERVICE_NAME = "scanlist-web-server"
@@ -57,7 +64,7 @@ def create_app(
     off_client: OffClient | None = None,
     frontend_dist: Path | None = None,
 ) -> FastAPI:
-    embedder = embedder or build_embedder(
+    embedder = embedder or build_configured_embedder(
         backend=os.environ.get("SCANLIST_EMBEDDER", "fake"),
         dims=int(os.environ.get("SCANLIST_DIMS", DEFAULT_DIMS)),
     )
@@ -78,6 +85,30 @@ def create_app(
     app.state.embedder = embedder
     app.state.off_client = off_client
 
+    async def _embed(method: str, payload):
+        """Run embedder work off the event loop.
+
+        C1's TODO(C3): a sync CPU embed call (100-400 ms, ~1 s for an image) inside
+        an ``async def`` stalls every other request at the 400 ms scan cadence.
+        ``GemmaEmbedder`` exposes ``aembed_*`` (anyio worker thread); the fake
+        embedder does not, so it is offloaded the same way here.
+        """
+        async_method = getattr(embedder, f"a{method}", None)
+        if async_method is not None:
+            return await async_method(payload)
+        return await anyio.to_thread.run_sync(getattr(embedder, method), payload)
+
+    def _tag_latency(response: Response) -> None:
+        """Per-call milliseconds for the C-track comparison card (X1)."""
+        elapsed = getattr(embedder, "last_latency_ms", None)
+        if elapsed is not None:
+            response.headers["x-embed-ms"] = f"{elapsed:.1f}"
+
+    @app.exception_handler(NoModelError)
+    async def _no_model_handler(_request: Request, exc: NoModelError) -> JSONResponse:
+        """Documented missing-weights answer (card C3): 503 + E_NO_MODEL."""
+        return JSONResponse(status_code=503, content={"error": exc.to_dict()})
+
     @app.get("/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
         """Feature detection for clients (browser spike C7 checks `modalities`)."""
@@ -92,13 +123,16 @@ def create_app(
         )
 
     @app.post("/embed/text", response_model=EmbedResponse)
-    async def embed_text(request: TextEmbedRequest) -> EmbedResponse:
+    async def embed_text(request: TextEmbedRequest, response: Response) -> EmbedResponse:
         # TODO(C3): real embedder calls must run via anyio.to_thread (sync CPU work
         # inside `async def` stalls the event loop), and each text needs a length cap.
+        # C3: done - `_embed` awaits the async wrappers (anyio worker thread) and
+        # GemmaEmbedder caps each text at max_chars before the tokeniser sees it.
         if request.kind == "query":
-            vectors = embedder.embed_queries(request.texts)
+            vectors = await _embed("embed_queries", request.texts)
         else:
-            vectors = embedder.embed_docs(request.texts)
+            vectors = await _embed("embed_docs", request.texts)
+        _tag_latency(response)
         return EmbedResponse(
             embeddings=vectors, dims=embedder.dims, backend=embedder.backend, model=embedder.name
         )
@@ -106,6 +140,7 @@ def create_app(
     @app.post("/embed/image", response_model=EmbedResponse)
     async def embed_image(
         request: Request,
+        response: Response,
         payload: bytes | None = Body(None, media_type="image/jpeg"),
     ) -> EmbedResponse:
         """Embed one image (raw JPEG body, as the phone camera produces it)."""
@@ -131,7 +166,8 @@ def create_app(
                 status_code=400,
                 detail="body is not a JPEG (missing FFD8FF magic); send raw JPEG bytes",
             )
-        vectors = embedder.embed_images([payload])
+        vectors = await _embed("embed_images", [payload])
+        _tag_latency(response)
         return EmbedResponse(
             embeddings=vectors, dims=embedder.dims, backend=embedder.backend, model=embedder.name
         )

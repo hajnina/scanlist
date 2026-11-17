@@ -33,10 +33,11 @@ cache (Android clears it; the scan screen is only open while scanning).
 ## API (what card A5 uses)
 
 ```tsx
-import {createFrameFeed} from './sources';
-import {createScanSources, createScanPipeline} from './sources';
-import {createMlKitReaders} from './sources/native';
-import {ScanCamera} from './sources/camera';
+// from src/scan/ui or any app code: the package root is src/scan/sources.
+import {createFrameFeed} from '../sources';
+import {createScanSources, createScanPipeline} from '../sources';
+import {createMlKitReaders} from '../sources/native';
+import {ScanCamera} from '../sources/camera';
 
 // once per scan screen
 const feed = useMemo(() => createFrameFeed(), []);                    // the screen owns the feed
@@ -104,13 +105,12 @@ running (`npm start`).
    `adb logcat` must not show a capture every frame. Expected: ~2.5 captures/s.
 4. **Barcode** — point at a product EAN: the barcode chip lights once with the digits and stays
    quiet for 4 s while the code stays in frame; move to another product → new digits immediately.
-   `adb shell` a QR code → the same chip lights with the URL text.
 5. **OCR** — point at a label with readable words: the OCR chip lights with the visible words
    (max ~1.25/s because of the 800 ms OCR gate). A blank wall emits nothing.
 6. **Image** — the image chip lights on every sampled frame; log the base64 length in `onImage`
    (expected ~100–200 KB for a 720p JPEG at quality 0.7).
 7. **Lifecycle** — leave the scan screen: captures stop (`feed.listenerCount() === 0`, no more
-   temp JPEGs in `adb shell ls $TMPDIR`), return: they resume.
+   temp JPEGs stop appearing in `adb shell ls $TMPDIR`), return: they resume.
 8. **Failure isolation** — airplane mode / an embedder that throws: the image chip reports the
    error through `onError` while barcode and OCR keep working.
 

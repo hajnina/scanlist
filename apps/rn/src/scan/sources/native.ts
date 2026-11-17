@@ -53,18 +53,16 @@ export function createMlKitReaders({
   return {
     async readBarcodes(frame: CameraFrame): Promise<BarcodeReadResult> {
       const result: BarcodeScanningResult =
-        await processImageBarcodeScanning(frame.filePath, {
-          formats: [...formats],
-          orientation: 'portrait',
-        });
+        // No orientation override (A4 review): the plugin falls back to the EXIF rotation
+        // VisionCamera writes (setTargetRotation), then PORTRAIT — a hardcoded 'portrait'
+        // overrode EXIF and would 90°-rotate frames to ML Kit.
+        await processImageBarcodeScanning(frame.filePath, {formats: [...formats]});
       return {barcodes: result.barcodes};
     },
     async readText(frame: CameraFrame): Promise<OcrResultLike> {
       const result: TextRecognitionResult =
-        await processImageTextRecognition(frame.filePath, {
-          language,
-          orientation: 'portrait',
-        });
+        // No orientation override — see the barcode path comment above.
+        await processImageTextRecognition(frame.filePath, {language});
       return result;
     },
   };

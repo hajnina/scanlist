@@ -105,7 +105,7 @@ npm run dev            # vite
 # or headless (what produced §6):
 #   chrome --headless=new --enable-unsafe-webgpu --use-angle=vulkan --enable-features=Vulkan \
 #          --remote-debugging-port=9222 --user-data-dir=/tmp/… http://localhost:5173/src/embed-spike/index.html
-#   then CDP Runtime.evaluate: await window.__c7.run({ device: "webgpu", dtype: "q4" })
+#   then CDP Runtime.evaluate: await window.__c7.run({ device: "webgpu", dtype: "fp16", textOnly: true })
 ```
 
 `?autorun=1&device=webgpu&dtype=fp16&textOnly=1&maxImages=0` runs without a driver and is the exact

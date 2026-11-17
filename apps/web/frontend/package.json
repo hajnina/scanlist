@@ -1,0 +1,27 @@
+{
+  "name": "@scanlist/web-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ScanList web frontend (Track C): import, nested list, tick, localStorage, export, installable PWA. Uses @scanlist/ts-core directly.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@material/web": "^2.5.0",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "happy-dom": "^21.0.4",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

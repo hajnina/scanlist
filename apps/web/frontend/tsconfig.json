@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "baseUrl": ".",
+    /*
+     * The shared TS core is imported straight from source, with no build step and no
+     * npm workspace: `@scanlist/ts-core` -> shared/ts-core/src/index.ts. vite.config.ts
+     * declares the same mapping for the bundler/vitest. See README.md ("ts-core import").
+     */
+    "paths": {
+      "@scanlist/ts-core": ["../../../shared/ts-core/src/index.ts"]
+    },
+    "types": []
+  },
+  "include": ["src", "tests", "vite.config.ts"]
+}

@@ -65,7 +65,7 @@ _WHITESPACE_RUN = re.compile(
     "[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+"
 )
 
-BARCODE_RE = re.compile(r"^\d{8,14}$")
+BARCODE_RE = re.compile(r"^[0-9]{8,14}$")  # [0-9], not \d — OFF.md §2 forbids fullwidth/Arabic-Indic digits (C8 review nit)
 
 # OFF.md §3.1/§3.2: the only fields allowed to produce query text.
 DERIVATION_FIELDS = ("product_name", "generic_name", "brands")

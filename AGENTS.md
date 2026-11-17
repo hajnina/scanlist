@@ -21,6 +21,7 @@ what the phone camera sees. Built 3 times (React Native / Kotlin / Web+server) t
 - Large downloads: run in background with a log, resumable (`~/housekeeper/scripts/resumable-download.sh URL DEST SIZE SHA256`),
   verify size/sha before use.
 - Never `pkill -f`/`pgrep -f` with a pattern; stop processes by PID.
+- NEVER use fetch/push refspecs like `main:main` (e.g. `git fetch origin main:main`, `git pull origin main:main`, `git push origin HEAD:main` from a detached worktree) — git DWIM resolves the bare `main` destination to `refs/tags/main` and silently (re)creates a tag named `main`, which shadow-aliases the branch repo-wide ("refname 'main' is ambiguous" breaks every ancestry check). Use plain `git fetch origin main` / `git pull --no-rebase`; if you ever see `warning: refname 'main' is ambiguous`, STOP and report — do not delete the tag yourself.
 - Native NDK/CMake builds do not run on this aarch64 laptop (installed NDKs ship x86_64-only prebuilts) — verify
   native-dependent work through the CI PR build (x86_64 ubuntu runners), not locally.
 - Don't install system packages with sudo; use venvs / project-local npm.

@@ -47,7 +47,9 @@ set -euo pipefail
 MODEL_NAME=embeddinggemma-2-740m.litertlm
 MODEL_SIZE=484622336
 MODEL_SHA256=e7a8a2204b91e0f96e92960e84a09a89212e1633dcb7575a9bf3378b4df77f4c
-MODEL_URL="https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/main/${MODEL_NAME}"
+# MODELDL fix 1: pin the immutable revision, not `main` (a future upload would break the sha check).
+MODEL_REVISION=66011bd4f00a8b36a1d3c4ae7bf908b4891b4881
+MODEL_URL="https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/${MODEL_REVISION}/${MODEL_NAME}"
 MODEL_SUBDIR=models   # on-device: <files>/models/<file>  (same layout MnemoThera uses)
 
 MODELS_DIR=${SCANLIST_MODELS_DIR:-$HOME/models/scanlist}

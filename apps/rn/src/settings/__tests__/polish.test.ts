@@ -310,7 +310,9 @@ describe('useScanGuidance (card A6 review fixes: the quiet clock)', () => {
     });
   });
 
-  test('a failed download explains itself in the missing-model note', () => {
+  test('a failed download explains itself and keeps the adb-push remedy', () => {
+    // MODELDL fix 5: the failed path used to drop `scripts/model.sh push`, leaving a phone whose
+    // in-app download cannot run with no documented way forward at all.
     const guidance = scanGuidance({
       hasPermission: true,
       modelMissing: true,
@@ -318,6 +320,19 @@ describe('useScanGuidance (card A6 review fixes: the quiet clock)', () => {
     });
 
     expect(guidance?.detail).toContain('Download failed: HTTP 404');
+    expect(guidance?.detail).toContain('scripts/model.sh push');
+  });
+
+  test('download copy does not claim Wi-Fi (the download auto-starts unasked)', () => {
+    // MODELDL fix 3: there is no ConnectivityManager gate, so "over Wi-Fi" was a false promise.
+    const guidance = scanGuidance({
+      hasPermission: true,
+      modelMissing: true,
+      modelDownload: {state: 'downloading', pct: 5},
+    });
+
+    expect(guidance?.detail).not.toContain('Wi-Fi');
+    expect(guidance?.detail).toContain('resumes where it left off');
   });
 
   test('a missing bundle renders the model note (and wins over quiet time)', async () => {

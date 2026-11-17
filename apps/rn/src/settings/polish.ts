@@ -127,13 +127,17 @@ export function scanGuidance({
       detail:
         modelDownload.state === 'verifying'
           ? 'Verifying the 484 MB bundle, then ranking turns on.'
-          : 'One-time download over Wi-Fi; anything interrupted resumes where it stopped.',
+          : // MODELDL fix 3: the download auto-starts on module init, before any network check, so
+            // the copy must not claim Wi-Fi. It is honest about the data and the resume instead.
+            'One-time 484 MB over the network; if it stops, it resumes where it left off.',
     };
   }
   if (modelMissing) {
+    // MODELDL fix 5: a failed in-app download still has the documented fallback — the adb push.
+    // Dropping it left a phone with both remedies gone.
     const failure =
       modelDownload?.state === 'failed' && modelDownload.error
-        ? `Download failed: ${modelDownload.error}`
+        ? `Download failed: ${modelDownload.error} Or push it with scripts/model.sh push <package>.`
         : 'Push it with scripts/model.sh push <package>.';
     return {
       kind: 'model',

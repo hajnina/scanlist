@@ -71,6 +71,8 @@ class ModelDownloadTest {
         transport: DownloadTransport,
         bytes: Long = payload.size.toLong(),
         expectedSha: String = sha,
+        usable: () -> Long = { Long.MAX_VALUE },
+        launch: (() -> Unit) -> Unit = { it() },
     ) = ModelDownload(
         target = File(dir, "model.litertlm"),
         url = "https://example.invalid/model",
@@ -78,6 +80,8 @@ class ModelDownloadTest {
         expectedSha256 = expectedSha,
         transport = transport,
         sleep = {},
+        usableBytes = usable,
+        launch = launch,
     )
 
     @Test
@@ -241,5 +245,110 @@ class ModelDownloadTest {
         model.run()
         assertEquals(DownloadState.READY, model.status.state)
         assertArrayEquals(payload, File(dir, "model.litertlm").readBytes())
+    }
+
+    // ---------------------------------------------------------------- MODELDL review fixes
+
+    /** MODELDL fix 1 (mutation c): an unpinned `/resolve/main/` URL must not come back. */
+    @Test
+    fun `model URL is pinned to the immutable revision that holds the pinned sha`() {
+        val url = ModelDownload.MODEL_URL
+        assertEquals(
+            "https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/" +
+                "66011bd4f00a8b36a1d3c4ae7bf908b4891b4881/embeddinggemma-2-740m.litertlm",
+            url,
+        )
+        assertFalse("a moving branch would break the sha pin", url.contains("/resolve/main/"))
+        // The pin is only meaningful together: revision + size + sha belong to the same upload.
+        assertEquals("66011bd4f00a8b36a1d3c4ae7bf908b4891b4881", ModelDownload.MODEL_REVISION)
+        assertEquals(484_622_336L, ModelDownload.MODEL_BYTES)
+        assertEquals(
+            "e7a8a2204b91e0f96e92960e84a09a89212e1633dcb7575a9bf3378b4df77f4c",
+            ModelDownload.MODEL_SHA256,
+        )
+    }
+
+    /** MODELDL fix 2 (mutation a): a full phone is terminal at start(), not an endless retry loop. */
+    @Test
+    fun `no free space fails terminally at start and never opens the transport`() {
+        val dir = dir()
+        val transport = FakeTransport(payload, FakeTransport.Mode.RANGE)
+        val need = payload.size + ModelDownload.FREE_SPACE_MARGIN_BYTES
+        var launches = 0
+        val model = downloader(
+            dir,
+            transport,
+            usable = { need - 1 },
+            launch = { launches += 1 },
+        )
+        assertFalse(model.start())
+        assertEquals(DownloadState.FAILED, model.status.state)
+        assertTrue(model.status.error!!.contains("not enough free space"))
+        assertEquals(0, launches) // no worker thread for a state only the user can fix
+        assertTrue(transport.offsets.isEmpty())
+        assertFalse(File(dir, "model.litertlm").exists())
+    }
+
+    /** MODELDL fix 2, resume path: space is re-checked on every attempt (the volume can fill). */
+    @Test
+    fun `resume attempt re-checks free space and fails terminally when the volume filled`() {
+        val dir = dir()
+        File(dir, "model.litertlm.part").writeBytes(payload.copyOfRange(0, 4_000))
+        val transport = FakeTransport(payload, FakeTransport.Mode.RANGE)
+        val missing = payload.size - 4_000L
+        val model = downloader(
+            dir,
+            transport,
+            usable = { missing + ModelDownload.FREE_SPACE_MARGIN_BYTES - 1 },
+        )
+        model.run()
+        assertEquals(DownloadState.FAILED, model.status.state)
+        assertTrue(model.status.error!!.contains("not enough free space"))
+        assertTrue(transport.offsets.isEmpty())
+    }
+
+    /** MODELDL fix 4 (mutation b): the first status() after mount must already say downloading. */
+    @Test
+    fun `start publishes downloading synchronously before the worker runs`() {
+        val dir = dir()
+        val transport = FakeTransport(payload, FakeTransport.Mode.RANGE)
+        var body: (() -> Unit)? = null
+        val model = downloader(dir, transport, launch = { body = it })
+        assertTrue(model.start())
+        // The worker has NOT run yet: only start()'s own publish can have produced this state.
+        assertEquals(DownloadState.DOWNLOADING, model.status.state)
+        assertEquals(0, model.status.bytes)
+        assertEquals(payload.size.toLong(), model.status.total)
+        assertNotNull(body)
+        body!!.invoke()
+        assertEquals(DownloadState.READY, model.status.state)
+        assertArrayEquals(payload, File(dir, "model.litertlm").readBytes())
+    }
+
+    /** MODELDL fix 6: two start() calls ⇒ one download; the second joins, it does not duplicate. */
+    @Test
+    fun `two start calls run exactly one download`() {
+        val dir = dir()
+        val transport = FakeTransport(payload, FakeTransport.Mode.RANGE)
+        var launches = 0
+        var body: (() -> Unit)? = null
+        val model = downloader(
+            dir,
+            transport,
+            launch = {
+                launches += 1
+                body = it
+            },
+        )
+        assertTrue(model.start())
+        assertFalse("second start must join the running download", model.start())
+        assertFalse("third start is still a no-op", model.start())
+        assertEquals(1, launches)
+        body!!.invoke()
+        assertEquals(DownloadState.READY, model.status.state)
+        assertEquals("one HTTP transfer", 1, transport.offsets.size)
+        // Once the bundle is on disk, a later start() adopts it instead of restating the thread.
+        assertFalse(model.start())
+        assertEquals(1, transport.offsets.size)
     }
 }

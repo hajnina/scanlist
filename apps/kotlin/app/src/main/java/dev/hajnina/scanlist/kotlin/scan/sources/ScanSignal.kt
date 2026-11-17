@@ -40,9 +40,19 @@ data class ScanSignal(
     val confidence: Float,
     /** Monotonic milliseconds (the source clock), for smoothing/staleness in B5. */
     val emittedAtMs: Long,
+    /**
+     * IMAGE only: `ImageProxy.imageInfo.rotationDegrees` — the clockwise turn that makes the JPEG
+     * upright (card B5). The bytes themselves stay sensor-oriented (card B4 encoded them that way);
+     * a consumer that embeds the frame MUST rotate it first. 0 for text/barcode signals.
+     */
+    val rotationDegrees: Int = 0,
 ) {
     init {
         require(confidence in 0f..1f) { "confidence must be 0..1, was $confidence" }
+        require(rotationDegrees % 90 == 0) { "rotationDegrees must be a multiple of 90, was $rotationDegrees" }
+        require(rotationDegrees == 0 || kind == ScanKind.IMAGE) {
+            "only IMAGE signals carry sensor rotation"
+        }
         when (kind) {
             ScanKind.BARCODE, ScanKind.TEXT -> require(payload is ScanPayload.Text) {
                 "$kind signal must carry text"
@@ -81,11 +91,12 @@ data class ScanSignal(
                 emittedAtMs = atMs,
             )
 
-        fun image(jpeg: ByteArray, atMs: Long): ScanSignal = ScanSignal(
+        fun image(jpeg: ByteArray, atMs: Long, rotationDegrees: Int = 0): ScanSignal = ScanSignal(
             kind = ScanKind.IMAGE,
             payload = ScanPayload.Jpeg(jpeg),
             confidence = IMAGE_CONFIDENCE,
             emittedAtMs = atMs,
+            rotationDegrees = rotationDegrees,
         )
     }
 }

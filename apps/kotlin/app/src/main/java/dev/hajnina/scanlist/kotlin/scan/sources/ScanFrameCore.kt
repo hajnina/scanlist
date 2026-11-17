@@ -71,8 +71,13 @@ class ScanFrameCore(
      */
     fun onFrame(frame: Yuv420Frame, nowMs: Long = clock.nowMs()): ScanSignal? = onFrame(nowMs) { frame }
 
-    /** Gate first, then materialise the frame only if this frame is due. */
-    fun onFrame(nowMs: Long, frame: () -> Yuv420Frame?): ScanSignal? {
+    /**
+     * Gate first, then materialise the frame only if this frame is due.
+     *
+     * [rotationDegrees] is `ImageProxy.imageInfo.rotationDegrees`, carried on the IMAGE signal so the
+     * consumer can rotate the (sensor-oriented) JPEG upright before embedding (card B5).
+     */
+    fun onFrame(nowMs: Long, rotationDegrees: Int = 0, frame: () -> Yuv420Frame?): ScanSignal? {
         if (!sampler.shouldEmit(nowMs)) return null
         val source = frame() ?: return null
 
@@ -80,7 +85,7 @@ class ScanFrameCore(
         val nv21 = Nv21.fromYuv420(source)
         val scaled = if (target == source.size) nv21 else Nv21.scale(nv21, source.size, target)
         val jpeg = jpegEncoder.encode(scaled, target.width, target.height, jpegQuality) ?: return null
-        return ScanSignal.image(jpeg, nowMs)
+        return ScanSignal.image(jpeg, nowMs, rotationDegrees)
     }
 
     /** Target size the next frame will be encoded at (B5 shows this in a debug chip if it wants). */

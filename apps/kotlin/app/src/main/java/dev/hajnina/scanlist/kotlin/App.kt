@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import dev.hajnina.scanlist.kotlin.list.ListDetailScreen
 import dev.hajnina.scanlist.kotlin.list.ListsHomeScreen
 import dev.hajnina.scanlist.kotlin.list.rememberListState
+import dev.hajnina.scanlist.kotlin.scan.ui.ScanScreen
 import dev.hajnina.scanlist.kotlin.settings.SettingsScreen
 
 /** Top-level destinations. List is pushed from Lists (see [ScanListApp]). */
@@ -34,6 +35,8 @@ enum class Tab(val label: String) {
  *
  * Card B2: the Lists tab is now the real imported-list screen (import file/paste, nested list,
  * tick, persist, export) from the `list` package; the pushed detail screen is keyed by the list id.
+ * Card B5: the Scan tab is the real magic scan (`scan/ui`), which needs the list state to rank and to
+ * tick — the last B1 stub screen is gone.
  */
 @Composable
 fun ScanListApp() {
@@ -58,7 +61,7 @@ fun ScanListApp() {
                     onBack = { openList = null },
                 )
                 tab == Tab.Lists -> ListsHomeScreen(listState, onOpen = { openList = it })
-                tab == Tab.Scan -> ScanScreen()
+                tab == Tab.Scan -> ScanScreen(listState)
                 else -> SettingsScreen()
             }
         }

@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.util.concurrent.Executors
 
@@ -68,6 +70,14 @@ fun CameraScanPreview(
 
     LaunchedEffect(Unit) {
         if (!granted) permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    // B4 review nit: the permission used to be checked once, so returning from the system Settings
+    // app (or a permission revoked in the background) left a dead "permission needed" box with no way
+    // to re-ask. Re-check on every resume; when it flips to granted the preview simply starts.
+    LifecycleResumeEffect(Unit) {
+        granted = hasCameraPermission(context)
+        onPauseOrDispose { }
     }
 
     if (!granted) {
@@ -105,8 +115,13 @@ fun CameraScanPreview(
         }
     }
 
+    // B4 review nit: a new `onSignal` lambda (every recomposition of the caller) used to be captured
+    // once by the DisposableEffect, so the analyzer could keep calling a stale lambda. The effect now
+    // reads the latest value through a state holder and is not keyed on it (no camera re-bind).
+    val latestOnSignal by rememberUpdatedState(onSignal)
+
     DisposableEffect(granted, previewView, lifecycleOwner) {
-        val analyzer = CameraScanAnalyzer(core = core, onSignal = onSignal)
+        val analyzer = CameraScanAnalyzer(core = core, onSignal = { signal -> latestOnSignal(signal) })
         val executor = Executors.newSingleThreadExecutor()
         val providerFuture = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null

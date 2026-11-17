@@ -65,10 +65,16 @@ fun ListDetailScreen(state: ListState, listId: String, onBack: () -> Unit) {
     val stored = state.get(listId)
 
     if (stored == null) {
-        // Card B7: the deleted/unreadable-list state used to be a bare title with no way forward.
-        // It is now the same leaf card + explicit button as every other empty state in the app.
+        // Card B7: this state always had the top ‹ LISTS escape; the improvement is the leaf card
+        // that explains what happened plus an in-card BACK TO LISTS button, like the other empty
+        // states in the app.
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextButton(onClick = onBack) { Text("‹ LISTS") }
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ToggleOff)
+                    onBack()
+                },
+            ) { Text("‹ LISTS") }
             ScreenHeader("List gone", "It was deleted or could not be read.")
             Card(
                 modifier = Modifier.fillMaxWidth().springIn(1),

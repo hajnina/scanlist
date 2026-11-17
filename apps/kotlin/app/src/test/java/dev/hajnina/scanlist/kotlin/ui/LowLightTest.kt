@@ -204,6 +204,32 @@ class LowLightTest {
     }
 
     @Test
+    fun `switching lists starts a new room instead of keeping a stale dim`() {
+        // The scan screen stays composed across a list switch, so the detector must not carry the
+        // previous list's DIM into the next one. Remove the reset in LowLightSession and this fails.
+        val session = LowLightSession(LowLightDetector(framesToEnter = 2, framesToExit = 2))
+        repeat(2) { session.sample("list-a", 5.0) }
+        assertEquals(LowLightState.DIM, session.state)
+
+        assertEquals(LowLightState.UNKNOWN, session.sample("list-b", 5.0))
+        assertEquals(LowLightState.UNKNOWN, session.state)
+        assertEquals(LowLightState.DIM, session.sample("list-b", 5.0))
+
+        // Going back is a new session too, not the old cached reading.
+        assertEquals(LowLightState.UNKNOWN, session.sample("list-a", 5.0))
+    }
+
+    @Test
+    fun `shipped defaults need five dark frames and ten bright frames`() {
+        // Pins the shipped debounce (5/10) rather than the constructor arguments the other tests pass.
+        val detector = LowLightDetector()
+        repeat(4) { assertEquals(LowLightState.UNKNOWN, detector.sample(10.0)) }
+        assertEquals(LowLightState.DIM, detector.sample(10.0))
+        repeat(9) { assertEquals(LowLightState.DIM, detector.sample(200.0)) }
+        assertEquals(LowLightState.OK, detector.sample(200.0))
+    }
+
+    @Test
     fun `thresholds must be ordered`() {
         val error = runCatching { LowLightDetector(enterBelow = 60.0, exitAbove = 40.0) }
         assertTrue(error.exceptionOrNull() is IllegalArgumentException)

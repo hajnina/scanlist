@@ -1,14 +1,15 @@
 # Kotlin polish pass — every screen against STYLE_GUIDE.md + the empty/error state matrix
 
-Card **B7** (`kanban/todo/B7.md`). Source of truth for look: `references/bonsai-ui/STYLE_GUIDE.md`
+Card **B7** (`kanban/doing/B7.md`). Source of truth for look: `references/bonsai-ui/STYLE_GUIDE.md`
 (§1–§7, Material 3 Expressive built by hand on material3 1.4.0 / compileSdk 35). Source of truth for
 behaviour: `docs/ARCHITECTURE.md` "UI" §1–§4 and the card list below.
 
 **How to read this file.** Every line is a checklist row. `- [x]` means the state/rule is implemented
-and either JVM-tested or build-verified. Rows marked **device-gated (B0)** could not be *visually*
-verified on this machine — there is no phone on adb for this project (card B0 is parked), so they are
-verified by compile + unit tests + code review, exactly like B4/B5's camera and ML Kit claims. Nothing
-in this document claims a screenshot, a screen recording, or a haptic felt on a device.
+and either JVM-tested or build-verified. `- [~]` marks rows that are implemented and build/test-verified
+but **device-gated (B0)**: they could not be *visually or physically* verified on this machine — there
+is no phone on adb for this project (card B0 is parked), so they are verified by compile + unit tests +
+code review, exactly like B4/B5's camera and ML Kit claims. Nothing in this document claims a
+screenshot, a screen recording, or a haptic felt on a device.
 
 Scope of the pass: the whole app shell (`App.kt`), the Lists tab and the List screen (`list/`), the
 Scan tab (`scan/ui/`, `scan/sources/CameraScanPreview.kt`) and Settings (`settings/`). Where the guide
@@ -50,7 +51,8 @@ and a card's accepted work disagreed, the deviation is listed in §4 with its re
       `ListDetailScreen`.
 - [x] Machine values (paths, sha256, JSON sample, error codes, scores) are `FontFamily.Monospace`.
 - [x] Body copy is `bodyLarge`/`bodyMedium`, secondary lines `bodySmall` in `onSurfaceVariant`.
-- [x] Scan tab uses a compact caps header instead of `ScreenHeader` — deliberate, see §4.2.
+- [x] Scan tab uses a compact caps `SectionLabel` header once a list exists (`ScanScreen.kt:188`);
+      the no-list state still uses `ScreenHeader` like the other screens (`:103`) — deliberate, see §4.2.
 
 ### Shape
 
@@ -79,15 +81,19 @@ and a card's accepted work disagreed, the deviation is listed in §4 with its re
 
 - [x] Tab change `ToggleOn`; list open/import success/save success `Confirm`; tick/untick
       `Confirm`/`ToggleOff`; delete `ToggleOff`; section toggle `ToggleOn`/`ToggleOff`; export
-      share/save/copy `ToggleOn`/`Confirm`; back `ToggleOff`; scan tick `Confirm`; new hero
-      `ToggleOn`; list picker chip `ToggleOn`; settings backend chip / test-again / live switch
-      `ToggleOn`/`ToggleOff`; banner action `ToggleOn`.
+      share/save/copy `ToggleOn`/`Confirm`; the List screen's top `‹ LISTS` (both states) and its
+      `BACK TO LISTS` card button `ToggleOff` — the system `BackHandler` path is silent; scan tick
+      `Confirm`; new hero `ToggleOn`; list picker chip `ToggleOn`; settings backend chip / test-again /
+      live switch `ToggleOn`/`ToggleOff`; banner action `ToggleOn`.
 - [x] Note-card dismiss now fires `ToggleOff` — **B7 fix** (`ListImportUi.NoteCard` was silent).
 
 ### Layout, insets, icons
 
-- [x] 16 dp horizontal / 12 dp vertical screen padding; 12 dp between cards; 28 dp hero inner, 24 dp
-      leaf inner, 18/16 dp tiles; header indented 8 dp — `App.kt` + every screen.
+- [x] 16 dp horizontal / 12 dp vertical screen padding; 12 dp between cards on Lists/List/Settings;
+      28 dp hero inner, 24 dp leaf inner, 18/16 dp tiles; header indented 8 dp — `App.kt` + every
+      screen. The scan tab is denser by design: 8 dp between ranked rows and the banner
+      (`ScanScreen.kt:520`) and a 24/20 dp hero inner (`:431`), because the camera owns 45 % of the
+      height.
 - [x] Edge-to-edge: `enableEdgeToEdge()` in `MainActivity`, root `windowInsetsPadding(WindowInsets.safeDrawing)`.
 - [x] No icon library, no image assets: glyphs are Unicode (`✓ ○ ● ▾ ▸ ‹ ✕`) — matches §6.
 - [x] No `Scaffold`/`TopAppBar`/`NavigationBar`/FAB: the shell is a Column + three expressive pills
@@ -130,8 +136,9 @@ and a card's accepted work disagreed, the deviation is listed in §4 with its re
 ### 2.3 List screen — `list/ListDetailScreen.kt`
 
 - [x] **Missing/deleted list** (id no longer resolves): header "List gone" + leaf card "Nothing to
-      show" with an explicit `BACK TO LISTS` button — **B7 fix** (previously a bare title, no way
-      forward).
+      show" with an explicit `BACK TO LISTS` button — **B7**: the previous state already had the top
+      `‹ LISTS` escape; the card now explains the state and puts the action inside the card, matching
+      the other empty states.
 - [x] **Empty list** (`"sections": []`): hero "DONE" 0 + leaf card "Nothing to buy" explaining that an
       empty sections array is valid; export is still offered.
 - [x] Nested sections at any depth: collapsible header with haptic, checkerboard children, indentation
@@ -189,14 +196,15 @@ it. The environmental states (permission, model, light, network) are the **new**
       (B7), so returning from the system settings page starts the preview.
 - [x] **Low light**: `Luma.mean` (stride-correct Y-plane mean) → `LowLightDetector` (hysteresis 40/60,
       5 dark / 10 bright frames) → LOW LIGHT banner advising light, explicitly not blocking: barcode
-      and OCR still read, ranking still runs. 16 JVM tests (`ui/LowLightTest`).
+      and OCR still read, ranking still runs. `LowLightSession` resets the detector when the selected
+      list changes, so a DIM reading never survives a list switch. 18 JVM tests (`ui/LowLightTest`).
 - [x] **Offline (OCR + image only)**: barcode lookups degrade through the OFF states
       `LOOKING_UP / FOUND / NO_TEXT / MISS / OFFLINE / INVALID` (cached text still shown); the B7
       OFFLINE banner says names come from cache while text and image matching still rank. Ranking
       needs no network at all (B5's tests rank from TEXT/IMAGE with no resolver).
 - [x] **Embedder failure at runtime**: `RANKING ERROR` banner with the embedder's text verbatim
       (`QueryEmbedder.error`), plus the NO_VECTORS card; one bad frame cannot crash the scan loop.
-- [x] **Banner priority** is pure and tested (`ui/ScanBannerTest`, 10 tests):
+- [x] **Banner priority** is pure and tested (`ui/ScanBannerTest`, 11 tests):
       CAMERA → MODEL → EMBED → LOW_LIGHT → OFFLINE; exactly one banner, `null` inputs (not yet known)
       never produce one.
 - [x] **Banner placement**: first item of the scrollable ranked list, so the fixed camera 45 % /
@@ -238,8 +246,8 @@ it. The environmental states (permission, model, light, network) are the **new**
 | Piece | Where | Tests |
 |---|---|---|
 | `Luma.mean(frame, step)` — stride/pixel-stride-correct Y-plane mean | `scan/sources/Yuv420Frame.kt` | `ui/LowLightTest` (6 luma cases) |
-| `LowLightState` + `LowLightDetector` (hysteresis + debounce + `reset`) | `ui/LowLight.kt` | `ui/LowLightTest` (10 detector cases) |
-| `ScanBanner`/`ScanBannerState`/`ScanBannerKind`/`scanBanner()` — one banner, fixed priority | `ui/ScanBanner.kt` | `ui/ScanBannerTest` (10) |
+| `LowLightState` + `LowLightDetector` (hysteresis + debounce + `reset`) + `LowLightSession` (reset per selected list) | `ui/LowLight.kt` | `ui/LowLightTest` (12 detector/session cases) |
+| `ScanBanner`/`ScanBannerState`/`ScanBannerKind`/`scanBanner()` — one banner, fixed priority | `ui/ScanBanner.kt` | `ui/ScanBannerTest` (11) |
 | `BackTarget` + `backTarget()` + `handledLocally` | `ui/BackPolicy.kt` | `ui/BackPolicyTest` (4) |
 | `onLuma` frame hook (2.5 fps gate, failure-isolated) | `scan/sources/CameraScanAnalyzer.kt` | build-verified (Android glue) |
 | `onPermission`/`onLuma` params + actionable CAMERA OFF card | `scan/sources/CameraScanPreview.kt` | build-verified (Android glue) |
@@ -282,59 +290,59 @@ infrastructure in this project); the decisions they render are the pure pieces a
 These are implemented and build/test-verified but **not** visually or physically verified. No
 screenshots or recordings are claimed anywhere in this card.
 
-- [x] **device-gated** — Camera permission flows on a real device: first ask at app entry to Scan,
+- [~] **device-gated** — Camera permission flows on a real device: first ask at app entry to Scan,
       "deny", "deny twice" (no dialog → banner's APP SETTINGS path), grant from system settings and
       return (resume re-check starts the preview). Code paths exist in `CameraScanPreview` +
       `ScanBanner`; only the dialog rendering/OS behaviour is unseen. Compensated by the pure banner
       test and the compile-verified launcher/resume wiring.
-- [x] **device-gated** — Low-light thresholds (enter < 40, exit > 60, 5/10 frames). They are a
+- [~] **device-gated** — Low-light thresholds (enter < 40, exit > 60, 5/10 frames). They are a
       documented heuristic; CameraX auto-exposure behaviour per room must be calibrated on the SM8750
       device. The detector's *behaviour* is unit-tested; only the numbers are uncalibrated. Tuning
       constants are the three constructor arguments, one place.
-- [x] **device-gated** — Mean-luma sampling cost on the analysis thread (14k pixels per analysed
+- [~] **device-gated** — Mean-luma sampling cost on the analysis thread (14k pixels per analysed
       frame, 2.5 fps). Build-verified only; if it ever shows up in profiling it is a one-parameter
       `step` change.
-- [x] **device-gated** — Real CameraX frames, bundled ML Kit barcode/OCR artifacts and the bundled
+- [~] **device-gated** — Real CameraX frames, bundled ML Kit barcode/OCR artifacts and the bundled
       embedder (the B4/B5 inheritance). Verified by the x86_64 CI APK build, not on the phone.
-- [x] **device-gated** — Dynamic colour / dark-mode appearance, font scale (Accessibility), landscape
+- [~] **device-gated** — Dynamic colour / dark-mode appearance, font scale (Accessibility), landscape
       rotation, TalkBack labels for the new banner/buttons. Compose layout is inset- and
       scroll-correct by construction; the visual result is unseen.
-- [x] **device-gated** — Haptic *feel* (Confirm/ToggleOn/ToggleOff/Reject) and the spring timing on
+- [~] **device-gated** — Haptic *feel* (Confirm/ToggleOn/ToggleOff/Reject) and the spring timing on
       60/120 Hz. Tokens match the guide's constants exactly; the sensation is device-only.
-- [x] **device-gated** — Battery/thermal behaviour of the camera + 2.5 fps embed loop during a long
+- [~] **device-gated** — Battery/thermal behaviour of the camera + 2.5 fps embed loop during a long
       scan. Unchanged from B5 except the luma mean (cheap, sampled).
-- [x] **device-gated** — Empty/error states on very small screens where the scan split (45/55) is
+- [~] **device-gated** — Empty/error states on very small screens where the scan split (45/55) is
       tight: the banner was moved into the scrollable list specifically to avoid overflow, but the
       real measurement needs a device.
 
 How to close them: with a phone on adb, install the debug APK, walk §2 screen by screen (the card's
-states), and replace each line above with a screenshot reference — the checklist rows then lose the
-`device-gated` marker.
+states), and replace each line above with a screenshot reference — that row then becomes `- [x]` and
+loses the `device-gated` marker.
 
 ---
 
 ## 6. Evidence (real output, worktree root `/home/martin/projects/scanlist-wt/B7`)
 
 ```
-$ source scripts/android-env.sh && ./gradlew --no-daemon :scanlistKotlin:assembleDebug :scanlistKotlin:testDebugUnitTest
-> Task :scanlistKotlin:packageDebug
-> Task :scanlistKotlin:assembleDebug
+$ source scripts/android-env.sh && ./gradlew :scanlistKotlin:testDebugUnitTest
+> Task :scanlistKotlin:compileDebugKotlin
+> Task :scanlistKotlin:compileDebugUnitTestKotlin
 > Task :scanlistKotlin:testDebugUnitTest
-BUILD SUCCESSFUL in 15s
-60 actionable tasks: 21 executed, 5 from cache, 34 up-to-date
+BUILD SUCCESSFUL in 18s
+36 actionable tasks: 6 executed, 30 up-to-date
 ```
 
 Test XML totals (`apps/kotlin/app/build/test-results/testDebugUnitTest/*.xml`):
 
 ```
-39 test classes · 326 tests · 0 failures · 0 errors · 0 skipped
+39 test classes · 329 tests · 0 failures · 0 errors · 0 skipped
 ```
 
-Baseline on merged main was 296 tests / 36 classes (B5's merge), so B7 adds **30 tests in 3 classes**:
+Baseline on merged main was 296 tests / 36 classes (B5's merge), so B7 adds **33 tests in 3 classes**:
 
 ```
-dev.hajnina.scanlist.kotlin.ui.LowLightTest     16
-dev.hajnina.scanlist.kotlin.ui.ScanBannerTest   10
+dev.hajnina.scanlist.kotlin.ui.LowLightTest     18
+dev.hajnina.scanlist.kotlin.ui.ScanBannerTest   11
 dev.hajnina.scanlist.kotlin.ui.BackPolicyTest    4
 ```
 

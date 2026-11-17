@@ -1,6 +1,7 @@
 package dev.hajnina.scanlist.kotlin.ui
 
 import dev.hajnina.scanlist.kotlin.settings.ModelProbe
+import dev.hajnina.scanlist.kotlin.settings.ModelStatus
 
 // Card B7 — the scan screen's degraded-state banner.
 //
@@ -44,8 +45,8 @@ data class ScanBanner(
 data class ScanBannerState(
     /** CAMERA permission: null until CameraScanPreview has reported it. */
     val cameraGranted: Boolean? = null,
-    /** Model bundle present at the pinned size: null until the filesystem probe has run. */
-    val modelReady: Boolean? = null,
+    /** Filesystem status of the bundle: null until the probe has run. */
+    val modelStatus: ModelStatus? = null,
     /** Sustained low light from [LowLightDetector]. */
     val lowLight: LowLightState = LowLightState.UNKNOWN,
     /** The last barcode lookup could not reach Open Food Facts. */
@@ -63,12 +64,22 @@ fun scanBanner(state: ScanBannerState): ScanBanner? = when {
         action = ScanBannerAction.OPEN_SETTINGS,
     )
 
-    state.modelReady == false -> ScanBanner(
-        kind = ScanBannerKind.MODEL,
-        title = "${ModelProbe.E_NO_MODEL} · ranking off",
-        // The exact fix, same string the settings screen shows (never a paraphrased path).
-        body = ModelProbe.PUSH_HINT,
-    )
+    state.modelStatus != null && !state.modelStatus.isReady -> {
+        val status = state.modelStatus
+        // E_NO_MODEL is reserved for a bundle that is genuinely absent; a wrong-size or unreadable
+        // file gets its own label instead of the missing-file code.
+        val title = when (status) {
+            is ModelStatus.Missing -> "${ModelProbe.E_NO_MODEL} · ranking off"
+            is ModelStatus.Unreadable -> "Model unreadable · ranking off"
+            is ModelStatus.Present -> "Model wrong size · ranking off"
+        }
+        val body = when (status) {
+            is ModelStatus.Missing -> ModelProbe.PUSH_HINT
+            is ModelStatus.Unreadable -> "${status.reason}. ${ModelProbe.PUSH_HINT}"
+            is ModelStatus.Present -> "${ModelProbe.sizeNote(status.bytes)}. ${ModelProbe.PUSH_HINT}"
+        }
+        ScanBanner(kind = ScanBannerKind.MODEL, title = title, body = body)
+    }
 
     state.embedError != null -> ScanBanner(
         kind = ScanBannerKind.EMBED,

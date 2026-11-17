@@ -69,7 +69,7 @@ import dev.hajnina.scanlist.kotlin.scan.sources.CameraScanPreview
 import dev.hajnina.scanlist.kotlin.scan.sources.Clock
 import dev.hajnina.scanlist.kotlin.settings.ModelProbe
 import dev.hajnina.scanlist.kotlin.springIn
-import dev.hajnina.scanlist.kotlin.ui.LowLightDetector
+import dev.hajnina.scanlist.kotlin.ui.LowLightSession
 import dev.hajnina.scanlist.kotlin.ui.LowLightState
 import dev.hajnina.scanlist.kotlin.ui.ScanBanner
 import dev.hajnina.scanlist.kotlin.ui.ScanBannerAction
@@ -141,19 +141,20 @@ fun ScanScreen(listState: ListState) {
     // ---------------------------------------------------------------- card B7 state matrix
     //
     // The three environmental states the polish pass owes this screen, all decided by pure,
-    // unit-tested helpers (`ui/ScanBanner`, `ui/LowLightDetector`); this screen only holds them:
+    // unit-tested helpers (`ui/ScanBanner`, `ui/LowLight`); this screen only holds them:
     //  - cameraGranted: reported by CameraScanPreview (null until it has looked),
-    //  - modelReady: one filesystem stat of the bundle the pipeline opens, per tab entry,
-    //  - lowLight: debounced mean-luma stream from the analysed frames.
+    //  - modelStatus: one filesystem stat of the bundle the pipeline opens, per tab entry,
+    //  - lowLight: debounced mean-luma stream from the analysed frames, scoped to the selected list
+    //    so a DIM reading never survives a list switch.
     // OFF's "offline" is the barcode strip's own state (a lookup that could not reach the network).
     var cameraGranted by remember { mutableStateOf<Boolean?>(null) }
-    val modelReady = remember(context) { ModelProbe.status(defaultModelFile(context)).isReady }
-    val lowLightDetector = remember { LowLightDetector() }
+    val modelStatus = remember(context) { ModelProbe.status(defaultModelFile(context)) }
+    val lowLightSession = remember { LowLightSession() }
     var lowLight by remember { mutableStateOf(LowLightState.UNKNOWN) }
     val banner = scanBanner(
         ScanBannerState(
             cameraGranted = cameraGranted,
-            modelReady = modelReady,
+            modelStatus = modelStatus,
             lowLight = lowLight,
             offline = controller.barcodeUi.state == OffUiState.OFFLINE,
             embedError = view.error,
@@ -199,7 +200,7 @@ fun ScanScreen(listState: ListState) {
             onSignal = controller::onSignal,
             onPermission = { cameraGranted = it },
             onLuma = { luma ->
-                val next = lowLightDetector.sample(luma)
+                val next = lowLightSession.sample(stored.id, luma)
                 // Only touch Compose state when the debounced answer actually changes.
                 if (next != lowLight) lowLight = next
             },

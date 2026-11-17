@@ -83,10 +83,34 @@ class LowLightDetector(
         return state
     }
 
-    /** Camera restarted (tab re-entry): the old room's light says nothing about the new one. */
+    /** Start from a clean room (list switch, camera restart): the old reading says nothing about the new one. */
     fun reset() {
         state = LowLightState.UNKNOWN
         darkRun = 0
         brightRun = 0
+    }
+}
+
+/**
+ * A [LowLightDetector] scoped to one scan session — the selected list, which is what restarts the
+ * scan controller. The first sample of a new session starts from UNKNOWN, so a DIM reading from the
+ * previous list cannot leak into the next one (the scan screen stays composed across a list switch).
+ * Leaving the tab disposes the screen and therefore this session too.
+ */
+class LowLightSession(private val detector: LowLightDetector = LowLightDetector()) {
+    private var listId: String? = null
+
+    var state: LowLightState = LowLightState.UNKNOWN
+        private set
+
+    /** Feed one frame's mean luma for [listId]; a different list starts a fresh, unknown room. */
+    fun sample(listId: String, luma: Double): LowLightState {
+        if (listId != this.listId) {
+            this.listId = listId
+            detector.reset()
+            state = LowLightState.UNKNOWN
+        }
+        state = detector.sample(luma)
+        return state
     }
 }

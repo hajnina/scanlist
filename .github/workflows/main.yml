@@ -48,11 +48,14 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - name: ts-core tests
+      - name: ts-core typecheck + tests
+        # Mirrors pr.yml: vitest alone let type errors in shared/ts-core through.
+        # `npm run typecheck` is `tsc --noEmit` per its package.json.
         run: |
           if [ -f shared/ts-core/package.json ]; then
             cd shared/ts-core
             npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+            npm run typecheck
             npm test
           elif [ -d shared/ts-core/src ]; then
             echo "::error::shared/ts-core has sources but no package.json - card not done"; exit 1
@@ -83,6 +86,39 @@ jobs:
           if [ ! -f apps/kotlin/app/build.gradle.kts ] && [ ! -f apps/kotlin/build.gradle.kts ]; then echo "::error::apps/kotlin changed but has no module build file - card not done"; exit 1; fi
           chmod +x gradlew
           ./gradlew --no-daemon :scanlistKotlin:assembleDebug
+      - name: Unit tests
+        # Mirrors pr.yml: assembleDebug alone never ran apps/kotlin/app/src/test. Same root
+        # build/wrapper as the step above (compiled debug classes are reused).
+        run: |
+          if [ ! -f gradlew ] || [ ! -f settings.gradle.kts ]; then echo "::error::no root gradle build yet (card S9) - cannot run apps/kotlin unit tests"; exit 1; fi
+          chmod +x gradlew
+          ./gradlew --no-daemon :scanlistKotlin:testDebugUnitTest
+      - name: Unit test summary
+        # Mirror of pr.yml: surface the real test totals (gradle prints none by default) so an
+        # empty/zero-test run can never pass silently.
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          roots = [
+              'apps/kotlin/app/build/test-results/testDebugUnitTest',
+              'apps/kotlin/build/test-results/testDebugUnitTest',
+          ]
+          files = []
+          for r in roots:
+              files += sorted(glob.glob(r + '/TEST-*.xml'))
+          if not files:
+              sys.exit('::error::testDebugUnitTest produced no XML reports in ' + ' / '.join(roots))
+          total = fails = errors = skipped = 0
+          for path in files:
+              node = ET.parse(path).getroot()
+              total += int(node.get('tests', 0))
+              fails += int(node.get('failures', 0))
+              errors += int(node.get('errors', 0))
+              skipped += int(node.get('skipped', 0))
+          print(f'kotlin unit tests: {len(files)} classes, {total} tests, '
+                f'{fails} failures, {errors} errors, {skipped} skipped')
+          sys.exit(1 if (fails or errors or total == 0) else 0)
+          PY
       - name: Rename APK
         if: hashFiles('apps/kotlin/app/build/outputs/apk/debug/*.apk') != ''
         run: mv apps/kotlin/app/build/outputs/apk/debug/*.apk ScanList-kotlin-debug.apk
@@ -107,6 +143,15 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      - name: JS typecheck + jest
+        # Mirrors pr.yml: jest + tsc gate the JS side before the APK build (fail fast). Node '22'
+        # matches the web job pin and apps/rn's engines (>= 22.11.0).
+        working-directory: apps/rn
+        run: |
+          if [ ! -f package.json ]; then echo "::error::apps/rn changed but has no package.json - card not done"; exit 1; fi
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          npm run typecheck
+          npm test -- --ci
       - name: Build APK
         working-directory: apps/rn/android
         run: |
@@ -194,15 +239,21 @@ jobs:
           pattern: scanlist-*
           merge-multiple: true
           path: rel
-      - name: Overwrite rolling release (tag main)
+      - name: Overwrite rolling release (tag rolling)
+        # The rolling release tag must never be named after a branch: a tag refs/tags/main
+        # shadow-aliases refs/heads/main repo-wide ("refname 'main' is ambiguous") and broke
+        # every ancestry/merge check. The rolling tag is now `rolling`; the leftover `main`
+        # tag/release is deleted here (no-op once gone) so it cannot spring back.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -la rel
           git push origin :refs/tags/main || true
           gh release delete main --yes --cleanup-tag || true
+          git push origin :refs/tags/rolling || true
+          gh release delete rolling --yes --cleanup-tag || true
           {
-            echo "Rolling \`main\` build - replaces the previous \`main\` release."
+            echo "Rolling build from \`main\` - replaces the previous \`rolling\` release."
             echo
             echo "- Commit: ${GITHUB_SHA::7}"
             echo "- Built: $(date -u '+%Y-%m-%d %H:%M UTC')"
@@ -211,4 +262,4 @@ jobs:
             echo "Recent main history:"
             git log --oneline -5 | sed 's/^/- /'
           } > notes.md
-          gh release create main rel/* --title "ScanList (main)" --notes-file notes.md --latest
+          gh release create rolling rel/* --title "ScanList (rolling)" --notes-file notes.md --latest

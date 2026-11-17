@@ -47,11 +47,14 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - name: ts-core tests
+      - name: ts-core typecheck + tests
+        # CI gap: the job ran vitest only, so a type error in shared/ts-core (the module both apps
+        # import) never failed CI. `npm run typecheck` is `tsc --noEmit` per its package.json.
         run: |
           if [ -f shared/ts-core/package.json ]; then
             cd shared/ts-core
             npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+            npm run typecheck
             npm test
           elif [ -d shared/ts-core/src ]; then
             echo "::error::shared/ts-core has sources but no package.json - card not done"; exit 1
@@ -82,6 +85,40 @@ jobs:
           if [ ! -f apps/kotlin/app/build.gradle.kts ] && [ ! -f apps/kotlin/build.gradle.kts ]; then echo "::error::apps/kotlin changed but has no module build file - card not done"; exit 1; fi
           chmod +x gradlew
           ./gradlew --no-daemon :scanlistKotlin:assembleDebug
+      - name: Unit tests
+        # CI gap: assembleDebug alone never ran the JVM unit tests (apps/kotlin/app/src/test).
+        # Same root build/wrapper as the step above, so it reuses the compiled debug classes;
+        # testDebugUnitTest is NO-SOURCE-safe (green if a module has no tests).
+        run: |
+          if [ ! -f gradlew ] || [ ! -f settings.gradle.kts ]; then echo "::error::no root gradle build yet (card S9) - cannot run apps/kotlin unit tests"; exit 1; fi
+          chmod +x gradlew
+          ./gradlew --no-daemon :scanlistKotlin:testDebugUnitTest
+      - name: Unit test summary
+        # gradle prints no test totals by default (jest/vitest do), so a silently empty test run
+        # would look green. Fail loudly if no reports exist or if nothing actually ran.
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          roots = [
+              'apps/kotlin/app/build/test-results/testDebugUnitTest',
+              'apps/kotlin/build/test-results/testDebugUnitTest',
+          ]
+          files = []
+          for r in roots:
+              files += sorted(glob.glob(r + '/TEST-*.xml'))
+          if not files:
+              sys.exit('::error::testDebugUnitTest produced no XML reports in ' + ' / '.join(roots))
+          total = fails = errors = skipped = 0
+          for path in files:
+              node = ET.parse(path).getroot()
+              total += int(node.get('tests', 0))
+              fails += int(node.get('failures', 0))
+              errors += int(node.get('errors', 0))
+              skipped += int(node.get('skipped', 0))
+          print(f'kotlin unit tests: {len(files)} classes, {total} tests, '
+                f'{fails} failures, {errors} errors, {skipped} skipped')
+          sys.exit(1 if (fails or errors or total == 0) else 0)
+          PY
       - name: Rename APK
         if: hashFiles('apps/kotlin/app/build/outputs/apk/debug/*.apk') != ''
         run: mv apps/kotlin/app/build/outputs/apk/debug/*.apk ScanList-kotlin-debug.apk
@@ -106,6 +143,17 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      - name: JS typecheck + jest
+        # CI gap: jest (18 suites / 163 tests) only ever ran on laptops. Placed BEFORE the APK build
+        # so a red test fails in ~1 min instead of after the ~6 min gradle build; the debug build does
+        # not consume the JS bundle, so the order is otherwise free. Node is the same '22' pin the web
+        # job uses (apps/rn engines: >= 22.11.0; setup-node '22' resolves the latest 22.x).
+        working-directory: apps/rn
+        run: |
+          if [ ! -f package.json ]; then echo "::error::apps/rn changed but has no package.json - card not done"; exit 1; fi
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          npm run typecheck
+          npm test -- --ci
       - name: Build APK
         working-directory: apps/rn/android
         run: |

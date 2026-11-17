@@ -3,10 +3,17 @@
  * the three import transports (file / paste / URL) produce the same ts-core outcome.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { flatten } from "@scanlist/ts-core";
 
-import { MAX_IMPORT_BYTES, importFromFile, importFromText, importFromUrl } from "../src/core/importer";
+import {
+  MAX_IMPORT_BYTES,
+  URL_IMPORT_TIMEOUT_ERROR,
+  URL_IMPORT_TIMEOUT_MS,
+  importFromFile,
+  importFromText,
+  importFromUrl,
+} from "../src/core/importer";
 import { samples } from "./samples";
 
 const validSample = samples.find((sample) => sample.name === "van-weekly");
@@ -178,5 +185,116 @@ describe("URL import", () => {
     expect(outcome.ok).toBe(false);
     if (outcome.ok) return;
     expect(outcome.errors[0]).toContain("larger than");
+  });
+});
+
+/**
+ * C2 follow-up: the URL fetch had no timeout, so a server that accepts the connection and stalls
+ * blocked the import (and the spinner) forever. The fix is an AbortController hard cap; these tests
+ * pin both halves of it — a hung request must abort and be classified, a slow-but-alive one must not.
+ */
+describe("URL import timeout (C2 follow-up)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  interface Captured {
+    signal: AbortSignal | null;
+  }
+
+  /** A server that accepts the request and never answers. Rejects only when the signal aborts. */
+  function fetchHung(captured: Captured): typeof fetch {
+    return ((_input: RequestInfo | URL, init?: RequestInit) => {
+      captured.signal = init?.signal ?? null;
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    }) as unknown as typeof fetch;
+  }
+
+  /** A slow-but-alive server: answers the body after `delayMs`. */
+  function fetchAfter(delayMs: number, body: string): typeof fetch {
+    return ((_input: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((resolve, reject) => {
+        const timer = setTimeout(() => resolve(new Response(body, { status: 200 })), delayMs);
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    }) as unknown as typeof fetch;
+  }
+
+  it("aborts a fetch that never settles at 10 s and classifies it as a timeout", async () => {
+    vi.useFakeTimers();
+    const captured: Captured = { signal: null };
+    const pending = importFromUrl("https://example.test/hung.json", fetchHung(captured));
+
+    // The signal goes to fetch, and nothing has fired one millisecond before the cap.
+    expect(captured.signal).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(URL_IMPORT_TIMEOUT_MS - 1);
+    expect(captured.signal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    const outcome = await pending;
+
+    expect(captured.signal?.aborted).toBe(true);
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    // Classified: exactly the exported timeout error, through the normal ImportOutcome path — so
+    // the UI's existing inline error list + "Import failed (…)" toast render it with no new surface.
+    expect(outcome.errors).toEqual([URL_IMPORT_TIMEOUT_ERROR]);
+    expect(outcome.source).toBe("url:https://example.test/hung.json");
+    expect(outcome.errors[0]).toContain("timed out");
+    // Not misreported as the CORS/network failure the abort also looks like from the inside.
+    expect(outcome.errors.join("\n")).not.toContain("CORS");
+  });
+
+  it("aborts when the headers arrive but the body stalls", async () => {
+    vi.useFakeTimers();
+    // Headers resolve immediately; the body never does until the signal aborts.
+    const stalledBody: typeof fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        text: () =>
+          new Promise<string>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }),
+      } as unknown as Response;
+    }) as unknown as typeof fetch;
+
+    const pending = importFromUrl("https://example.test/stalled-body.json", stalledBody);
+    await vi.advanceTimersByTimeAsync(URL_IMPORT_TIMEOUT_MS);
+    const outcome = await pending;
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.errors).toEqual([URL_IMPORT_TIMEOUT_ERROR]);
+  });
+
+  it("is unaffected by a fetch that settles at 9 s", async () => {
+    vi.useFakeTimers();
+    const pending = importFromUrl("https://example.test/slow.json", fetchAfter(9_000, validText));
+
+    await vi.advanceTimersByTimeAsync(9_000);
+    const outcome = await pending;
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.list.title).toBe("Van weekly shop");
+  });
+
+  it("clears the timer when the import finishes early", async () => {
+    vi.useFakeTimers();
+    const outcome = await importFromUrl("https://example.test/fast.json", fetchReturning(validText));
+    expect(outcome.ok).toBe(true);
+    // No timer outlives the import: otherwise every import would keep the page alive for 10 s.
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

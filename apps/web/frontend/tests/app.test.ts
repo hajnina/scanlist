@@ -20,6 +20,7 @@ import { flatten, parseList } from "@scanlist/ts-core";
 import { App, scanTarget } from "../src/app";
 import { STORAGE_KEYS, docKey } from "../src/core/storage";
 import type { ListIndexEntry } from "../src/core/storage";
+import { URL_IMPORT_TIMEOUT_MS } from "../src/core/importer";
 import { exportJson } from "../src/core/exportDoc";
 import { samples } from "./samples";
 
@@ -410,6 +411,51 @@ describe("import transports", () => {
     expect(screenText()).toContain("HTTP 404");
     expect(screenText()).toContain("Import failed");
     expect(localStorage.getItem(STORAGE_KEYS.index)).toBeNull();
+  });
+
+  /**
+   * C2 follow-up: a hung URL used to block the import forever ("Fetching…" spinner never stopped).
+   * This drives the real UI path — ImportPanel -> importFromUrl -> app.applyOutcome -> inline error
+   * list + toast — so the classified timeout error is proven to reach the existing error surface.
+   */
+  it("aborts a hung URL import at 10 s and shows the classified timeout error", async () => {
+    mount();
+    await flush();
+    click("button.chip", "URL");
+    await flush();
+    typeInto("md-outlined-text-field", "https://example.test/hung.json");
+
+    // Fake only the timer the timeout uses: mounting/effects need happy-dom's real scheduling
+    // (fake rAF leaks past restore into later tests' `useEffect` toasts).
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const hangingFetch = vi.fn(
+        (_input: RequestInfo | URL, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }),
+      );
+      vi.stubGlobal("fetch", hangingFetch);
+
+      click("md-outlined-button", "Fetch and import");
+      await vi.advanceTimersByTimeAsync(URL_IMPORT_TIMEOUT_MS - 1);
+      // Still waiting: no error surface one millisecond before the cap.
+      expect(exists(".import-errors")).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(1);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(hangingFetch).toHaveBeenCalledTimes(1);
+      expect(exists(".import-errors")).not.toBeNull();
+      expect(screenText()).toContain("timed out");
+      expect(screenText()).toContain("Import failed");
+      // Nothing was half-imported.
+      expect(localStorage.getItem(STORAGE_KEYS.index)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

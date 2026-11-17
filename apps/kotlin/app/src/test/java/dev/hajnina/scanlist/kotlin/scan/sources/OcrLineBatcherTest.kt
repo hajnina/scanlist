@@ -1,66 +1,119 @@
 package dev.hajnina.scanlist.kotlin.scan.sources
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Card B4: OCR line batching — normalise, drop noise, join, suppress repeats, cap length. */
+/**
+ * Card B4 + B4-sync: RANK.md §2.2 — **each OCR line is its own text query**, in detection order,
+ * at most 16 per frame, with per-line repeat suppression and per-line confidence (never averaged).
+ */
 class OcrLineBatcherTest {
 
     @Test
-    fun `lines are trimmed, collapsed, deduped and joined`() {
+    fun `one visible line becomes one normalised line`() {
         val batcher = OcrLineBatcher()
-        val text = batcher.batch(listOf("  Fresh   milk ", "1 L", "Fresh milk", "", "a"))
-        assertEquals("Fresh milk | 1 L", text)
+        assertEquals(
+            listOf("Fresh milk"),
+            batcher.batch(listOf(OcrLine("  Fresh   milk ")), nowMs = 0).map { it.text },
+        )
+    }
+
+    @Test
+    fun `each line is its own signal in detection order`() {
+        val batcher = OcrLineBatcher()
+        val out = batcher.batch(
+            listOf(OcrLine("Fresh milk"), OcrLine("1 L"), OcrLine("Whole")),
+            nowMs = 0,
+        )
+        assertEquals(listOf("Fresh milk", "1 L", "Whole"), out.map { it.text })
+    }
+
+    @Test
+    fun `junk and duplicate lines are dropped`() {
+        val batcher = OcrLineBatcher()
+        val out = batcher.batch(
+            listOf(OcrLine("  Fresh   milk "), OcrLine(" "), OcrLine("."), OcrLine("x"), OcrLine("Fresh milk")),
+            nowMs = 0,
+        )
+        assertEquals(listOf("Fresh milk"), out.map { it.text })
     }
 
     @Test
     fun `no visible words yields nothing`() {
         val batcher = OcrLineBatcher()
-        assertNull(batcher.batch(emptyList()))
-        assertNull(batcher.batch(listOf(" ", ".", "x")))
+        assertTrue(batcher.batch(emptyList()).isEmpty())
+        assertTrue(batcher.batch(listOf(OcrLine(" "), OcrLine("."), OcrLine("x"))).isEmpty())
     }
 
     @Test
-    fun `identical text is suppressed inside the repeat window`() {
+    fun `a line already emitted is suppressed inside the repeat window`() {
         val batcher = OcrLineBatcher()
-        assertEquals("Olive oil", batcher.batch(listOf("Olive oil"), nowMs = 0))
-        assertNull(batcher.batch(listOf("Olive oil"), nowMs = 500))
-        assertNull(batcher.batch(listOf("Olive  oil"), nowMs = 1_499))
+        assertEquals(listOf("Olive oil"), batcher.batch(listOf(OcrLine("Olive oil")), nowMs = 0).map { it.text })
+        assertTrue(batcher.batch(listOf(OcrLine("Olive oil")), nowMs = 500).isEmpty())
+        assertTrue(batcher.batch(listOf(OcrLine("Olive  oil")), nowMs = 1_499).isEmpty())
     }
 
     @Test
-    fun `identical text is re-emitted after the window`() {
+    fun `a line is re-emitted after the window`() {
         val batcher = OcrLineBatcher()
-        assertEquals("Olive oil", batcher.batch(listOf("Olive oil"), nowMs = 0))
-        assertEquals("Olive oil", batcher.batch(listOf("Olive oil"), nowMs = 1_500))
+        assertEquals(listOf("Olive oil"), batcher.batch(listOf(OcrLine("Olive oil")), nowMs = 0).map { it.text })
+        assertEquals(listOf("Olive oil"), batcher.batch(listOf(OcrLine("Olive oil")), nowMs = 1_500).map { it.text })
     }
 
     @Test
-    fun `different text is emitted immediately`() {
+    fun `the repeat window is per line not per frame`() {
         val batcher = OcrLineBatcher()
-        assertEquals("Olive oil", batcher.batch(listOf("Olive oil"), nowMs = 0))
-        assertEquals("Basil", batcher.batch(listOf("Basil"), nowMs = 10))
+        val first = batcher.batch(listOf(OcrLine("Olive oil"), OcrLine("Basil")), nowMs = 0)
+        assertEquals(listOf("Olive oil", "Basil"), first.map { it.text })
+
+        // Both lines are still inside their own window, so the whole frame is suppressed.
+        assertTrue(batcher.batch(listOf(OcrLine("Olive oil"), OcrLine("Basil")), nowMs = 1_000).isEmpty())
+
+        // "Basil" left the frame and comes back after the window: it is emitted, "Olive oil" too.
+        val again = batcher.batch(listOf(OcrLine("Olive oil"), OcrLine("Basil")), nowMs = 1_600)
+        assertEquals(listOf("Olive oil", "Basil"), again.map { it.text })
     }
 
     @Test
-    fun `result is capped without splitting a line`() {
-        val batcher = OcrLineBatcher(maxChars = 12)
-        val text = batcher.batch(listOf("abcdefghij", "klmno"), nowMs = 0)
-        assertEquals("abcdefghij", text)
-    }
-
-    @Test
-    fun `a single over-long line is truncated to the cap`() {
+    fun `maxChars truncates a single line, not the frame`() {
         val batcher = OcrLineBatcher(maxChars = 5)
-        assertEquals("abcde", batcher.batch(listOf("abcdefghij"), nowMs = 0))
+        val out = batcher.batch(listOf(OcrLine("abcdefghij"), OcrLine("klmno")), nowMs = 0)
+        assertEquals(listOf("abcde", "klmno"), out.map { it.text })
     }
 
     @Test
-    fun `reset allows the same text again immediately`() {
+    fun `at most 16 lines per frame are emitted in detection order`() {
         val batcher = OcrLineBatcher()
-        assertEquals("Milk", batcher.batch(listOf("Milk"), nowMs = 0))
+        val input = (1..20).map { n -> OcrLine("line %02d".format(n)) }
+        val out = batcher.batch(input, nowMs = 0)
+
+        assertEquals(OcrLineBatcher.MAX_LINES_PER_FRAME, out.size)
+        assertEquals(16, out.size)
+        assertEquals((1..16).map { "line %02d".format(it) }, out.map { it.text })
+    }
+
+    @Test
+    fun `confidence is per line and never averaged`() {
+        val batcher = OcrLineBatcher()
+        val out = batcher.batch(
+            listOf(OcrLine("Fresh milk", 0.9f), OcrLine("1 L", 0.3f)),
+            nowMs = 0,
+        )
+        assertEquals(listOf(0.9f, 0.3f), out.map { it.confidence })
+        assertEquals("Fresh milk", out[0].text)
+    }
+
+    @Test
+    fun `reset allows the same line again immediately`() {
+        val batcher = OcrLineBatcher()
+        assertEquals(listOf("Milk"), batcher.batch(listOf(OcrLine("Milk")), nowMs = 0).map { it.text })
         batcher.reset()
-        assertEquals("Milk", batcher.batch(listOf("Milk"), nowMs = 1))
+        assertEquals(listOf("Milk"), batcher.batch(listOf(OcrLine("Milk")), nowMs = 1).map { it.text })
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `out-of-range per-line confidence is rejected`() {
+        OcrLine("Milk", 1.5f)
     }
 }

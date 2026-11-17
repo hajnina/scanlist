@@ -65,11 +65,43 @@ describe("golden.json — byte-identical flatten (44 sample items)", () => {
       expect(flat).toHaveLength(sample.itemCount);
       expect(flat).toEqual(expected);
 
-      // Explicit docText comparison as the card asks (ids + docText byte-for-byte).
+      // ids byte-for-byte per the card. docText is NOT stored in golden.json (FLATTEN §1
+      // key set), so the FORMAT is pinned separately below with spec-derived literals.
       expect(flat.map((item) => item.id)).toEqual(expected.map((item) => item.id));
-      expect(flat.map(docText)).toEqual(expected.map(docText));
     });
   }
+
+  it("pins the docText format with spec-derived literals", () => {
+    // docText is not stored in golden.json, so a self-comparison would pin nothing.
+    // These literals are hand-checked against FLATTEN.md §3.2 and the Python oracle's
+    // doc_text (shared/ref/scanlist_ref.py: '; ' between fields, ', ' between aliases).
+    const flattenByName = (sample: string, name: string): string => {
+      const parsed = parseList(must(samples.find((s) => s.name === sample)).text);
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) return "";
+      const item = must(flatten(parsed.list).find((i) => i.name === name));
+      return docText(item);
+    };
+    expect(flattenByName("van-weekly", "Bananas")).toBe("Bananas; Fresh > Fruit & veg");
+    expect(flattenByName("van-weekly", "Tomatoes")).toBe(
+      "Tomatoes; tomates; Fresh > Fruit & veg",
+    );
+    expect(flattenByName("deep-nesting", "Cumin")).toBe(
+      "Cumin; comino, kmín; Home > Kitchen > Pantry > Spices",
+    );
+    // No list emits an empty field or a misplaced separator anywhere.
+    for (const sample of samples) {
+      const parsed = parseList(sample.text);
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) continue;
+      for (const item of flatten(parsed.list)) {
+        const value = docText(item);
+        expect(value).not.toContain("; ;");
+        expect(value).not.toContain(", ;");
+        expect(value.startsWith("; ")).toBe(false);
+      }
+    }
+  });
 
   it("covers all 44 real sample items across the four files", () => {
     const total = samples.reduce((sum, sample) => {

@@ -20,8 +20,18 @@ test -f "$APK" || { echo "::error::APK not found: $APK"; exit 1; }
 
 # The shipping gate lives in the workflow (bundle present, arm64 only). Here we only prove LOAD,
 # but re-assert the bundle on the emulator APK too: the x86_64 variant must also be standalone.
-unzip -l "$APK" | grep -q 'assets/index.android.bundle' || {
+#
+# The listing goes to a file on purpose. `unzip -l "$APK" | grep -q ...` under `set -o pipefail`
+# FAILS even when the bundle is present: grep -q exits at the first match, unzip dies of SIGPIPE
+# (141), and pipefail propagates 141. That false negative failed run 44168106312 after a green
+# build ("emulator APK has no JS bundle" while :app:createBundleReleaseJsAndAssets had just run).
+apk_list="$(mktemp)"
+unzip -l "$APK" > "$apk_list"
+grep -q 'assets/index.android.bundle' "$apk_list" || {
   echo "::error::emulator APK has no JS bundle — it would need Metro"; exit 1; }
+bundle_bytes="$(awk '/assets\/index.android.bundle/{print $1}' "$apk_list")"
+abis="$(grep -oE 'lib/[^/]+/' "$apk_list" | cut -d/ -f2 | sort -u | paste -sd, -)"
+echo "emulator APK: $(stat -c%s "$APK") bytes, JS bundle ${bundle_bytes} bytes, ABIs: ${abis:-none}"
 
 adb install -r "$APK"
 adb shell pm grant "$PKG" android.permission.CAMERA || true
@@ -31,13 +41,15 @@ grep -q "Status: ok" launch.txt
 
 # Cold start of a release RN app: give the first frame time, then require a live process.
 sleep 15
-pid="$(adb shell pidof "$PKG" | tr -d '\r')"
+pid="$(adb shell pidof "$PKG" | tr -d '\r' || true)"
 test -n "$pid" || { echo "::error::app process not running after launch"; exit 1; }
 adb exec-out screencap -p > screen-1-lists.png
 
-if adb logcat -d | grep -q "FATAL EXCEPTION"; then
+# Same pipefail/SIGPIPE trap as the bundle guard above: capture the log, then grep the file.
+adb logcat -d > logcat-launch.txt
+if grep -q "FATAL EXCEPTION" logcat-launch.txt; then
   echo "::error::app crashed on launch"
-  adb logcat -d | tail -150
+  tail -150 logcat-launch.txt
   exit 1
 fi
 
@@ -81,9 +93,10 @@ if tap_text "Magic scan"; then
   sleep 2
 fi
 
-if adb logcat -d | grep -q "FATAL EXCEPTION"; then
+adb logcat -d > logcat-end.txt
+if grep -q "FATAL EXCEPTION" logcat-end.txt; then
   echo "::error::app crashed during navigation"
-  adb logcat -d | tail -150
+  tail -150 logcat-end.txt
   exit 1
 fi
 

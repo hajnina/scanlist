@@ -442,9 +442,17 @@ class GemmaEmbedder:
 
     def _encode_image(self, blob: bytes) -> Sequence[float]:
         """Raw 768-d model output for one image (no prefix, per prompts.json)."""
-        from PIL import Image  # noqa: PLC0415 - pulled in by sentence-transformers
-
+        # Load (and validate) the model first: missing weights are the expected
+        # failure and must surface as E_NO_MODEL, not as a missing-Pillow import
+        # (CI installs neither).
         model = self._ensure_model()
+        try:
+            from PIL import Image  # noqa: PLC0415 - pulled in by sentence-transformers
+        except ImportError as exc:  # pragma: no cover - pillow ships with ST
+            raise NoModelError(
+                f"image embedding needs Pillow: {exc}",
+                hint="pip install -r apps/web/server/requirements-gemma.txt",
+            ) from exc
         with Image.open(io.BytesIO(blob)) as image:
             image = image.convert("RGB")
             out = model.encode(

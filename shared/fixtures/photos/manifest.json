@@ -1,0 +1,209 @@
+[
+  {
+    "file": "milk.jpg",
+    "slug": "milk",
+    "kind": "hit",
+    "target_names": [
+      "Milk"
+    ],
+    "barcode": "8593807234713",
+    "product_name": "Mléko polotučné s obsahem  1,5% tuku",
+    "brands": "Olma",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/859/380/723/4713/front_en.10.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/8593807234713",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "pasta.jpg",
+    "slug": "pasta",
+    "kind": "hit",
+    "target_names": [
+      "Pasta"
+    ],
+    "barcode": "8076800195057",
+    "product_name": "Spaghetti Nº5",
+    "brands": "Barilla, BARILLA NORGE ASbarilla",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/807/680/019/5057/front_en.3881.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/8076800195057",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "ice-cream.jpg",
+    "slug": "ice-cream",
+    "kind": "hit",
+    "target_names": [
+      "Ice cream"
+    ],
+    "barcode": "5000159484695",
+    "product_name": "Twix glacé",
+    "brands": "Twix",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/500/015/948/4695/front_fr.85.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/5000159484695",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "olive-oil.jpg",
+    "slug": "olive-oil",
+    "kind": "hit",
+    "target_names": [
+      "Olive oil"
+    ],
+    "barcode": "8002470023727",
+    "product_name": "Huile d'olive vierge extra Bio Classico",
+    "brands": "Carapelli",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/800/247/002/3727/front_en.71.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/8002470023727",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "olives.jpg",
+    "slug": "olives",
+    "kind": "hit",
+    "target_names": [
+      "Olives"
+    ],
+    "barcode": "3017239003723",
+    "product_name": "Olives vertes dénoyautées -25% sel",
+    "brands": "Tramier",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/301/723/900/3723/front_fr.53.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/3017239003723",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "bananas.jpg",
+    "slug": "bananas",
+    "kind": "hit",
+    "target_names": [
+      "Bananas"
+    ],
+    "barcode": "3564707141710",
+    "product_name": "Bananes 5 fruits",
+    "brands": "Bio Village, Marque Repère",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/356/470/714/1710/front_en.46.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/3564707141710",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "cheese.jpg",
+    "slug": "cheese",
+    "kind": "hit",
+    "target_names": [
+      "Cheese"
+    ],
+    "barcode": "6111246721261",
+    "product_name": "Fromage Blanc Nature",
+    "brands": "Milky Food Professional, SODIPOL",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/611/124/672/1261/front_fr.118.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/6111246721261",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "butter.jpg",
+    "slug": "butter",
+    "kind": "hit",
+    "target_names": [
+      "Butter"
+    ],
+    "barcode": "6111242105331",
+    "product_name": "Beurre Frais Pasteurisé",
+    "brands": "Jaouda",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/611/124/210/5331/front_fr.38.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/6111242105331",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "honey.jpg",
+    "slug": "honey",
+    "kind": "hit",
+    "target_names": [
+      "Honey"
+    ],
+    "barcode": "3088540004440",
+    "product_name": "Honey",
+    "brands": "Lune de Miel",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/308/854/000/4440/front_fr.129.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/3088540004440",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "tomatoes.jpg",
+    "slug": "tomatoes",
+    "kind": "hit",
+    "target_names": [
+      "Tomatoes"
+    ],
+    "barcode": "6111021090049",
+    "product_name": "Concentré de tomates Aicha",
+    "brands": "LES CONSERVES DE MEKNES",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/611/102/109/0049/front_fr.4.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/6111021090049",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "eggs.jpg",
+    "slug": "eggs",
+    "kind": "hit",
+    "target_names": [
+      "Eggs"
+    ],
+    "barcode": "3270190021179",
+    "product_name": "Oeufs frais BIO",
+    "brands": "Carrefour",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/327/019/002/1179/front_fr.168.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/3270190021179",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "bread.jpg",
+    "slug": "bread",
+    "kind": "hit",
+    "target_names": [
+      "Bread",
+      "Sourdough loaf"
+    ],
+    "barcode": "3760049790214",
+    "product_name": "Pain De Mie Bio",
+    "brands": "La Boulangère, La Boulangère Bio, La Boulangère",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/376/004/979/0214/front_en.262.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/3760049790214",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "coffee.jpg",
+    "slug": "coffee",
+    "kind": "hit",
+    "target_names": [
+      "Coffee beans"
+    ],
+    "barcode": "6111018903161",
+    "product_name": "Nescafé Classic",
+    "brands": "Nescafé",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/611/101/890/3161/front_fr.48.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/6111018903161",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "nutella.jpg",
+    "slug": "nutella",
+    "kind": "distractor",
+    "target_names": [],
+    "barcode": "3017620422003",
+    "product_name": "Nutella",
+    "brands": "Ferrero, Nutella",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/301/762/042/2003/front_en.879.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/3017620422003",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  },
+  {
+    "file": "coca-cola.jpg",
+    "slug": "coca-cola",
+    "kind": "distractor",
+    "target_names": [],
+    "barcode": "5449000000996",
+    "product_name": "Coca-Cola Original",
+    "brands": "COCA-COLA SERVICES SA/NV",
+    "image_front_url": "https://images.openfoodfacts.org/images/products/544/900/000/0996/front_en.1129.400.jpg",
+    "off_url": "https://world.openfoodfacts.org/product/5449000000996",
+    "licence": "CC-BY-SA 3.0 — Open Food Facts product image"
+  }
+]

@@ -232,7 +232,10 @@ export function browserStorage(): StorageLike | null {
 
 export interface ResolvedStorage {
   storage: StorageLike;
-  /** Non-null when persistence is degraded (in-memory only); surfaced as a toast. */
+  /**
+   * Non-null when persistence is degraded (in-memory only); surfaced as the startup toast and a
+   * persistent banner.
+   */
   warning: string | null;
 }
 

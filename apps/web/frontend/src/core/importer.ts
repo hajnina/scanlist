@@ -22,7 +22,22 @@ export function importFromText(text: string, source = "paste"): ImportOutcome {
   if (text.trim() === "") {
     return { ok: false, source, errors: ["/: the document is empty"] };
   }
-  const result = parseList(text);
+  // ts-core's recursive descent overflows the stack around ~1600 nesting levels
+  // (C2 review: a hostile paste was a silent no-op — RangeError escaped as neither
+  // ok nor errors). Catch it here so EVERY failure path returns pointered errors
+  // and the UI can toast; a ts-core depth cap remains the durable fix (logged).
+  let result: ReturnType<typeof parseList>;
+  try {
+    result = parseList(text);
+  } catch (error) {
+    return {
+      ok: false,
+      source,
+      errors: [
+        `/: the document is too deeply nested to parse (${error instanceof Error ? error.message : "unknown error"})`,
+      ],
+    };
+  }
   if (!result.ok) return { ok: false, source, errors: result.errors };
   return { ok: true, list: result.list, source };
 }

@@ -17,9 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  *  - resumable: one `.part` file next to the target, HTTP `Range: bytes=<len>-`;
  *  - retrying: IOException/timeouts back off 1/2/4/8… up to 30 s, forever while the app lives;
- *    403/404 are terminal (the URL or the pin is wrong, retrying cannot help);
+ *    403/404, a wrong pinned URL/sha, or too little free space are terminal (retrying cannot help);
  *  - verified: exact byte size + sha256 before the atomic `.part` → final rename;
- *  - observable: [status] is a cheap snapshot the bridge returns from `status()`.
+ *  - observable: [status] is a cheap snapshot the bridge returns from `status()`; `start()` publishes
+ *    DOWNLOADING synchronously, so the first status poll after mount already sees the work;
  *
  * The core is transport- and clock-injectable so JVM unit tests cover the state machine without a
  * network or a 484 MB fixture (see `app/src/test/.../ModelDownloadTest.kt`).
@@ -101,6 +102,15 @@ internal class ModelDownload(
     private val transport: DownloadTransport = HttpDownloadTransport(),
     private val sleep: (Long) -> Unit = { Thread.sleep(it) },
     private val onUpdate: (DownloadStatus) -> Unit = {},
+    /** Usable bytes on [target]'s volume; injected because `StatFs` is an Android stub on the JVM. */
+    private val usableBytes: () -> Long = { usableSpaceOn(target) },
+    /**
+     * Runs the download body. Injected only by tests, which capture the body instead of running it
+     * on a thread — that is how "start() published before the worker ran" is asserted deterministically.
+     */
+    private val launch: (() -> Unit) -> Unit = { body ->
+        Thread(body, "scanlist-model-download").apply { isDaemon = true }.start()
+    },
 ) {
     val part: File = File(target.parentFile, target.name + ".part")
 
@@ -124,13 +134,29 @@ internal class ModelDownload(
         if (!running.compareAndSet(false, true)) return false
         shaRestarts = 0
         rangeRestarts = 0
-        Thread({
+        target.parentFile?.mkdirs()
+        // MODELDL fix 2: a full phone looped the transient retry forever with the UI stuck at
+        // "Downloading model… X%" (and the `.part` never growing). Space is something only the user
+        // can fix, so it is terminal: one clear FAILED, no backoff.
+        val shortage = spaceShortage()
+        if (shortage != null) {
+            running.set(false)
+            fail(shortage)
+            return false
+        }
+        // MODELDL fix 4 (the cold-start race): publish BEFORE the worker exists. JS re-polls only
+        // while the snapshot says downloading/verifying (`useScanGuidance.ts`), so an IDLE first
+        // answer froze the adb-push hint for the whole 484 MB session. From here the state machine
+        // is honest: a download really is in progress.
+        val offset = existingPartBytes()
+        publish(DownloadStatus(DownloadState.DOWNLOADING, offset, expectedBytes, pct(offset)))
+        launch {
             try {
                 run()
             } finally {
                 running.set(false)
             }
-        }, "scanlist-model-download").apply { isDaemon = true }.start()
+        }
         return true
     }
 
@@ -187,6 +213,9 @@ internal class ModelDownload(
             publish(DownloadStatus(DownloadState.READY, expectedBytes, expectedBytes, 100))
             return
         }
+        // MODELDL fix 2, resume path: the volume can fill while the app lives (the scanner writes
+        // ~100-200 KB per sampled frame), so re-check at every attempt — one `StatFs` call is cheap.
+        spaceShortage()?.let { throw TerminalDownloadException(it) }
         var offset = if (part.isFile) part.length() else 0L
         if (offset > expectedBytes) {
             part.delete()
@@ -312,6 +341,28 @@ internal class ModelDownload(
         return ContentRange(start, end, total)
     }
 
+    /** Bytes already downloaded into the `.part` (clamped: a stale oversized part restarts at zero). */
+    private fun existingPartBytes(): Long =
+        if (part.isFile) part.length().coerceIn(0, expectedBytes) else 0
+
+    /**
+     * MODELDL fix 2: `null` when the target volume can hold the bytes still missing plus
+     * [FREE_SPACE_MARGIN_BYTES] of headroom (the `.part` fsync, the rename, and the OS's own writes
+     * need slack). A `usableBytes` that throws means "unknown", which never blocks a download.
+     */
+    private fun spaceShortage(): String? {
+        val missing = (expectedBytes - existingPartBytes()).coerceAtLeast(0)
+        val need = missing + FREE_SPACE_MARGIN_BYTES
+        val have = runCatching { usableBytes() }.getOrDefault(Long.MAX_VALUE)
+        if (have >= need) return null
+        return "not enough free space: need ${mib(need)} " +
+            "(${mib(missing)} still to download + ${mib(FREE_SPACE_MARGIN_BYTES)} margin), " +
+            "${mib(have)} available"
+    }
+
+    private fun mib(bytes: Long): String =
+        String.format(java.util.Locale.US, "%.0f MiB", bytes / 1_048_576.0)
+
     private fun copyToPart(body: InputStream, offset: Long) {
         // Append for a resumed transfer; truncate when the server restarted us at zero.
         java.io.FileOutputStream(part, offset > 0).use { out ->
@@ -349,13 +400,34 @@ internal class ModelDownload(
         if (expectedBytes <= 0) 0 else ((bytes * 100) / expectedBytes).toInt().coerceIn(0, 100)
 
     companion object {
+        /**
+         * MODELDL fix 1 — the bundle's immutable revision on Hugging Face. `/resolve/main/` would
+         * silently track a future upload: sha mismatch ⇒ one cold 484 MB retry ⇒ terminal FAILED
+         * (and the settings copy then lost the adb remedy). Re-pin URL + [MODEL_SHA256] +
+         * [MODEL_BYTES] together when the bundle changes:
+         *   curl -s "https://huggingface.co/api/models/litert-community/embeddinggemma-2-740m-litert-lm/revision/main"
+         * Verified 2026-11-17: sha 66011bd4…, file 484622336 B, lfs sha256 e7a8a220…7f4c.
+         */
+        const val MODEL_REVISION = "66011bd4f00a8b36a1d3c4ae7bf908b4891b4881"
+
         const val MODEL_URL =
-            "https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/main/embeddinggemma-2-740m.litertlm"
+            "https://huggingface.co/litert-community/embeddinggemma-2-740m-litert-lm/resolve/" +
+                MODEL_REVISION + "/embeddinggemma-2-740m.litertlm"
 
         /** Pinned by `scripts/model.sh` / `EmbedderConfig.DEFAULT_MODEL_SHA256`. */
         const val MODEL_SHA256 = "e7a8a2204b91e0f96e92960e84a09a89212e1633dcb7575a9bf3378b4df77f4c"
 
         const val MODEL_BYTES = 484_622_336L
+
+        /** Headroom demanded on top of the missing bytes (filesystem/rename/OS writes). */
+        const val FREE_SPACE_MARGIN_BYTES = 512L * 1024 * 1024
+
+        /** Usable bytes on [target]'s volume. Unreadable volumes read as "plenty" (never block). */
+        internal fun usableSpaceOn(target: File): Long {
+            val dir = target.parentFile ?: return Long.MAX_VALUE
+            return runCatching { android.os.StatFs(dir.absolutePath).availableBytes }
+                .getOrDefault(Long.MAX_VALUE)
+        }
 
         private const val BUFFER_BYTES = 256 * 1024
 

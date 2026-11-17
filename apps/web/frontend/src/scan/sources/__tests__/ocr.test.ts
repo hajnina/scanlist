@@ -104,6 +104,19 @@ describe('extractOcrLines', () => {
     expect(extractOcrLines(page(lateLine)).map((line) => line.text)).toEqual(['Oat milk']);
   });
 
+  it('collapses within-batch duplicates BEFORE the cap (mutant guard)', () => {
+    // A label repeated 16 times (shelf rows, reflections) must not use all 16 slots: cap-before-
+    // dedupe would return just ['Same label'] and lose the four fresh lines below it.
+    const repeated = [...Array.from({ length: 16 }, () => 'Same label'), 'new 0', 'new 1', 'new 2', 'new 3'];
+    expect(extractOcrLines(page(repeated)).map((line) => line.text)).toEqual([
+      'Same label',
+      'new 0',
+      'new 1',
+      'new 2',
+      'new 3',
+    ]);
+  });
+
   it('honours custom minChars/maxLines', () => {
     expect(extractOcrLines(page(['ab', 'abc', 'abcd']), { minChars: 2 }).map((line) => line.text)).toEqual([
       'ab',
@@ -219,5 +232,22 @@ describe('ocrLineSignals (one signal per line, repeat-suppressed)', () => {
     );
     expect(signals).toHaveLength(16);
     expect(signals.at(-1)?.text).toBe('line 15');
+  });
+
+  it('repeat-suppressed lines consume no cap slots (starvation guard, A4-sync parity)', () => {
+    const deduper = createOcrLineDeduper(2000, { now: () => 0 });
+
+    // Tick 1 sees 16 held lines and fills the repeat window with them.
+    const held = Array.from({ length: 16 }, (_, index) => `held ${index}`);
+    expect(
+      ocrLineSignals(page(held), { deduper, clock: { now: () => 0 } }).map((signal) => signal.text),
+    ).toEqual(held);
+
+    // Tick 2 (inside the 2 s window) sees the same 16 lines and 4 fresh ones below them. If the cap
+    // ran before the repeat window, the 16 suppressed lines would fill every slot and this tick would
+    // emit nothing — the merged A4-sync implementation emits the 4 fresh lines.
+    const fresh = ['new 0', 'new 1', 'new 2', 'new 3'];
+    const tickTwo = ocrLineSignals(page([...held, ...fresh]), { deduper, clock: { now: () => 1000 } });
+    expect(tickTwo.map((signal) => signal.text)).toEqual(fresh);
   });
 });

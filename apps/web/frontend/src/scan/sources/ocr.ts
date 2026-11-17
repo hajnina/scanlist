@@ -15,8 +15,9 @@
  *  - per-line confidence chain: the line's own `confidence` → the mean of **that line's** element
  *    confidences → neutral 0.6;
  *  - ≤ {@linkcode MAX_OCR_LINES_PER_TICK} lines per tick, in detection order, **cap applied after**
- *    filtering and per-batch dedupe (mutating it to a "first 16 raw lines" cap must break the
- *    tests: blanks/duplicates would eat the budget);
+ *    normalising, min-length filtering, per-batch dedupe and the cross-tick repeat window — a
+ *    suppressed line consumes no cap slot (mutants that cap before any of those steps must break the
+ *    tests: blanks, duplicates or a held page would otherwise eat the budget);
  *  - a repeat window per line, case-insensitive, so a held-still shelf does not re-rank on identical
  *    queries every tick.
  *
@@ -113,24 +114,34 @@ export function lineConfidence(line: OcrLineLike): number {
 export interface ExtractOcrLinesOptions {
   /** Ignore lines shorter than this after whitespace normalisation. Default 3. */
   minChars?: number;
-  /** Hard cap, in detection order, applied AFTER filtering/dedupe. Default 16 (RANK.md §2.2). */
+  /** Hard cap on emitted lines, in detection order. Default 16 (RANK.md §2.2). */
   maxLines?: number;
+  /**
+   * Optional cross-tick suppression (the repeat window). Called after blank/too-short and
+   * within-batch duplicate filtering, and before the cap counts the line: a suppressed line
+   * consumes no cap slot (A4-sync parity; a held page must not starve fresh lines below it).
+   */
+  acceptLine?: (text: string) => boolean;
 }
 
 /**
  * Flatten an OCR result into per-line queries in detection order.
  *
- * Within one batch: blank/too-short lines are dropped and a repeated line (case-insensitive, e.g. a
- * logo or a reflection) is kept once — the first occurrence wins. **Then** the first `maxLines`
- * surviving lines are kept: filtering before capping is what keeps a page of blanks from spending
- * the whole query budget on nothing.
+ * Order matches the merged A4-sync extractor and Kotlin B4-sync batcher: normalise → drop
+ * blank/too-short → collapse duplicates within the batch → apply the optional cross-tick
+ * `acceptLine` predicate → count against `maxLines`. Suppressed lines therefore consume no cap
+ * slots and fresh lines further down a held page still get emitted.
  *
  * When the backend only fills `result.text`, it is split on line breaks so the per-line contract
  * still holds.
  */
 export function extractOcrLines(
   result: OcrResultLike,
-  { minChars = DEFAULT_OCR_MIN_CHARS, maxLines = MAX_OCR_LINES_PER_TICK }: ExtractOcrLinesOptions = {},
+  {
+    minChars = DEFAULT_OCR_MIN_CHARS,
+    maxLines = MAX_OCR_LINES_PER_TICK,
+    acceptLine,
+  }: ExtractOcrLinesOptions = {},
 ): OcrLine[] {
   const raw: OcrLineLike[] = [];
   for (const block of result.blocks ?? []) {
@@ -154,11 +165,12 @@ export function extractOcrLines(
     const key = text.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
+    if (acceptLine !== undefined && !acceptLine(text)) continue;
     lines.push({ text, confidence: lineConfidence(line) });
+    if (lines.length >= maxLines) break;
   }
 
-  // Cap AFTER filtering/dedupe: RANK.md §2.2 drops extra OCR lines in detection order.
-  return lines.slice(0, Math.max(0, maxLines));
+  return lines;
 }
 
 export interface OcrLineDeduper {
@@ -211,7 +223,8 @@ export interface OcrLineSignalsOptions extends ExtractOcrLinesOptions {
 
 /**
  * Turn one OCR result into **one ScanSignal per OCR line** (≤ 16, detection order). Lines emitted
- * within the repeat window are suppressed.
+ * within the repeat window are suppressed *before* the cap (inside extraction), so a carried-over
+ * page cannot starve fresh lines further down the frame.
  */
 export function ocrLineSignals(
   result: OcrResultLike,
@@ -220,12 +233,14 @@ export function ocrLineSignals(
   const dedupe = deduper ?? createOcrLineDeduper(repeatMs, clock);
   const now = clock.now();
 
-  return extractOcrLines(result, { minChars, maxLines })
-    .filter((line) => dedupe.accept(line.text, now))
-    .map((line) => ({
-      source: 'ocr' as const,
-      text: line.text,
-      confidence: line.confidence,
-      at: now,
-    }));
+  return extractOcrLines(result, {
+    minChars,
+    maxLines,
+    acceptLine: (text) => dedupe.accept(text, now),
+  }).map((line) => ({
+    source: 'ocr' as const,
+    text: line.text,
+    confidence: line.confidence,
+    at: now,
+  }));
 }

@@ -135,6 +135,10 @@ android {
     }
 }
 
+// Card A6 (nit a): resolved outside `dependencies {}` — that closure's delegate does not expose
+// Project properties such as `rootDir`/`settingsDir`.
+def scanlistEmbedModule = new File(rootDir, '../../../shared/android-embed/build.gradle.kts')
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
@@ -142,7 +146,7 @@ dependencies {
     // Card A6 (nit a): the shared on-device embedding engine, included by path in settings.gradle.
     // The guard mirrors that file's include-if-exists (a checkout without shared/android-embed fails
     // later with an explicit message instead of a confusing "project not found" here).
-    if (new File(settingsDir, '../../../shared/android-embed/build.gradle.kts').isFile()) {
+    if (scanlistEmbedModule.isFile()) {
         implementation project(':android-embed')
     }
 

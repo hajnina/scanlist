@@ -25,6 +25,9 @@ newest are anchor-inserted near the TOP, use grep for headings).
 - BEFORE every commit in the MAIN checkout, verify `git branch --show-current` == main — parallel actors
   create/checkout branches here (checkout race bit once: a log commit landed on the owner's PR branch).
   Worktree lanes for anything else; the main checkout is the board's coordination surface and must stay on main.
+- AFTER ANY RESTART, verify the SSH identity BEFORE pushing: `ssh -T git@github.com` must resolve to the
+  expected account (hajnina, not hajny-gutiva). The restart flipped key precedence once; fixed repo-locally via
+  `git config core.sshCommand "ssh -i ~/.ssh/id_ed25519_github_personal -o IdentitiesOnly=yes"`.
 - `gh pr edit` is BROKEN on this gh version (projects-classic GraphQL deprecation) — update PR bodies via REST:
   `gh api repos/hajnina/scanlist/pulls/<n> -X PATCH -f body="$(cat body.md)"`.
 - Martin merges his own lanes WITHOUT reviews sometimes (mergedBy hajnina, #42/#43) — accepted; adversarial

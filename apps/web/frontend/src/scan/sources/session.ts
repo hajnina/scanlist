@@ -3,9 +3,10 @@
  *
  * One video element, one canvas, three signals:
  *
- *   every ~150 ms   drawImage → BarcodeDetector.detect(ImageData) → barcode signal (debounced)
- *   every ~450 ms   canvas → 384 px JPEG → single-flight uploader → image signal + embedding
- *   every ~1 s      canvas → JPEG → lazy Tesseract → one OCR signal per line (repeat-suppressed)
+ *   every 150 ms    drawImage → BarcodeDetector.detect(ImageData) → barcode signal (debounced)
+ *   every 400 ms    JPEG capture budget (2.5 fps; on the 150 ms grid the second tick is at ~450 ms)
+ *                   → 384 px JPEG → single-flight uploader → image signal + embedding (on result)
+ *   every 1 s       canvas → JPEG → lazy Tesseract → one OCR signal per line (repeat-suppressed)
  *
  * The cadence gate, barcode/OCR shaping and uploader are unit-tested; this file is the thin DOM
  * glue (camera stream, canvas, timers). It is exercised by the manual webcam script in `README.md`
@@ -36,7 +37,10 @@ export interface ScanSessionOptions {
   onError?: (error: unknown, source: 'camera' | 'barcode' | 'ocr' | 'image') => void;
   /** Pre-selected detector (tests/demos); otherwise feature-detected at `start()`. */
   detector?: Pick<BarcodeDetectorLike, 'detect'>;
-  /** OCR is opt-in: no engine, no Tesseract download. */
+  /**
+   * OCR is opt-in: no engine, no Tesseract download. The session takes ownership of the engine and
+   * terminates its worker in `stop()` (a stopped session is single-use).
+   */
   ocr?: { engine: OcrEngine; intervalMs?: number };
   endpoint?: string;
   camera?: CameraEnvironment;
@@ -80,7 +84,15 @@ export function createScanSession(options: ScanSessionOptions): ScanSession {
   const bytes = createByteCounter();
   const uploader: FrameUploader = createFrameUploader({
     embed: createServerImageEmbedder({ fetch, ...(endpoint === undefined ? {} : { endpoint }) }).embed,
-    onResult: (result) => onImageEmbedding?.(result),
+    onResult: (result) => {
+      // Emit the image signal only when the vector actually lands (A4 parity): a frame that was
+      // replaced by a newer one while the upload was in flight never produces a signal, so the
+      // ranker cannot be handed an image marker with no accompanying embedding. `capturedAt` is
+      // the frame's own timestamp, not "now".
+      if (!running) return;
+      onSignal(imageSignal(result.frame.capturedAt));
+      onImageEmbedding?.(result);
+    },
     onError: (error) => onError?.(error, 'image'),
   });
 
@@ -141,7 +153,6 @@ export function createScanSession(options: ScanSessionOptions): ScanSession {
       return;
     }
     bytes.record(frame);
-    onSignal(imageSignal(frame.capturedAt));
     uploader.submit(frame);
   }
 
@@ -167,7 +178,16 @@ export function createScanSession(options: ScanSessionOptions): ScanSession {
       video.srcObject = stream;
       video.playsInline = true;
       video.muted = true;
-      await video.play();
+      try {
+        await video.play();
+      } catch (error) {
+        // A rejected play() (autoplay policy, device switched away) must not leave the camera LED
+        // on: release the tracks before surfacing the error.
+        stopStream(stream);
+        stream = undefined;
+        video.srcObject = null;
+        throw error;
+      }
 
       if (ocr !== undefined) {
         ocrSource = createOcrSource({
@@ -197,6 +217,14 @@ export function createScanSession(options: ScanSessionOptions): ScanSession {
       }
       ocrSource?.stop();
       ocrSource = undefined;
+      if (ocr !== undefined) {
+        // The Tesseract worker is a real thread + wasm instance: it must be terminated, not left to
+        // the page's lifetime. The session owns the engine it was handed (single-use: a stopped
+        // session is not restartable with the same engine).
+        void ocr.engine.dispose().catch(() => {
+          // A worker that never started (OCR unused) has nothing to terminate.
+        });
+      }
       uploader.close();
       grabber.dispose();
       stopStream(stream);

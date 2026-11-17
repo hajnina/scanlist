@@ -146,6 +146,42 @@ describe('frame uploader', () => {
     await expect(uploader.idle()).resolves.toBeUndefined();
   });
 
+  it('emits the image signal only when the embedding result lands (replaced frames emit nothing)', async () => {
+    const first = deferred<ImageEmbedding>();
+    const second = deferred<ImageEmbedding>();
+    const calls: number[] = [];
+    const embed = vi.fn(async (submitted: CapturedFrame) => {
+      calls.push(submitted.capturedAt);
+      return calls.length === 1 ? first.promise : second.promise;
+    });
+    const signals: Array<{ text: string; at: number | undefined }> = [];
+    const embeddings: number[] = [];
+    // Mirrors createScanSession's `onResult`: the signal is emitted from the upload result, never
+    // from submit(). A frame replaced while the POST was in flight therefore emits no marker.
+    const uploader = createFrameUploader({
+      embed,
+      onResult: ({ frame }) => {
+        const signal = imageSignal(frame.capturedAt);
+        signals.push({ text: signal.text, at: signal.at });
+        embeddings.push(frame.capturedAt);
+      },
+    });
+
+    uploader.submit(frame(1)); // in flight
+    uploader.submit(frame(2)); // pending
+    uploader.submit(frame(3)); // replaces frame 2 before it is ever sent
+    expect(signals).toEqual([]); // nothing emitted before a response arrives
+
+    first.resolve(embedding());
+    await vi.waitFor(() => expect(calls).toEqual([1, 3]));
+    expect(signals).toEqual([{ text: IMAGE_QUERY_MARKER, at: 1 }]); // frame 2 never emitted
+
+    second.resolve(embedding());
+    await uploader.idle();
+    expect(signals.map((signal) => signal.at)).toEqual([1, 3]);
+    expect(embeddings).toEqual([1, 3]);
+  });
+
   it('imageSignal carries the A1 image marker', () => {
     expect(imageSignal(42)).toEqual({ source: 'image', text: IMAGE_QUERY_MARKER, confidence: 1, at: 42 });
   });

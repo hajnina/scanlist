@@ -2,6 +2,10 @@
  * Card A6 — render smoke test for the settings screen: it renders the controller's snapshot (picker,
  * latency, model status, prefix set, haptics) and routes the two actions through the controller.
  * The decisions are covered by the module tests; this is the wiring the jsdom-level tests cannot see.
+ *
+ * Every tree is unmounted in `afterEach`: `SpringIn` uses a native-driver spring, and a tree left
+ * mounted would keep that animation scheduled past Jest's teardown (the worker then crashes on a
+ * dead native handle even though the test itself PASSed).
  */
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
@@ -67,8 +71,9 @@ function controller(
   return new SettingsController(deps);
 }
 
-async function render(ctl: SettingsController) {
-  let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+let tree: ReactTestRenderer.ReactTestRenderer | undefined;
+
+async function mount(ctl: SettingsController): Promise<ReactTestRenderer.ReactTestRenderer> {
   await ReactTestRenderer.act(async () => {
     tree = ReactTestRenderer.create(
       <ScanListThemeProvider>
@@ -79,8 +84,21 @@ async function render(ctl: SettingsController) {
   // init() + the run effect both settle off the first render.
   await ReactTestRenderer.act(async () => {});
   await ReactTestRenderer.act(async () => {});
-  return JSON.stringify(tree?.toJSON());
+  return tree!;
 }
+
+async function render(ctl: SettingsController): Promise<string> {
+  const mounted = await mount(ctl);
+  return JSON.stringify(mounted.toJSON());
+}
+
+afterEach(async () => {
+  await ReactTestRenderer.act(async () => {
+    tree?.unmount();
+  });
+  tree = undefined;
+  jest.clearAllTimers();
+});
 
 describe('SettingsScreen', () => {
   test('renders the picker, the latency measurement, the model bundle and the prefix set', async () => {
@@ -101,10 +119,9 @@ describe('SettingsScreen', () => {
     expect(text).toContain(MODEL.path);
     expect(text).toContain('matches the pinned bundle size');
     expect(text).toContain('EXPECTED e7a8a220');
-    // Prefix set: the summary and the named trailing spaces.
+    // Prefix set: the summary and the named trailing spaces. The snapshot is JSON, so the
+    // quoted prefix arrives with escaped quotes; the exact quoting is `describePrefix`'s own test.
     expect(text).toContain('mnemothera · v1 · 768→256');
-    // The snapshot is JSON, so the quoted prefix arrives with escaped quotes; assert the
-    // load-bearing parts (the exact quoting is `describePrefix`'s own unit test).
     expect(text).toContain('task: search result | text: ');
     expect(text).toContain('· trailing space');
     expect(ctl.getSnapshot().phase).toBe('done');
@@ -126,18 +143,9 @@ describe('SettingsScreen', () => {
 
   test('picking a backend persists it and re-runs the self-test on the new choice', async () => {
     const ctl = controller();
-    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
-    await ReactTestRenderer.act(async () => {
-      tree = ReactTestRenderer.create(
-        <ScanListThemeProvider>
-          <SettingsScreen onBack={() => undefined} controller={ctl} />
-        </ScanListThemeProvider>,
-      );
-    });
-    await ReactTestRenderer.act(async () => {});
-    await ReactTestRenderer.act(async () => {});
+    const mounted = await mount(ctl);
 
-    const cpuChip = tree?.root.findAll(
+    const cpuChip = mounted.root.findAll(
       node =>
         node.props.accessibilityLabel === 'CPU' &&
         typeof node.props.onPress === 'function',
@@ -150,24 +158,16 @@ describe('SettingsScreen', () => {
     await ReactTestRenderer.act(async () => {});
 
     expect(ctl.getSnapshot().choice).toBe('cpu');
-    expect(JSON.stringify(tree?.toJSON())).toContain(
+    expect(JSON.stringify(mounted.toJSON())).toContain(
       'CPU — CPU only · active CPU',
     );
   });
 
   test('the haptics switch routes through the controller and persists', async () => {
     const ctl = controller();
-    let tree: ReactTestRenderer.ReactTestRenderer | undefined;
-    await ReactTestRenderer.act(async () => {
-      tree = ReactTestRenderer.create(
-        <ScanListThemeProvider>
-          <SettingsScreen onBack={() => undefined} controller={ctl} />
-        </ScanListThemeProvider>,
-      );
-    });
-    await ReactTestRenderer.act(async () => {});
+    const mounted = await mount(ctl);
 
-    const switches = tree?.root.findAll(
+    const switches = mounted.root.findAll(
       node =>
         node.props.accessibilityLabel === 'Haptics' &&
         typeof node.props.onValueChange === 'function',

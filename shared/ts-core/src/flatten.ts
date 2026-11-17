@@ -6,6 +6,7 @@
  * deeply nested list cannot overflow the call stack.
  */
 
+import { casefold } from "./casefold";
 import { sha1Hex } from "./sha1";
 import type { FlattenedItem, ScanList, ScanListSection } from "./types";
 
@@ -62,15 +63,13 @@ export function flatten(list: ScanList): FlattenedItem[] {
       }
       usedIds.add(id);
 
-      // FLATTEN.md §5: trim, drop empties, dedupe case-insensitively after NFC.
-      // NOTE: String#toLowerCase is not full Unicode case folding (Python's casefold() maps
-      // "ß" -> "ss", Kotlin uses lowercase(ROOT)); this is the same approximation the Kotlin
-      // track makes, pending S10's RANK.md amendment pinning one rule for all three tracks.
+      // FLATTEN.md §5: trim, drop empties, dedupe after NFC + Unicode full case folding — exactly
+      // the oracle's `unicodedata.normalize("NFC", alias).casefold()` (`casefold.ts`).
       const aliases: string[] = [];
       const seenAliases = new Set<string>();
       for (const rawAlias of item.aliases ?? []) {
         const alias = typeof rawAlias === "string" ? rawAlias.trim() : "";
-        const norm = alias.normalize("NFC").toLowerCase();
+        const norm = casefold(alias.normalize("NFC"));
         if (alias !== "" && !seenAliases.has(norm)) {
           seenAliases.add(norm);
           aliases.push(alias);

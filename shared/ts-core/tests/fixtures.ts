@@ -35,6 +35,10 @@ export interface GoldenQuery {
   expectedScores: number[];
   expectedMargin: number;
   text?: string | null;
+  /** Image queries only: the source photo and its resolved OFF product name + barcode. */
+  file?: string;
+  product?: string;
+  barcode?: string;
 }
 
 export interface GoldenFixture {

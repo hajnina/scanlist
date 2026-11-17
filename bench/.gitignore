@@ -1,0 +1,6 @@
+# Bench-local artifacts (card X1). Nothing here is ever committed.
+node_modules/
+.cache/
+.venv/
+driver/*.class
+driver/kotlin-classes/

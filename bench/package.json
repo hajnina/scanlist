@@ -1,0 +1,17 @@
+{
+  "name": "@scanlist/bench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ScanList cross-track benchmark harness (card X1). Dev-only: bundles shared/ts-core to runnable ESM so the rank benchmark needs no build of the app tracks.",
+  "license": "MIT",
+  "scripts": {
+    "rank:ts-core": "node scripts/rank-ts-core.mjs",
+    "rank:oracle": "python3 scripts/rank-oracle.py",
+    "loc": "bash scripts/loc.sh",
+    "run-all": "bash scripts/run-all.sh"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  }
+}

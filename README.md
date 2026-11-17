@@ -1,7 +1,7 @@
 # ScanList
 
 [![PR build](https://github.com/hajnina/scanlist/actions/workflows/pr.yml/badge.svg)](https://github.com/hajnina/scanlist/actions/workflows/pr.yml)
-[![ScanList (main)](https://img.shields.io/badge/release-main--rolling-blue)](https://github.com/hajnina/scanlist/releases/tag/main)
+[![ScanList (rolling)](https://img.shields.io/badge/release-rolling-blue)](https://github.com/hajnina/scanlist/releases/tag/rolling)
 
 Shopping list from nested JSON (section → item → amount) with a **magic scanner**: point the phone at a product and
 EmbeddingGemma 2 (text + image embeddings, on-device GPU/CPU/NPU or on a server) sorts the list by similarity so you tick it off fast.

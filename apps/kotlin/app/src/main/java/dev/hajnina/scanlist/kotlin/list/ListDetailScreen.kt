@@ -6,6 +6,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,9 +65,44 @@ fun ListDetailScreen(state: ListState, listId: String, onBack: () -> Unit) {
     val stored = state.get(listId)
 
     if (stored == null) {
+        // Card B7: this state always had the top ‹ LISTS escape; the improvement is the leaf card
+        // that explains what happened plus an in-card BACK TO LISTS button, like the other empty
+        // states in the app.
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextButton(onClick = onBack) { Text("‹ LISTS") }
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.ToggleOff)
+                    onBack()
+                },
+            ) { Text("‹ LISTS") }
             ScreenHeader("List gone", "It was deleted or could not be read.")
+            Card(
+                modifier = Modifier.fillMaxWidth().springIn(1),
+                shape = Shapes.leaf,
+                colors = CardDefaults.cardColors(
+                    containerColor = cs.surfaceContainerHigh,
+                    contentColor = cs.onSurface,
+                ),
+            ) {
+                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionLabel("Nothing to show")
+                    Text(
+                        "Go back to Lists and import it again, or pick another list.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Button(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.ToggleOff)
+                            onBack()
+                        },
+                    ) {
+                        Text(
+                            "BACK TO LISTS",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = Heavy, letterSpacing = 1.sp),
+                        )
+                    }
+                }
+            }
         }
         return
     }
@@ -311,7 +350,15 @@ private fun SectionBlock(
                 }
         }
 
-        AnimatedVisibility(visible = open) {
+        // Card B7: section expand/collapse used AnimatedVisibility's defaults (linear-ish fade+expand),
+        // which broke the guide's "spatial springs for anything that moves" rule. Explicit now.
+        AnimatedVisibility(
+            visible = open,
+            enter = expandVertically(animationSpec = Motion.spatial()) +
+                fadeIn(animationSpec = Motion.effects()),
+            exit = shrinkVertically(animationSpec = Motion.spatial()) +
+                fadeOut(animationSpec = Motion.effects()),
+        ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 section.items.forEachIndexed { itemIndex, item ->
                     val itemId = index.idAt(sectionPath, itemIndex) ?: return@forEachIndexed

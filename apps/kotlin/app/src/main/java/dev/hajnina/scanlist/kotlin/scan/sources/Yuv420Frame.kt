@@ -41,6 +41,43 @@ class Yuv420Frame(
 }
 
 /**
+ * Luma (brightness) of the Y plane, full range 0..255.
+ *
+ * Card B7's low-light gate needs one number per analysed frame. It lives here, next to the other pure
+ * YUV arithmetic, so the stride/pixel-stride rules are shared with [Nv21]: padding bytes must never be
+ * averaged into the mean (CameraX leaves them stale) and a `pixelStride` of 2 means every other byte is
+ * the sample. The detector that debounces this stream is `ui/LowLightDetector`.
+ */
+object Luma {
+
+    /**
+     * Mean luma of [frame], sampling every [step]-th pixel row and column. A 720p frame is ~920k
+     * pixels; step 8 reads ~14k of them, which is exact enough for a light-level gate and cheap
+     * enough to run on the camera analysis thread.
+     */
+    fun mean(frame: Yuv420Frame, step: Int = 8): Double {
+        require(step >= 1) { "step must be >= 1, was $step" }
+        val width = frame.width
+        val height = frame.height
+        var sum = 0L
+        var count = 0
+        var y = 0
+        while (y < height) {
+            var x = 0
+            var i = y * frame.yRowStride
+            while (x < width) {
+                sum += frame.y[i].toInt() and 0xFF
+                count++
+                x += step
+                i += step * frame.yPixelStride
+            }
+            y += step
+        }
+        return if (count == 0) 0.0 else sum.toDouble() / count
+    }
+}
+
+/**
  * NV21 (a.k.a. YUV420sp) helpers: the layout `android.graphics.YuvImage` accepts, so the last step
  * of "frame → JPEG" is a single `YuvImage.compressToJpeg` call on the already-downscaled buffer.
  *

@@ -35,47 +35,24 @@ include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
 
 /*
- * ScanList bootstrap (card A3) — the shared on-device embedding engine, and the two build facts it
- * brings. `shared/android-embed` (card S5) is a plain Kotlin Android library at the repo root: it has
- * no package.json, so RN autolinking cannot see it, and it is included by path here.
+ * ScanList bootstrap (card A3) — the shared on-device embedding engine.
  *
- * The `include` alone does not put it on `:app`'s classpath, and the API floor has to move too:
- * LiteRT-LM 0.18.1 needs Android 12 (API 31) while the RN skeleton pins minSdk 24
- * (`android/build.gradle`). Both are applied below, before `:app` is evaluated, because
- * `app/build.gradle` and `android/build.gradle` are outside this card's `owns`:
+ * `shared/android-embed` (card S5) is a plain Kotlin Android library at the repo root: it has no
+ * package.json, so RN autolinking cannot see it, and it is included by path here.
  *
- *   - rootProject.ext.minSdkVersion = 31  (app/build.gradle reads it in its android {} block)
- *   - implementation project(':android-embed') as soon as the Android plugin is applied
+ * Card A6 folded the old `gradle.beforeProject` hook (minSdk bump, `implementation` dependency and
+ * the Kotlin metadata flag) into the modules that own those facts:
  *
- * Prefer plain files? Move those two lines into `app/build.gradle` (and bump the ext in
- * `android/build.gradle`) and delete this block except the `include` + `projectDir` pair.
+ *   - `android/build.gradle`: `minSdkVersion = 31` (LiteRT-LM 0.18.1 needs Android 12);
+ *   - `app/build.gradle`: `implementation project(':android-embed')` + `-Xskip-metadata-version-check`;
+ *
+ * so this file only includes the project. Keep the include-if-exists guard: a checkout without
+ * `shared/android-embed` still configures (and then fails with the explicit message below).
  */
 def scanlistEmbedProjectDir = new File(settingsDir, '../../../shared/android-embed').canonicalFile
 if (new File(scanlistEmbedProjectDir, 'build.gradle.kts').isFile()) {
     include ':android-embed'
     project(':android-embed').projectDir = scanlistEmbedProjectDir
-
-    gradle.beforeProject { project ->
-        if (project.path == ':app') {
-            project.rootProject.ext.minSdkVersion = 31
-            project.plugins.withId('com.android.application') {
-                // `implementation` exists as soon as AGP's configurations are created (plugin applied).
-                project.dependencies.add(
-                        'implementation',
-                        project.project(':android-embed'))
-
-                // LiteRT-LM 0.18.1 is built with Kotlin 2.4 metadata while RN 0.88 compiles this app
-                // with Kotlin 2.2 (see shared/android-embed/README.md §"LiteRT-LM version decision").
-                // The library passes this flag to its own compiler; the app compiles against the same
-                // AAR (api dependency) and needs it too. Compile-time only, no runtime effect.
-                project.tasks.matching { task ->
-                    task.name.startsWith('compile') && task.name.endsWith('Kotlin')
-                }.configureEach { task ->
-                    task.compilerOptions.freeCompilerArgs.add('-Xskip-metadata-version-check')
-                }
-            }
-        }
-    }
 } else {
     println "[scanlist] shared/android-embed not found at ${scanlistEmbedProjectDir} — the build FAILS without the embed module (card A3: EmbedModule.kt is compiled unconditionally; provide the path above or restore the checkout)"
 }

@@ -25,8 +25,11 @@ const {vectors, backend, dims, latencyMs, openMs} = await embedDocs(['milk', 'Oa
 | `embedDocs(texts)` | detailed batch call: `vectors`, `backend`, `dims`, `latencyMs`, `openMs` |
 | `embedQuery(text)` | one vector + metadata (query prefix) |
 | `embedImage({base64} \| {uri})` | one image vector, no prefix (needs a vision-capable bundle) |
-| `embedStatus()` | `linked`, `backend`, `dims`, `modelId`, `modelPresent`, `modelPath`, `open`, `hint` — never rejects |
+| `embedStatus()` | `linked`, `backend`, `dims`, `modelId`, `modelPresent`, `modelPath`, `modelBytes`, `modelReadable`, `modelSha256`, `prompts`, `open`, `hint` — never rejects |
 | `closeEmbed()` | unload the model; the next call reopens it through the ladder |
+| `setBackend(choice)` | card A6: persist `auto \| gpu \| cpu \| npu`, unload the open engine (strict choices fail honestly instead of mislabelling a fallback) |
+| `deleteTempFile(path)` | card A6: delete one scanner temp JPEG; the native side refuses paths outside the app cache and an older binary resolves `{deleted:false}` instead of throwing |
+| `BACKEND_CHOICES` | the picker ids the bridge accepts (`auto`, `gpu`, `cpu`, `npu`) |
 | `EmbedError` + `EMBED_ERROR` | stable `code`s: `E_MODEL_MISSING`, `E_NO_BACKEND`, `E_UNAVAILABLE`, `E_INPUT`, `E_IMAGE`, `E_EMBED`, `E_NO_MODULE`, `E_CODEC` |
 | `base64ToFloat32` | the vector codec (exported for tests and future `Float32Array` consumers) |
 
@@ -41,21 +44,35 @@ module constants (`none` / `dims.active` = 256) before the first one.
   Codegen was skipped on purpose: a codegen spec needs `codegenConfig` in a package-level
   `package.json` / autolinked RN library, i.e. files outside this card's `owns`, and five methods
   gain nothing from a generated spec.
-* Gradle: `apps/rn/android/settings.gradle` includes `shared/android-embed` by path
-  (`../../../shared/android-embed`) and adds it to `:app`, raises the app's `minSdk` to **31**
-  (LiteRT-LM 0.18.1 needs Android 12; the RN skeleton pinned 24), and passes
-  `-Xskip-metadata-version-check` to the app's Kotlin compiler (LiteRT-LM's Kotlin 2.4 metadata vs
-  RN 0.88's Kotlin 2.2 — the same flag `shared/android-embed` already uses). All three live in
-  `settings.gradle` because `app/build.gradle` and `android/build.gradle` are outside the card's
-  `owns`; the block documents the plain-file version (two lines in `app/build.gradle`, one in
-  `android/build.gradle`).
+* Gradle: `apps/rn/android/settings.gradle` only includes `shared/android-embed` by path
+  (`../../../shared/android-embed`). The dependency, `minSdk` and the Kotlin compiler flag now live
+  where they belong (card A6 nit a): `android/build.gradle` sets `minSdkVersion = 31` (LiteRT-LM
+  0.18.1 needs Android 12; the RN skeleton pinned 24) and `app/build.gradle` adds
+  `implementation project(':android-embed')` plus
+  `-Xskip-metadata-version-check` (LiteRT-LM's Kotlin 2.4 metadata vs RN 0.88's Kotlin 2.2 — the same
+  flag `shared/android-embed` already uses). The old `gradle.beforeProject` hook that injected all
+  three from `settings.gradle` is gone.
 * Model file: the library never downloads weights. `EmbedModel.kt` looks in
   `<files>/models/embeddinggemma-2-740m.litertlm` (internal first, then external), and in
   `<files>/models/embeddinggemma-2-740m/embeddinggemma-2-740m.litertlm`
   (`LiteRtEmbedder.defaultModelFile`). A missing file is `E_MODEL_MISSING` with the exact
   `scripts/model.sh push <package>` hint — the expected state until card B0/S6 provisions a phone.
+  `status()` reports the chosen path, byte size and readability so the settings model card can say
+  `E_NO_MODEL`/unreadable without guessing (the sha is a pinned EXPECTED label, not recomputed).
 * Threading: all calls are serialised on one worker thread; the JS thread never blocks. The first
-  call also loads and self-tests the model (CPU 1–2 s, GPU 3–8 s), reported as `openMs`.
+  call also loads and self-tests the model (CPU 1–2 s, GPU 3–8 s), reported as `openMs`. A failed
+  `open()` resets the cached `created` flag, so the next call retries instead of pretending the
+  engine exists.
+
+## Settings screen (card A6)
+
+`apps/rn/src/settings/` is the RN twin of the Kotlin track's B6 settings: `setBackend` persists the
+picker choice and unloads the engine, `embedStatus()` feeds the model card (`modelBytes`,
+`modelReadable`, `modelSha256`, `prompts`), and the self-test (`latency.ts`) opens the engine on the
+chosen ladder, measures one warm-up + three fixed documents, and closes it again. The prefix card
+reads `prompts` from `status()` — exactly what the engine loaded from `shared/spec/prompts.json` —
+instead of hard-coding prefix strings. See `src/settings/__tests__/` for the decisions (no device
+needed) and `docs/POLISH.md` for the states.
 
 ## Test screen
 

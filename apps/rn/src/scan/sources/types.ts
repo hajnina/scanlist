@@ -43,6 +43,13 @@ export interface CameraFrame {
   height: number;
   /** `Date.now()` at capture, ms. */
   capturedAt: number;
+  /**
+   * Deletes the temp JPEG behind {@linkcode filePath}, when the capturer knows how (card A6).
+   *
+   * The feed calls it after a grace period (async readers may still have the path open) and on
+   * `releaseAll()`; nothing else has to remember the file. Absent for synthetic/test frames.
+   */
+  release?: () => void | Promise<void>;
 }
 
 /** Fan-out of captured frames to the sources attached to one camera session. */

@@ -59,6 +59,32 @@ export interface NativeEmbedStatus {
   open: boolean;
   /** `scripts/model.sh push <package>` — the fix for a missing model. */
   hint: string;
+  /** Card A6: size of the bundle on disk (0 when absent). */
+  modelBytes?: number;
+  /** Card A6: whether this process can read the bundle. */
+  modelReadable?: boolean;
+  /** Card A6: the pinned sha256, displayed as EXPECTED — never recomputed on the device. */
+  modelSha256?: string;
+  /** Card A6: the prefix set from the bundled prompts.json (null on an older binary). */
+  prompts?: NativePrompts | null;
+}
+
+/** The active prefix set (Prompts.kt serialised by `EmbedModule.status()`). */
+export interface NativePrompts {
+  active?: string;
+  version?: number;
+  model?: string;
+  doc?: string;
+  query?: string;
+  image?: string;
+  dims?: number;
+  nativeDims?: number;
+}
+
+/** What `deleteTempFile` resolved (card A6: the scanner's temp JPEG lifecycle). */
+export interface NativeTempFileDelete {
+  deleted: boolean;
+  path: string;
 }
 
 export interface NativeEmbedModule {
@@ -68,6 +94,13 @@ export interface NativeEmbedModule {
   embedImage(base64: string | null, uri: string | null): Promise<NativeEmbedSingle>;
   status(): Promise<NativeEmbedStatus>;
   close(): Promise<void>;
+  /**
+   * Card A6: persist the picker policy and unload the engine so the next open uses it. Optional so a
+   * binary built before A6 keeps loading; the JS side reports `E_UNAVAILABLE` for it.
+   */
+  setBackend?(choice: string): Promise<void>;
+  /** Card A6: delete one of the scanner's temp JPEGs (refuses paths outside the app cache). */
+  deleteTempFile?(path: string): Promise<NativeTempFileDelete>;
 }
 
 let cached: NativeEmbedModule | null | undefined;

@@ -60,6 +60,13 @@ export function createFeedSource({
   let skipped = 0;
   // Set by start(); cleared on stop() so a capture that resolves after stop() is not delivered.
   let onSignal: ((signal: ScanSignal) => void) | undefined;
+  /**
+   * Generation counter (card A6, A4 review nit): `stop()` bumps it, so an ML Kit call that was
+   * already in flight cannot deliver its answer to the listener of a *later* `start()`. `busy` is
+   * deliberately **not** reset by `stop()`: until the old call settles, a restart must not overlap a
+   * second ML Kit call (the sources are single-flight, not queued).
+   */
+  let epoch = 0;
 
   const handleFrame = (frame: CameraFrame): void => {
     if (busy) {
@@ -71,18 +78,21 @@ export function createFeedSource({
       return;
     }
 
+    const startedIn = epoch;
     busy = true;
     (async () => {
       try {
         const produced = await process(frame);
-        if (produced === undefined) {
-          return;
+        if (startedIn !== epoch || produced === undefined) {
+          return; // stopped/restarted while reading: the answer belongs to the old session
         }
         for (const signal of Array.isArray(produced) ? produced : [produced]) {
           onSignal?.(signal);
         }
       } catch (error) {
-        onError?.(error);
+        if (startedIn === epoch) {
+          onError?.(error);
+        }
       } finally {
         busy = false;
       }
@@ -100,10 +110,10 @@ export function createFeedSource({
       unsubscribe = feed.subscribe(handleFrame);
     },
     async stop(): Promise<void> {
+      epoch += 1;
       onSignal = undefined;
       unsubscribe?.();
       unsubscribe = undefined;
-      busy = false;
       gate.reset();
     },
     droppedWhileBusy: () => dropped,

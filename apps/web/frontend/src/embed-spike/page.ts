@@ -14,9 +14,9 @@
  *   window.__c7.report                            // last report (JSON)
  */
 
-import { buildScenario } from "./fixtures";
+import { buildScenario, loadGolden, photoUrl } from "./fixtures";
 import { runMeasurement } from "./harness";
-import type { SpikeReport } from "./session";
+import type { EmbedSession, SpikeReport } from "./session";
 import { createGemmaSession, probeAdapter } from "./model";
 import type { LoadMetrics } from "./session";
 
@@ -34,8 +34,15 @@ interface RunOptions {
 interface C7Api {
   run(options?: RunOptions): Promise<SpikeReport>;
   probe(): Promise<unknown>;
+  /** Load the model without running the suite; the session is kept on `session` for ad-hoc probes. */
+  loadModel(options?: RunOptions): Promise<LoadMetrics>;
   report: SpikeReport | null;
   load: LoadMetrics | null;
+  session: EmbedSession | null;
+  /** Dev URL for a `shared/fixtures/photos/*` file (ad-hoc probes). */
+  photo(file: string): string;
+  /** The parsed golden fixture (ad-hoc parity checks without the full suite). */
+  golden(): ReturnType<typeof loadGolden>;
   errors: string[];
 }
 
@@ -128,11 +135,26 @@ function renderReport(report: SpikeReport): void {
 const api: C7Api = {
   report: null,
   load: null,
+  session: null,
+  photo: photoUrl,
+  golden: loadGolden,
   errors: [],
   async probe() {
     const adapter = await probeAdapter();
     log(adapter ? `adapter: ${JSON.stringify(adapter)}` : "adapter: none");
     return adapter;
+  },
+  async loadModel(options: RunOptions = {}) {
+    const { session, load } = await createGemmaSession({
+      device: options.device ?? "webgpu",
+      dtype: options.dtype ?? "q4",
+      textOnly: options.textOnly ?? false,
+      onProgress: log,
+    });
+    api.session = session;
+    api.load = load;
+    api.session = session;
+    return load;
   },
   async run(options: RunOptions = {}) {
     const scenario = buildScenario({
@@ -151,6 +173,7 @@ const api: C7Api = {
       onProgress: log,
     });
     api.load = load;
+    api.session = session;
 
     const started = performance.now();
     const images = [];

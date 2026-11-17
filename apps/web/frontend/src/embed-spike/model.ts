@@ -176,8 +176,12 @@ export async function createGemmaSession(
     },
     async embedImages(groups: ImageHandle[][]): Promise<Float32Array[]> {
       if (processor === null) throw new Error("text-only session: no vision encoder was loaded");
+      const tPre = now();
       const inputs = await processor(null, groups);
+      log(`image preprocess (${groups.length} input(s)) in ${(now() - tPre).toFixed(0)} ms`);
+      const tRun = now();
       const output = await model(inputs);
+      log(`image forward pass (${groups.length} input(s)) in ${(now() - tRun).toFixed(0)} ms`);
       return sentences(output);
     },
     async embedImagesFlat(handles: ImageHandle[]): Promise<Float32Array> {

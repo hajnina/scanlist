@@ -40,7 +40,8 @@ fi
 rm -f "$NEW"
 
 echo "== closed-unmerged audit (lead incident lesson: a closeout isn't a closeout until mergedAt != null) =="
-# WAIVED: #34 closed-unmerged — superseded by re-land PR #37 (C5 landing + sync fixes); waiver retires when #37 merges.
+# WAIVED: #34 closed-unmerged — superseded AND completed by re-land PR #37 (MERGED 13:13:41Z, mergedAt-verified).
+# The waiver is permanent: #34 can never merge; any NEW closed-unmerged PR still alarms.
 gh pr list --state closed --limit 10 --json number,mergedAt \
   --jq '.[] | select(.mergedAt == null and .number != 34) | "ALARM: #\(.number) CLOSED-UNMERGED"' 2>/dev/null || true
 

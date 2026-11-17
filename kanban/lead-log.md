@@ -44,6 +44,12 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Reviewer dispatched (fresh session ses_e180f8ff0ffekQw04k0F2lfM2l): strict scope mapping, §83-88 line-by-line (cap DROPS in detection order — not confidence-sort), 0.75-default judgment, 4 mutations (cap 3, rejoin, global-dedupe, reversed order), RN-twin symmetry table (A4-sync branch), consumers-unbroken grep.
 - Fleet: A2-review, B4-sync-review, C3? no — building: C2, A4-sync; reviewing: PR #24 (B3-sync), PR #26 (B4-sync), PR #22 (A2) = 5.
 
+## 2026-11-17 — PR #37 MERGED (C5 landing COMPLETE, mergedAt-verified); PR-34 incident CLOSED; C2-follow-up dispatched
+- PR #37 (card/C5-sync) MERGED: re-land fidelity PASS (9-path delta exactly the sync fixes, screenshots sha-identical), both bug mutations bite (2 fail each), 26 files / 252 tests, build 210.25 kB / 58.07 gzip, smoke 21/21, CI web pass. VERDICT APPROVE-WITH-NITS. **mergedAt 13:13:41Z verified per the incident lesson** — the PR-34 saga is closed; board 31/34 stands (C5 done is now TRUE).
+- C5-sync round deferred nits → micro-delegate: N1 (ScanScreen.tsx:240 call-site mutation survives the suite — needs an integration assertion so a future call-site regression fails), N2 (README ffmpeg recipe pin -frames:v 10).
+- C2-follow-up dispatched (fresh session ses_e165b4652ffesVWcEOI0tw72ZE, worktree ../scanlist-wt/C2FU, branch card/C2-followup): URL-import AbortController timeout (10 s, classified error through the existing degraded path) + orphaned-doc sweep (load or list-deletion trigger, idempotent, survivors protected); mutations required; baseline 26 files / 252 tests; no new deps. No card move; evidence lead-side after merge.
+- Fleet: A6 review (PR #36), A5-OFF-sync review (PR #38), B7 build, C2-followup build, C5-nits micro = 5 active. X2 waits on B7 + A6 only.
+
 ## 2026-11-17 — Heartbeat cycle 2: A5-OFF-sync delivered (PR #38); B7 + A6 checkpoints flowing; #34 waived in watchdog
 - Watchdog: **PR #38 (A5-OFF-sync) OPEN** (rn CI pending) → fresh reviewer dispatched same-cycle (overlap play, like PR #36). **card/B7 tip appeared** (1a27ff9 — checkpoints flowing, no PR yet). card/A6 pushed another checkpoint (622b1ab; CI re-running — reviewer was briefed on head movement). Rolling release refreshed by the C7-nits push (apps/web path → artifacts → 13:02:20). refs/tags/main 0.
 - Watchdog hardened: closed-unmerged audit live (ALARMed on #34 as designed) → waived #34 explicitly (superseded by re-land PR #37; waiver retires when #37 merges — noted in script). New closed-unmerged PRs still alarm.

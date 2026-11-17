@@ -57,10 +57,12 @@ not edited here)**.
 - [x] ✅ The self-test short-circuits with `E_NO_MODEL` and never opens the engine when the bundle is
   absent; a throwing model check is the same code, not an embedder crash.
   `src/settings/latency.ts` + `__tests__/latency.test.ts`.
-- [x] ✅ The scan screen has a model-missing note (`No embedding model on this phone`, barcode/OCR
-  still work, push hint) in the same priority ladder as permission/quiet: `scanGuidance`'s `model`
-  branch, `__tests__/polish.test.ts`. The settings card is the authority for *why*; the note only
-  explains what still works.
+- [x] ✅ The scan screen derives `modelMissing` from the bridge (`embedStatus()` → `modelStatus.ts`
+  facts → `modelStatusFromFacts`, via `useModelStatus` in `src/settings/useScanGuidance.ts`) and
+  passes it into the guidance ladder, so a genuinely missing bundle renders the note (`No embedding
+  model on this phone`, barcode/OCR still work, push hint). An unreadable bundle or an old bridge
+  that cannot report is **not** called missing. Tests: `src/scan/ui/__tests__/scanScreen.test.tsx`
+  (missing renders / present does not) and `src/settings/__tests__/polish.test.ts` (hook branch).
 - [ ] 📱 Push the bundle (`scripts/model.sh push <package> --dest internal`), re-open Settings: the
   card flips from `E_NO_MODEL` to `present · 484,622,336 B · 462.2 MiB · matches the pinned bundle
   size`; run the self-test and see the measured backend. Device step.
@@ -69,12 +71,16 @@ not edited here)**.
 
 - [x] ✅ Guidance appears only after **6 s with no new signal from any source** (`QUIET_GUIDANCE_MS`,
   `quietFor`), measured from the newest of barcode/OCR/image. A starting camera or flowing signals
-  never nag. `src/settings/polish.ts` + `__tests__/polish.test.ts`.
+  never nag. A silent scene produces no signals and therefore no re-render, so `useScanGuidance`
+  adds a cleaned-up 1 s interval that recomputes the guidance; without it the advice could never
+  appear. Tests: `polish.test.ts` (quiet scene crosses 6 s; busy scene stays silent; interval cleared
+  on unmount).
 - [x] ✅ The quiet copy names the two actionable causes — *point at an item and hold steady* and
   *in low light or with glare, turn on the torch* — and explains the consequence (dim frames give
   the embedder little to work with), instead of a generic "try again".
-- [x] ✅ Permission outranks model, which outranks quiet time; only one note is shown at a time
-  (`scanGuidance` priority test).
+- [x] ✅ Permission outranks model, which outranks quiet time, and only one note is shown at a time
+  (`polish.test.ts`: permission-vs-quiet, model-vs-permission priority, and model-note-wins-over
+  quiet).
 - [x] ✅ `GuidanceNote` renders the three kinds with the M3 Expressive surface tokens
   (`src/ui/components/GuidanceNote.tsx`), used from `ScanScreen` (A5's layout).
 - [ ] 📱 Dim a shelf, cover the light: the torch hint appears after ~6 s; turn the torch on and a
@@ -82,8 +88,10 @@ not edited here)**.
 
 ## Degraded / offline
 
-- [x] ✅ The scan path is offline by construction: barcode/OCR run in ML Kit on device, the image
-  query runs in the local embedder; no network client is imported by `src/scan`.
+- [x] ✅ No frame, OCR text or model data leaves the device: barcode/OCR run in ML Kit on device and
+  the image query runs in the local embedder. The scan path's only network call is the explicit
+  barcode → product-name lookup (`src/scan/ui/off.ts`, world.openfoodfacts.org, barcode digits only,
+  cached and failure-tolerant); nothing in `src/scan` downloads model weights.
 - [x] ✅ Without the model, barcode and OCR still emit and the scan screen stays usable; only the
   image/ranking path degrades, and the model note says exactly that.
 - [x] ✅ One failing source cannot take down the others: source errors are reported through
@@ -111,9 +119,14 @@ not edited here)**.
   timers.
 - [x] ✅ A restart cannot leak stale ML Kit answers into the new session
   (`feedSource.ts` epoch; `sources.test.ts` — *a stale in-flight answer is dropped…*).
-- [x] ✅ Settings is a pushed screen with the same back contract (`onBack`, `SettingsScreen`), and
-  no screen adds an `Animated` or timer that outlives unmount without cleanup (the render test
-  unmounts and clears timers).
+- [x] ✅ `SettingsScreen` has the same back contract (`onBack`) and its render test unmounts the
+  tree and clears timers, so no `Animated` spring or probe is left running. The scan screen's quiet
+  interval is likewise cleared on unmount (`polish.test.ts`).
+- [ ] ⏳ **Known follow-up (not done here):** nothing mounts `SettingsScreen` yet — `App.tsx` renders
+  `ListsScreen` (and the scan screen is composed by the same later wiring pass), so Settings is not
+  reachable from the running app in this round. The two-line mount recipe is documented in
+  `src/settings/index.ts`; the app-level navigation/startup wiring is outside A6's `owns:` and the
+  lead will run it separately.
 
 ## Haptics on / off
 

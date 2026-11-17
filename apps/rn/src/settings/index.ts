@@ -106,3 +106,9 @@ export {
   asyncStorageSettingsStore,
   createSettingsRepository,
 } from './asyncStorage';
+export {
+  useModelStatus,
+  useScanGuidance,
+  type ModelProbeState,
+  type ScanGuidanceInput,
+} from './useScanGuidance';

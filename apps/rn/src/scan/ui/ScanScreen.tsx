@@ -39,7 +39,10 @@ import {
 import {HEAVY, Spacing} from '../../theme/tokens';
 import type {ScanListTheme} from '../../theme';
 import type {ListRepository, StoredList} from '../../list/store';
-import {quietFor, scanGuidance} from '../../settings/polish';
+import {
+  useModelStatus,
+  useScanGuidance,
+} from '../../settings/useScanGuidance';
 import {embedder} from '../../../modules/embed';
 import {createFrameFeed} from '../sources';
 import {useScanCamera} from '../sources/camera';
@@ -209,11 +212,14 @@ export function ScanScreen({repository, stored, onBack, onChanged}: Props) {
   const error = commitError ?? session.error;
   const backend = embedder.backend;
 
-  // Card A6 (POLISH.md): permission → missing model → quiet-for-6-s advice, in that order.
-  const guidance = scanGuidance({
+  // Card A6 (review fix): the model probe and the 1 s quiet-clock are hooks now; without the ticker
+  // a silent scene never re-renders, so the 6 s "nothing in frame" advice could never appear.
+  const model = useModelStatus();
+  const guidance = useScanGuidance({
     hasPermission: camera.hasPermission,
     canRequestPermission: camera.canRequestPermission,
-    quietMs: quietFor(activity, Date.now()),
+    activity,
+    modelMissing: model.missing,
   });
   const permissionCopy = guidance?.kind === 'camera' ? guidance : null;
   const hint = guidance !== null && guidance.kind !== 'camera' ? guidance : null;

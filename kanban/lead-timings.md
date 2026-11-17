@@ -11,6 +11,7 @@ All times UTC. "Delivered" = the subagent's completion notification.
 | X2 builder (COMPARISON.md) | `…15SZAnuhPFy9xt` | 13:40 | 14:35 | **55 min** | PR #41, 150/150 number checks |
 | A6 fix round 2 (timeboxed to 20 min) | `…vG9Bg3oxf2lHRU` | 14:13 | 14:27 | **14 min** | pushed, 352 tests, both mutations bite |
 | B7 prescribed nits (timeboxed, scope-cut mid-run) | `…EUkHEY378VYu4v` | 14:20 | 14:43 | **23 min** | pushed, 329 tests (also took optional N3/N7 wiring) |
+| A6 re-verify (timeboxed to 15 min) | `…LTyRMAQS7AQfgV` | 14:27 | 14:52 | **25 min** | APPROVE; 352 tests; 2/2 mutations; rn CI 19m16s was the tail |
 | Lead merge + closeout (per PR) | — | — | — | **2-3 min** | merge → mergedAt → board move → cleanup |
 | Lead heartbeat cycle | — | — | — | **1-2 min** | re-arm + watchdog |
 

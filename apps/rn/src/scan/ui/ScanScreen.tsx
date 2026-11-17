@@ -212,13 +212,14 @@ export function ScanScreen({repository, stored, onBack, onChanged}: Props) {
   const error = commitError ?? session.error;
   const backend = embedder.backend;
 
-  // Card A6 (review fix): the model probe and the 1 s quiet-clock are hooks now; without the ticker
-  // a silent scene never re-renders, so the 6 s "nothing in frame" advice could never appear.
+  // Card A6 (review fix): the model probe and the 1 s quiet-clock are hooks now. The camera emits
+  // one image marker per frame, so the clock ignores frames and only resets on barcode/OCR/hero.
   const model = useModelStatus();
   const guidance = useScanGuidance({
     hasPermission: camera.hasPermission,
     canRequestPermission: camera.canRequestPermission,
     activity,
+    tick,
     modelMissing: model.missing,
   });
   const permissionCopy = guidance?.kind === 'camera' ? guidance : null;

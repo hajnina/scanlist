@@ -8,26 +8,56 @@ import {
   QUIET_GUIDANCE_MS,
   quietFor,
   scanGuidance,
+  type ScanProgress,
   type SourceActivity,
 } from '../polish';
 import {useScanGuidance} from '../useScanGuidance';
 
 describe('quietFor', () => {
-  test('null until a source has fired (a starting camera is not "nothing found")', () => {
-    expect(quietFor({barcode: 0, ocr: 0, image: 0}, 10_000)).toBeNull();
+  const progress = (
+    overrides: Partial<ScanProgress> = {},
+  ): ScanProgress => ({
+    barcode: 0,
+    ocr: 0,
+    image: 0,
+    firstFrameAt: 0,
+    heroAt: 0,
+    ...overrides,
   });
 
-  test('measures from the newest of the three sources', () => {
-    expect(quietFor({barcode: 0, ocr: 5_000, image: 8_000}, 10_000)).toBe(
-      2_000,
-    );
-    expect(quietFor({barcode: 9_000, ocr: 5_000, image: 8_000}, 10_000)).toBe(
-      1_000,
-    );
+  test('null until the camera has delivered a frame (a starting camera is not "nothing found")', () => {
+    expect(quietFor(progress(), 10_000)).toBeNull();
+    // A useful signal without any frame is impossible in the app; still not a quiet scene.
+    expect(quietFor(progress({barcode: 9_000}), 10_000)).toBeNull();
+  });
+
+  test('frames alone do not reset the clock (the review blocker)', () => {
+    // 20 s of 2.5 fps frame markers, not one barcode/OCR line/hero: the scene was quiet all along.
+    expect(
+      quietFor(progress({image: 20_000, firstFrameAt: 1_000}), 21_000),
+    ).toBe(20_000);
+  });
+
+  test('a barcode, an OCR line or a hero resets the clock', () => {
+    const live = progress({image: 20_000, firstFrameAt: 1_000});
+    expect(quietFor({...live, barcode: 18_500}, 20_000)).toBe(1_500);
+    expect(quietFor({...live, ocr: 18_000}, 20_000)).toBe(2_000);
+    expect(quietFor({...live, heroAt: 19_000}, 20_000)).toBe(1_000);
+  });
+
+  test('the clock starts at the first frame when nothing useful has arrived yet', () => {
+    expect(
+      quietFor(progress({image: 5_000, firstFrameAt: 5_000}), 11_000),
+    ).toBe(6_000);
   });
 
   test('never negative when the clock disagrees with an activity stamp', () => {
-    expect(quietFor({barcode: 0, ocr: 0, image: 12_000}, 10_000)).toBeNull();
+    expect(
+      quietFor(
+        progress({image: 12_000, firstFrameAt: 12_000}),
+        10_000,
+      ),
+    ).toBeNull();
   });
 });
 
@@ -79,11 +109,12 @@ describe('scanGuidance', () => {
 });
 
 
-describe('useScanGuidance (card A6 review fix: the quiet clock)', () => {
+describe('useScanGuidance (card A6 review fixes: the quiet clock)', () => {
   interface ProbeProps {
     hasPermission: boolean;
     canRequestPermission?: boolean;
     activity: SourceActivity;
+    tick?: {heroId: string | null; at: number} | null;
     modelMissing?: boolean;
   }
 
@@ -109,12 +140,25 @@ describe('useScanGuidance (card A6 review fix: the quiet clock)', () => {
   const textOf = (tree: ReactTestRenderer.ReactTestRenderer) =>
     JSON.stringify(tree.toJSON());
 
+  /** A render with fresh props, then one fake second (the hook's own ticker). */
+  async function tick(
+    tree: ReactTestRenderer.ReactTestRenderer,
+    props: ProbeProps,
+  ): Promise<void> {
+    await ReactTestRenderer.act(async () => {
+      tree.update(React.createElement(GuidanceProbe, props));
+    });
+    await ReactTestRenderer.act(async () => {
+      jest.advanceTimersByTime(1_000);
+    });
+  }
+
   afterEach(() => {
     jest.clearAllTimers();
     jest.useRealTimers();
   });
 
-  test('a scene that went quiet shows the advice after 6 s without any new signal', async () => {
+  test('a scene that went quiet shows the advice after 6 s without a useful result', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(10_000);
     const tree = await mount({
@@ -122,7 +166,7 @@ describe('useScanGuidance (card A6 review fix: the quiet clock)', () => {
       activity: {barcode: 0, ocr: 0, image: 5_000},
     });
 
-    // 5 s after the last signal: still below the 6 s threshold.
+    // 5 s since the first frame: still below the 6 s threshold.
     expect(textOf(tree)).toContain('none');
 
     await ReactTestRenderer.act(async () => {
@@ -135,28 +179,112 @@ describe('useScanGuidance (card A6 review fix: the quiet clock)', () => {
     });
   });
 
-  test('a busy scene is not nagged while signals keep arriving', async () => {
+  test('frames flowing for 8 s with no useful result still go quiet (the review blocker)', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(10_000);
+    // The image source emits a marker every frame; that must not reset the clock.
+    const tree = await mount({
+      hasPermission: true,
+      activity: {barcode: 0, ocr: 0, image: Date.now()},
+    });
+
+    for (let second = 0; second < 5; second += 1) {
+      await tick(tree, {
+        hasPermission: true,
+        activity: {barcode: 0, ocr: 0, image: Date.now()},
+      });
+      expect(textOf(tree)).toContain('none');
+    }
+
+    // 6 s of frames only: the advice must finally appear, not stay pinned at ~0 s quiet.
+    await tick(tree, {
+      hasPermission: true,
+      activity: {barcode: 0, ocr: 0, image: Date.now()},
+    });
+    expect(textOf(tree)).toContain('light:Nothing in frame yet');
+
+    await ReactTestRenderer.act(async () => {
+      tree.unmount();
+    });
+  });
+
+  test('a barcode/OCR signal keeps the scene useful while frames keep flowing', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(10_000);
     const tree = await mount({
       hasPermission: true,
-      activity: {barcode: 0, ocr: 0, image: 10_000},
+      activity: {barcode: 0, ocr: 0, image: Date.now()},
     });
 
     for (let second = 0; second < 8; second += 1) {
-      await ReactTestRenderer.act(async () => {
-        tree.update(
-          React.createElement(GuidanceProbe, {
-            hasPermission: true,
-            activity: {barcode: 0, ocr: 0, image: Date.now()},
-          }),
-        );
-      });
-      await ReactTestRenderer.act(async () => {
-        jest.advanceTimersByTime(1_000);
+      const at = Date.now();
+      await tick(tree, {
+        hasPermission: true,
+        activity: {barcode: 0, ocr: at, image: at},
       });
       expect(textOf(tree)).toContain('none');
     }
+
+    await ReactTestRenderer.act(async () => {
+      tree.unmount();
+    });
+  });
+
+  test('a ranked hero keeps the scene useful while frames keep flowing', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(10_000);
+    const tree = await mount({
+      hasPermission: true,
+      activity: {barcode: 0, ocr: 0, image: Date.now()},
+      tick: {heroId: null, at: Date.now()},
+    });
+
+    for (let second = 0; second < 8; second += 1) {
+      const at = Date.now();
+      await tick(tree, {
+        hasPermission: true,
+        activity: {barcode: 0, ocr: 0, image: at},
+        tick: {heroId: 'milk', at},
+      });
+      expect(textOf(tree)).toContain('none');
+    }
+
+    await ReactTestRenderer.act(async () => {
+      tree.unmount();
+    });
+  });
+
+  test('one hero resets the whole stretch, then the clock runs again', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(10_000);
+    const tree = await mount({
+      hasPermission: true,
+      activity: {barcode: 0, ocr: 0, image: Date.now()},
+    });
+
+    await tick(tree, {
+      hasPermission: true,
+      activity: {barcode: 0, ocr: 0, image: Date.now()},
+      tick: {heroId: 'milk', at: Date.now()},
+    });
+
+    // 5 s after the hero: still quiet, but below the threshold.
+    for (let second = 0; second < 4; second += 1) {
+      await tick(tree, {
+        hasPermission: true,
+        activity: {barcode: 0, ocr: 0, image: Date.now()},
+        tick: {heroId: null, at: Date.now()},
+      });
+      expect(textOf(tree)).toContain('none');
+    }
+
+    await tick(tree, {
+      hasPermission: true,
+      activity: {barcode: 0, ocr: 0, image: Date.now()},
+      tick: {heroId: null, at: Date.now()},
+    });
+    // 6 s after the last hero with frames still flowing: advice.
+    expect(textOf(tree)).toContain('light:Nothing in frame yet');
 
     await ReactTestRenderer.act(async () => {
       tree.unmount();

@@ -12,7 +12,7 @@ import ReactTestRenderer from 'react-test-renderer';
 import {ScanListThemeProvider} from '../../theme';
 import {MemoryKeyValueStore} from '../../list/store';
 import type {BackendChoice} from '../backend';
-import type {SelfTestRunner} from '../latency';
+import {E_NO_BACKEND, type SelfTestRunner} from '../latency';
 import {EXPECTED_MODEL_BYTES, type ModelFileFacts} from '../modelStatus';
 import type {PrefixInfo} from '../prefix';
 import {SettingsScreen} from '../SettingsScreen';
@@ -52,6 +52,19 @@ function fakeRunner(backend: BackendChoice = 'cpu'): SelfTestRunner {
       },
     }),
   } as unknown as SelfTestRunner;
+}
+
+/** A runner that fails with a stable code and the per-backend ladder reasons. */
+function failingRunner(): SelfTestRunner {
+  return {
+    selfTest: async (choice: BackendChoice) => ({
+      ok: false as const,
+      choice,
+      code: E_NO_BACKEND,
+      message: 'all backends failed to open the bundle',
+      reasons: ['gpu: E_GPU_INIT', 'cpu: E_EMBEDDER'],
+    }),
+  };
 }
 
 function controller(
@@ -134,6 +147,15 @@ describe('SettingsScreen', () => {
     expect(text).toContain('E_NO_MODEL');
     expect(text).toContain('no bundle at');
     expect(text).toContain('scripts/model.sh push');
+  });
+
+  test('a failed self-test renders its code, message and ladder reasons (no stale number)', async () => {
+    const text = await render(controller({runner: failingRunner()}));
+    expect(text).toContain('E_NO_BACKEND');
+    expect(text).toContain('all backends failed to open the bundle');
+    expect(text).toContain('gpu: E_GPU_INIT');
+    expect(text).toContain('cpu: E_EMBEDDER');
+    expect(text).not.toContain('12.3 ms');
   });
 
   test('an unavailable prefix set says so (no invented prefixes)', async () => {

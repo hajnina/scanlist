@@ -76,6 +76,7 @@ export {
   type GuidanceInput,
   type GuidanceKind,
   type ScanGuidance,
+  type ScanProgress,
   type SourceActivity,
 } from './polish';
 export {

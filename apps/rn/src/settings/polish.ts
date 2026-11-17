@@ -27,18 +27,43 @@ export interface SourceActivity {
 }
 
 /**
- * Milliseconds since the newest signal of the three sources, or `null` when no source has fired yet
- * (a starting camera is not "nothing found") or the clock disagrees with a stamp.
+ * What the quiet clock needs: the raw source stamps plus the two facts the sources cannot express.
+ *
+ * `activity.image` is the newest image-source **marker** — the source emits one for every sampled
+ * frame (~2.5 fps), so it proves the camera is delivering, but it is not a useful result. A live
+ * but dim shelf keeps emitting those markers while finding nothing, which is exactly the case the
+ * low-light advice exists for. Treating a frame marker as activity was the review blocker this
+ * type exists to fix: it refreshed the clock every ~400 ms and the advice could never appear.
  */
-export function quietFor(
-  activity: SourceActivity,
-  now: number,
-): number | null {
-  const newest = Math.max(activity.barcode, activity.ocr, activity.image);
-  if (!(newest > 0) || !(now >= newest)) {
+export interface ScanProgress extends SourceActivity {
+  /** The first frame of this scan (0 = the camera has not delivered yet). Starts the clock. */
+  firstFrameAt: number;
+  /** The newest tick whose `topId` was non-null (0 = no hero yet). A hero is a useful result. */
+  heroAt: number;
+}
+
+/**
+ * Milliseconds since the scan last yielded something useful — a barcode, an OCR line or a ranked
+ * hero — or `null` when no frame has arrived yet (a starting camera is not "nothing found") or the
+ * clock disagrees with a stamp.
+ *
+ * Frames deliberately do **not** reset this clock (see {@linkcode ScanProgress}): with a live
+ * camera they arrive every ~400 ms, so counting them would pin the quiet time near zero forever.
+ */
+export function quietFor(progress: ScanProgress, now: number): number | null {
+  if (!(progress.image > 0) || !(progress.firstFrameAt > 0)) {
     return null;
   }
-  return now - newest;
+  const lastUseful = Math.max(
+    progress.barcode,
+    progress.ocr,
+    progress.heroAt,
+  );
+  const since = Math.max(progress.firstFrameAt, lastUseful);
+  if (!(since > 0) || !(now >= since)) {
+    return null;
+  }
+  return now - since;
 }
 
 export interface GuidanceInput {

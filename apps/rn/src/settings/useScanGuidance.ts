@@ -1,16 +1,17 @@
 /**
- * Scan-screen guidance state (card A6 fix round): the two things the pure copy in `polish.ts`
- * cannot decide by itself.
+ * Scan-screen guidance state (card A6 fix rounds): the things the pure copy in `polish.ts` cannot
+ * decide by itself.
  *
  *  - **Model status** is a probe, not a render-time fact: `useModelStatus` asks the bridge once
  *    (`embedStatus()`) and maps the answer through the same `modelStatus.ts` decisions the settings
  *    model card uses, so the scan note and the settings card agree about "missing".
- *  - **Quiet time** needs a clock. `quietFor` is a pure calculation, but a silent scene produces no
- *    signals and therefore no re-render — without a ticker the 6 s "nothing in frame" advice could
- *    never appear. `useScanGuidance` re-renders on a cleaned-up 1 s interval and recomputes the
- *    guidance; the timer starts once per mount and is cleared on unmount.
+ *  - **Quiet time** needs a clock *and* a definition of useful work. A live camera emits one image
+ *    marker per sampled frame (~2.5 fps), so the screen does re-render while the scene is dim; those
+ *    markers only prove frames are flowing. `useScanGuidance` remembers the first frame, counts
+ *    only barcode/OCR/hero results as useful, and re-renders on a cleaned-up 1 s interval so the
+ *    6 s threshold is crossed on time even when no signal arrives.
  */
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {embedStatus} from '../../modules/embed';
 import {
   factsFromNativeStatus,
@@ -100,6 +101,12 @@ export interface ScanGuidanceInput {
   canRequestPermission?: boolean;
   /** When each source last fired (ms since epoch, 0 = never). */
   activity: SourceActivity;
+  /**
+   * Latest completed rank tick. Only `heroId`/`at` are read: a tick that produced a hero
+   * (`topId !== null`) is a useful result and resets the quiet clock. Optional so the pure
+   * guidance can be tested without a scan engine.
+   */
+  tick?: {heroId: string | null; at: number} | null;
   modelMissing?: boolean;
   /** Ticker period; 1000 ms is enough to cross `QUIET_GUIDANCE_MS` on time. */
   intervalMs?: number;
@@ -112,22 +119,46 @@ export function useScanGuidance({
   hasPermission,
   canRequestPermission = false,
   activity,
+  tick = null,
   modelMissing = false,
   intervalMs = 1_000,
   now = Date.now,
 }: ScanGuidanceInput): ScanGuidance | null {
   // The value is not read in render except to force the recompute; `now()` below is authoritative.
   const [, setTick] = useState(0);
+  /** First frame since this screen mounted; starts the quiet clock (0 = camera not delivering). */
+  const firstFrameAt = useRef(0);
+  /** Newest hero tick; persists across later ticks so one good find resets the whole stretch. */
+  const heroAt = useRef(0);
 
   useEffect(() => {
-    const timer = setInterval(() => setTick(tick => tick + 1), intervalMs);
+    const timer = setInterval(() => setTick(value => value + 1), intervalMs);
     return () => clearInterval(timer);
   }, [intervalMs]);
+
+  useEffect(() => {
+    if (firstFrameAt.current === 0 && activity.image > 0) {
+      firstFrameAt.current = activity.image;
+    }
+  }, [activity.image]);
+
+  useEffect(() => {
+    if (tick !== null && tick.heroId !== null) {
+      heroAt.current = tick.at;
+    }
+  }, [tick]);
 
   return scanGuidance({
     hasPermission,
     canRequestPermission,
     modelMissing,
-    quietMs: quietFor(activity, now()),
+    quietMs: quietFor(
+      {
+        ...activity,
+        firstFrameAt: firstFrameAt.current,
+        heroAt: heroAt.current,
+      },
+      now(),
+    ),
   });
 }

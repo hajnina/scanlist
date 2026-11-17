@@ -2,6 +2,31 @@
 
 Running log of the lead's triage (review reports, research digests) so decisions survive across sessions.
 
+## 2026-11-17 — live milestone: in-app model download + real APK size cut (20-min box, 15:47Z)
+
+**Delivered, but ~3× the box**: downloader merged 16:11:59Z (PR #43), real ABI fix merged 16:39:55Z (PR #45),
+rolling asset republished at 16:46:24Z as **118,965,591 B (113.45 MiB)** — from 304,830,208 B (−61%).
+
+- **Downloader (#43)**: model was never in the APK (no `.litertlm` in git; app downloads 484,622,336 B on first
+  open). Fresh review caught what a deadline merge would have shipped: a dead sha-restart counter that looped
+  484 MB downloads forever, 206 responses appended without `Content-Range` validation, a start guard that missed
+  adb-provisioned bundles and re-downloaded 484 MB, and a JUnit test that hot-looped forever — i.e. its claimed
+  evidence could not exist. Fixed in `a929774`/`40473cc`; reviewer independently reran 9/9 tests in 57 ms.
+  Delegated follow-ups (PR #46, other lead): revision pinning, disk pre-check, metered honesty, sync state
+  publish, adb hint, start-guard tests.
+- **APK size — one wrong merge, then right**: PR #42 (`abiFilters 'arm64-v8a'` in `build.gradle`) merged 16:17:39Z
+  and did nothing. RN 0.88's `NdkConfiguratorUtils.kt:59-63` runs in `finalizeDsl` and
+  `addAll(reactNativeArchitectures)` from `gradle.properties`, widening the filter back to four ABIs. APK inside
+  the artifact was still 304,813,824 B. PR #45 (`reactNativeArchitectures=arm64-v8a`, merged 16:39:55Z) is the
+  real fix: measured APK **118,965,591 B, arm64 only, 20 `.so`**; release asset byte-identical.
+- **Lead error (recorded so it is not repeated)**: quoted the CI **artifact zip** (107,370,196 B) as the APK size.
+  Zips compress `.so`; the APK inside was 304 MB. New gate: `stat` the APK itself and `unzip -l` its `lib/`
+  dirs before any size claim. Comment path/size claims in the merged #42 docs were corrected by #45.
+- **Parallel-lead**: the other instance merged #45 (`mergedAt` verified); I merged #43/#42 and kept the ledger.
+  No duplicate work on the same PR.
+- **CI side effect**: with one ABI, the `rn` main job took **6m31s** vs 16–19 min with four — arm64-only also
+  cuts CI time by ~3×.
+
 ## 2026-11-16 — dunning-kruger premortem report (ses_e1a3f413dffeP2gDvVSFatFtDE)
 
 Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:

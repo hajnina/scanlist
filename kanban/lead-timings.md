@@ -27,3 +27,24 @@ All times UTC. "Delivered" = the subagent's completion notification.
 - Result: **X2 merged 15:13:09Z = 57 min** from the instruction, with two REQUEST-CHANGES rounds (A6 real blocker, X2 provenance) and one branch integration.
 - What made it fit: timebox messages on every lane (A6 fix 20-min box → 14 min; B7 nits scope-cut mid-run; X2 fix 8-min box → 10 min), gating nits only for B7, and lead closeouts kept at 2-3 min.
 - What nearly broke it: RN CI is 15-19 min per head — any RN fix round inside a 60-min window must be pushed within the first 20 min, or the merge slips. Fresh reviews are 20-35 min, so **only one review round per PR fits in an hour**; a second round needs the reviewer to be pre-briefed and the fix to be reviewer-prescribed.
+
+## Live milestone (2026-11-17, 20-min box at 15:47Z): model download + APK size
+| Lane | Dispatched | Delivered | Duration | Outcome |
+|---|---|---|---|---|
+| Downloader, first shippable push | 15:51 | 16:03 | **12 min** | WIP branch (no tests yet) |
+| Downloader, blocker fixes (reviewer-prescribed) | 16:07 | 16:12 | **5 min** | 4/4 blockers, 9/9 JVM tests |
+| Downloader review (fresh) | 16:00 | 16:07 | **7 min** | REQUEST-CHANGES, 3 real bugs + hanging test |
+| Downloader re-verify (delta) | 16:08 | 16:11 | **3 min** | APPROVE-WITH-NITS, independently reran 9/9 |
+| ABI PR #42 builder (incl. CI) | 15:51 | 16:18 | **27 min** | merged but INEFFECTIVE; APK still 304 MB |
+| ABI real fix PR #45 builder (incl. CI) | 16:19 | 16:33 | **14 min** | 118,965,591 B, arm64-only verified |
+| Main CI → release asset | 16:39:57 | 16:46:24 | **6m31s** | 118,965,591 B live |
+
+**What the numbers say**
+- A from-scratch, correctly-reviewed downloader is **~35 min minimum**: 12 min to a pushable skeleton + 7 min
+  review + 5 min prescribed fixes + 3 min re-verify, with CI overlapping. The 20-min box was arithmetically
+  infeasible once robustness (resume/verify/retry) was required.
+- A packaging change looks like 2 lines but needed **two iterations (27 + 14 min)** because the framework silently
+  overrode the first mechanism. CI was the only possible verifier on this aarch64 laptop.
+- **Always measure the artifact's contents, not its zip size.** The 107 MB artifact contained the unchanged
+  304 MB APK; one wrong merge and one wrong user-facing number came from that.
+- One ABI also cuts RN CI from 16–19 min to **~6.5 min**, which materially changes future estimates.

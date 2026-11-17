@@ -25,6 +25,7 @@ import { docText, flatten } from "@scanlist/ts-core";
 import type { ScanList, ScanListItem } from "@scanlist/ts-core";
 
 import { SCAN_TICK_INTERVAL_MS, ScanScreen } from "../ScanScreen";
+import * as flip from "../flip";
 import type { ScanSessionOptions } from "../../sources/session";
 import type { ScanSignal } from "../../sources/types";
 import type { EmbedPort, EmbedResolution } from "../textEmbedder";
@@ -277,6 +278,32 @@ describe("ScanScreen — auto-rank, manual tick", () => {
       element.getAttribute("data-source"),
     );
     expect(active).toEqual(["barcode", "off", "ocr", "queries"]);
+  });
+
+  it("measures the ranked rows in document space — the capture receives the viewport scroll", async () => {
+    const list = makeList(["Milk", "Bread"]);
+    const embed = fakeEmbed(list, new Map([["milk label", vec({ 0: 1 })]]));
+    // A scrolled page: without this offset a scroll between the two captures animates as a move.
+    Object.defineProperty(window, "scrollY", { value: 300, configurable: true, writable: true });
+    Object.defineProperty(window, "scrollX", { value: 0, configurable: true, writable: true });
+    const captureSpy = vi.spyOn(flip, "capturePositions");
+
+    try {
+      mount({ list, embed, off: fakeOff() });
+      await wait(MOUNT);
+      sessionOptions().onSignal(ocr("milk label"));
+      await wait(SCAN_TICK_INTERVAL_MS + 80);
+
+      // The ranked render is the first FLIP "first" capture; it must be in document space.
+      expect(document.querySelector(".scan-hero-name .hero-value")?.textContent).toBe("Milk");
+      expect(captureSpy).toHaveBeenCalled();
+      const lastCall = captureSpy.mock.calls[captureSpy.mock.calls.length - 1];
+      expect(lastCall?.[1]).toEqual({ x: 0, y: 300 });
+    } finally {
+      captureSpy.mockRestore();
+      Object.defineProperty(window, "scrollY", { value: 0, configurable: true, writable: true });
+      Object.defineProperty(window, "scrollX", { value: 0, configurable: true, writable: true });
+    }
   });
 });
 

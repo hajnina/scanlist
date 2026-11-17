@@ -40,6 +40,6 @@ background, black "BANANAS" filling the frame. One way to recreate it (any ffmpe
 
     ffmpeg -f lavfi -i color=white:s=640x480:d=10:r=30 \
       -vf "drawtext=text='BANANAS':fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:fontcolor=black:fontsize=150:x=(w-text_w)/2:y=(h-text_h)/2" \
-      -pix_fmt yuv420p -f yuv4mpegpipe /tmp/opencode/bananas.y4m
+      -frames:v 10 -pix_fmt yuv420p -f yuv4mpegpipe /tmp/opencode/bananas.y4m
 
 OCR needs large, high-contrast glyphs; shrink the font and Tesseract may stop reading the frame.

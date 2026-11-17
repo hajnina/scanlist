@@ -137,6 +137,22 @@ describe('extractOcrLines', () => {
     expect(lines[15].text).toBe('line 16');
   });
 
+  test('cap applies after filtering, not to the raw line list', () => {
+    // 8 junk (too short) + 8 early valid + 8 late valid: slicing the first 16 raw lines
+    // before filtering would keep only 8 valid lines and drop every late one.
+    const raw = [
+      ...Array.from({length: 8}, () => ({text: 'x'})),
+      ...Array.from({length: 8}, (_, index) => ({text: `early ${index + 1}`})),
+      ...Array.from({length: 8}, (_, index) => ({text: `late ${index + 1}`})),
+    ];
+
+    const lines = extractOcrLines({blocks: [{lines: raw}]});
+
+    expect(lines).toHaveLength(16);
+    expect(lines[0].text).toBe('early 1');
+    expect(lines[15].text).toBe('late 8');
+  });
+
   test('maxLines honours a stricter cap', () => {
     const lines = extractOcrLines(
       {blocks: [{lines: [{text: 'aaa'}, {text: 'bbb'}, {text: 'ccc'}]}]},
@@ -258,6 +274,34 @@ describe('ocrLineSignals', () => {
 
     now = 4000;
     expect(ocrLineSignals(result, {deduper, clock})).toHaveLength(2);
+  });
+
+  test('suppressed lines consume no cap slots, so fresh lines past position 16 still emit', () => {
+    let now = 0;
+    const clock = {now: () => now};
+    const deduper = createOcrLineDeduper(4000, clock);
+    const held = Array.from({length: 8}, (_, index) => ({
+      text: `held ${index + 1}`,
+    }));
+    const fresh = Array.from({length: 12}, (_, index) => ({
+      text: `fresh ${index + 1}`,
+    }));
+
+    expect(
+      ocrLineSignals({blocks: [{lines: held}]}, {deduper, clock}),
+    ).toHaveLength(8);
+
+    now = 800; // inside the repeat window: the held lines are suppressed
+    const signals = ocrLineSignals(
+      {blocks: [{lines: [...held, ...fresh]}]},
+      {deduper, clock},
+    );
+
+    // 8 held (suppressed) + 12 fresh: a cap applied before suppression would keep only
+    // fresh 1–8. Suppression first means all 12 fresh lines get a slot.
+    expect(signals.map(signal => signal.text)).toEqual(
+      fresh.map(line => line.text),
+    );
   });
 
   test('one-shot calls use their own deduper (repeatMs option)', () => {

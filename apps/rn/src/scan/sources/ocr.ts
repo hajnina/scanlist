@@ -14,9 +14,11 @@
  * confidence (its `confidence`, else the mean of its element confidences, else a neutral 0.6 —
  * never a cross-line mean).
  *
- * Pool cap: the ranker owns "16 text vectors per tick" (S8's rank/decideTop); the source must not
- * flood it, so it emits at most {@linkcode MAX_OCR_LINES_PER_TICK} OCR lines per batch — with one
- * barcode per frame that keeps barcode + OCR ≤ 16 together in the common case.
+ * Pool cap: the ranker owns the combined "≤ 16 text vectors per tick" rule (barcode + OCR lines,
+ * S8's rank/decideTop). This source caps its own OCR lines at
+ * {@linkcode MAX_OCR_LINES_PER_TICK} per batch so it cannot flood the pool; a barcode signal is
+ * additional — one frame can carry up to 17 text signals — and the ranker drops the extras in
+ * detection order.
  */
 import {type Clock, systemClock} from './clock';
 import type {ScanSignal} from './types';
@@ -98,15 +100,23 @@ export function lineConfidence(line: OcrLineLike): number {
 export interface ExtractOcrLinesOptions {
   /** Ignore lines shorter than this after whitespace normalisation. Default 3. */
   minChars?: number;
-  /** Hard cap, in detection order. Default {@linkcode MAX_OCR_LINES_PER_TICK}. */
+  /** Hard cap on emitted lines, in detection order. Default {@linkcode MAX_OCR_LINES_PER_TICK}. */
   maxLines?: number;
+  /**
+   * Optional cross-tick suppression (the repeat window). Called after blank/too-short and
+   * within-batch duplicate filtering, and before the cap counts the line: a suppressed line
+   * consumes no cap slot, exactly like the merged Kotlin B4-sync batcher.
+   */
+  acceptLine?: (text: string) => boolean;
 }
 
 /**
  * Flatten an ML Kit result into per-line queries in detection order.
  *
- * Within one batch: blank/too-short lines are dropped, and a repeated line (case-insensitive, e.g.
- * a logo or a reflection) is kept only once — the first occurrence wins.
+ * Order matches the merged Kotlin B4-sync batcher: normalise → drop blank/too-short → collapse
+ * duplicates within the batch → apply the optional cross-tick `acceptLine` predicate → count
+ * against `maxLines`. Suppressed lines therefore consume no cap slots and fresh lines further
+ * down a held page still get emitted.
  *
  * When the backend only fills `result.text`, it is split on line breaks so the per-line contract
  * still holds.
@@ -116,6 +126,7 @@ export function extractOcrLines(
   {
     minChars = DEFAULT_OCR_MIN_CHARS,
     maxLines = MAX_OCR_LINES_PER_TICK,
+    acceptLine,
   }: ExtractOcrLinesOptions = {},
 ): OcrLine[] {
   const raw: OcrLineLike[] = [];
@@ -144,6 +155,9 @@ export function extractOcrLines(
       continue;
     }
     seen.add(key);
+    if (acceptLine !== undefined && !acceptLine(text)) {
+      continue;
+    }
     lines.push({text, confidence: lineConfidence(line)});
     if (lines.length >= maxLines) {
       break;
@@ -209,7 +223,8 @@ export interface OcrLineSignalsOptions extends ExtractOcrLinesOptions {
 
 /**
  * Turn one ML Kit result into **one ScanSignal per OCR line** (≤ {@linkcode MAX_OCR_LINES_PER_TICK},
- * detection order). Lines emitted within the repeat window are suppressed.
+ * detection order). Lines emitted within the repeat window are suppressed *before* the cap, so a
+ * carried-over page cannot starve fresh lines further down the frame.
  */
 export function ocrLineSignals(
   result: OcrResultLike,
@@ -224,11 +239,13 @@ export function ocrLineSignals(
   const dedupe = deduper ?? createOcrLineDeduper(repeatMs, clock);
   const now = clock.now();
 
-  return extractOcrLines(result, {minChars, maxLines})
-    .filter(line => dedupe.accept(line.text, now))
-    .map(line => ({
-      source: 'ocr' as const,
-      text: line.text,
-      confidence: line.confidence,
-    }));
+  return extractOcrLines(result, {
+    minChars,
+    maxLines,
+    acceptLine: text => dedupe.accept(text, now),
+  }).map(line => ({
+    source: 'ocr' as const,
+    text: line.text,
+    confidence: line.confidence,
+  }));
 }

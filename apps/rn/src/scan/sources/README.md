@@ -80,9 +80,11 @@ confidence (its `confidence`, else the mean of its element confidences, else 0.6
 cross-line mean). The A1 `ScanSource` callback is single-signal, so a batch arrives as consecutive
 `onSignal` calls.
 
-A batch is capped at **16 OCR line signals** (`MAX_OCR_LINES_PER_TICK`) so barcode + OCR stay ≤ 16
-text vectors per tick; the authoritative pool cap is enforced in the ranker (S8's `rank`/`decideTop`).
-An identical line (case-insensitive) is suppressed for 4 s (`ocrRepeatMs`), like the barcode debounce.
+A batch is capped at **16 OCR line signals** (`MAX_OCR_LINES_PER_TICK`). A barcode signal is
+additional, so one frame can yield up to 17 text signals; the combined 16-text-vector pool cap is
+rank-side (S8's `rank`/`decideTop`, which drops extras in detection order — A5 does the wiring).
+Suppression runs **before** the cap, so repeated lines consume no slots. An identical line
+(case-insensitive) is suppressed for 4 s (`ocrRepeatMs`), like the barcode debounce.
 
 Per-source knobs: `barcodeDedupeMs` (default 4000), `barcodeIntervalMs` (0 = every frame),
 `ocrIntervalMs` (800), `ocrMinChars` (3), `ocrMaxLines` (16), `ocrRepeatMs` (4000),

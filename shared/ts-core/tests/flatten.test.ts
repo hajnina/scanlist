@@ -168,6 +168,14 @@ describe("flatten — aliases, amount, unit, note (FLATTEN.md §1/§5)", () => {
     expect(item.aliases).toEqual(["Leche", "MLÉKO"]);
   });
 
+  it("dedupes with Unicode full case folding, not just lowercasing (ß ≡ ss, ﬁ ≡ fi)", () => {
+    const item = oneItem({
+      name: "Milk",
+      aliases: ["Straße", "STRASSE", "strasse", "ﬁle", "FILE", "ﬁle"],
+    });
+    expect(item.aliases).toEqual(["Straße", "ﬁle"]);
+  });
+
   it("keeps the first spelling in order (decomposed é)", () => {
     const item = oneItem({ name: "Milk", aliases: ["Mle\u0301ko", "ml\u00e9ko", "mléko"] });
     expect(item.aliases).toEqual(["Mle\u0301ko"]);

@@ -52,7 +52,7 @@ export interface FlattenedItem {
   amount: ScanListAmount | null;
   unit: string | null;
   note: string | null;
-  /** Non-empty trimmed aliases, deduped case-insensitively after NFC (FLATTEN.md §5). */
+  /** Non-empty trimmed aliases, deduped after NFC + Unicode full case folding (FLATTEN.md §5). */
   aliases: string[];
   done: boolean;
   /** Section names root -> parent section, `[]` for a root item. */

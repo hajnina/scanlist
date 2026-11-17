@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { casefold } from "../src/casefold";
 import {
   barcodeMatch,
   cosine,
@@ -12,7 +13,8 @@ import {
 } from "../src/rank";
 import type { RankedCandidate } from "../src/rank";
 import type { RankEntry, RankItem, RankOutput } from "../src/types";
-import { makeItem } from "./helpers";
+import { golden, goldenListsById } from "./fixtures";
+import { makeItem, must } from "./helpers";
 
 function milkItems(): RankItem[] {
   return [
@@ -24,6 +26,11 @@ function milkItems(): RankItem[] {
 
 function textQueries(...vectors: number[][]): { text: number[][]; image: number[][] } {
   return { text: vectors, image: [] };
+}
+
+function itemsWithVectors(listId: string): RankItem[] {
+  const list = must(goldenListsById.get(listId));
+  return list.items.map((item) => ({ ...item, vec: must(list.itemVectors[item.id]) }));
 }
 
 function tick(
@@ -102,13 +109,16 @@ describe("RANK.md §10 worked example", () => {
     ]);
   });
 
-  it("tick 3: a 0.02 margin is NOT enough to switch the top", () => {
+  it("tick 3: inside the hysteresis band the 0.02 margin closes the gate (no hero)", () => {
     const s1 = tick(milkItems(), [1, 0, 0, 0]).state;
     const s2 = tick(milkItems(), [0.8, 0.6, 0, 0], s1).state;
     const out = tick(milkItems(), [0.8, 0.6, 0, 0], s2);
     expect(out.state.smoothed).toEqual({ a: 0.85, b: 0.87, c: 0 });
-    expect(out.topId).toBe("a");
-    expect(ids(out.entries)).toEqual(["a", "b", "c"]);
+    // §6.1 would keep a (b is only 0.02 ahead), but §6.2 needs 0.05: topId is null and the
+    // entries stay the full ranked order.
+    expect(out.topId).toBeNull();
+    expect(out.state.topId).toBeNull();
+    expect(ids(out.entries)).toEqual(["b", "a", "c"]);
   });
 
   it("tick 4: a 0.09 margin switches the top", () => {
@@ -294,7 +304,8 @@ describe("ordering, ties, done group, state (RANK.md §4/§5/§6)", () => {
     ];
     const out = rank(items, textQueries([0, 1, 0, 0]), null, null, { dims: 4 });
     expect(ids(out.entries)).toEqual(["first", "second"]);
-    expect(out.topId).toBe("first");
+    // A 0.0 margin is below M_text, so the order is ranked but nothing is highlighted.
+    expect(out.topId).toBeNull();
     expect(out.entries[0]?.smoothed).toBe(1);
     expect(out.entries[1]?.smoothed).toBe(1);
   });
@@ -350,7 +361,8 @@ describe("ordering, ties, done group, state (RANK.md §4/§5/§6)", () => {
       null,
       { dims: 4 },
     );
-    expect(out.topId).toBe("b");
+    // b is alone (margin vacuous) but its 0.6 is below T_text = 0.79: ranked, no hero.
+    expect(out.topId).toBeNull();
     expect(ids(out.entries)).toEqual(["b", "a"]);
     expect("a" in out.state.smoothed).toBe(false);
   });
@@ -364,7 +376,8 @@ describe("ordering, ties, done group, state (RANK.md §4/§5/§6)", () => {
       null,
       { dims: 4 },
     );
-    expect(out.topId).toBe("b");
+    // 0.6 is below the text no-match floor: ranked, no hero.
+    expect(out.topId).toBeNull();
     expect(Object.keys(out.state.smoothed)).toEqual(["b"]);
   });
 
@@ -487,33 +500,213 @@ describe("EMA exactness (RANK.md §4)", () => {
   });
 });
 
-describe("highlight decision is isolated (decideTop)", () => {
-  function candidates(): RankedCandidate[] {
+describe("highlight decision is isolated (decideTop, RANK.md §6.1–§6.3)", () => {
+  function textCandidates(top: number, second: number): RankedCandidate[] {
     return [
-      { id: "b", raw: 0.87, smoothed: 0.87, done: false, order: 1 },
-      { id: "a", raw: 0.85, smoothed: 0.85, done: false, order: 0 },
+      { id: "b", raw: top, smoothed: top, done: false, order: 1, source: "text" },
+      { id: "a", raw: second, smoothed: second, done: false, order: 0, source: "text" },
     ];
   }
 
-  it("keeps the current top at exactly 0.02 and switches above it", () => {
-    expect(decideTop(candidates(), "a")?.id).toBe("a");
-    const higher = candidates();
-    (higher[0] as RankedCandidate).smoothed = 0.88;
-    expect(decideTop(higher, "a")?.id).toBe("b");
+  function imageCandidates(top: number, second: number): RankedCandidate[] {
+    return textCandidates(top, second).map((entry) => ({ ...entry, source: "image" }));
+  }
+
+  it("closes the text gate below M_text = 0.05, inclusive at exactly 0.05", () => {
+    expect(decideTop(textCandidates(0.87, 0.85), null)).toBeNull();
+    expect(decideTop(textCandidates(0.9, 0.85), null)?.id).toBe("b");
+    expect(decideTop(textCandidates(0.85, 0.85), null)).toBeNull();
   });
 
-  it("returns the best candidate with no current top, and null with none", () => {
-    expect(decideTop(candidates(), null)?.id).toBe("b");
+  it("applies the text floor T_text = 0.79 to the hero, inclusive", () => {
+    const atFloor: RankedCandidate[] = [
+      { id: "a", raw: 0.79, smoothed: 0.79, done: false, order: 0, source: "text" },
+    ];
+    const belowFloor: RankedCandidate[] = [
+      { id: "a", raw: 0.789999, smoothed: 0.789999, done: false, order: 0, source: "text" },
+    ];
+    // One candidate: the margin is vacuous, the floor still decides.
+    expect(decideTop(atFloor, null)?.id).toBe("a");
+    expect(decideTop(belowFloor, null)).toBeNull();
+  });
+
+  it("keeps hysteresis before the gate: a text hero in the 0.02 band is hidden", () => {
+    // Sorted b 0.87, a 0.85; hysteresis keeps a, but the sorted pair is only 0.02 apart.
+    expect(decideTop(textCandidates(0.87, 0.85), "a")).toBeNull();
+  });
+
+  it("uses M_image/T_image and lets hysteresis keep a slightly-behind image hero", () => {
+    // §10 image tick: y 0.855 ahead of x 0.850 by exactly 0.005; hysteresis keeps x. This is the
+    // both-rule case (M_image 0.005 < hysteresis 0.02, so the gate and hysteresis interact).
+    const ranked = (top: number, second: number): RankedCandidate[] => [
+      { id: "y", raw: top, smoothed: top, done: false, order: 1, source: "image" },
+      { id: "x", raw: second, smoothed: second, done: false, order: 0, source: "image" },
+    ];
+    const confirmed = new Set(["x", "y"]);
+    expect(decideTop(ranked(0.855, 0.85), "x", confirmed)?.id).toBe("x");
+    // A 0.004 margin is below M_image: the gate closes even though hysteresis prefers x.
+    expect(decideTop(ranked(0.854, 0.85), "x", confirmed)).toBeNull();
+    // Above the 0.02 hysteresis band the challenger takes over (0.03 >= M_image).
+    expect(decideTop(ranked(0.88, 0.85), "x", confirmed)?.id).toBe("y");
+    // Image floor is 0.68, not 0.79.
+    expect(decideTop(ranked(0.679, 0.6), null, confirmed)).toBeNull();
+    expect(decideTop(ranked(0.68, 0.6), null, confirmed)?.id).toBe("y");
+  });
+
+  it("floors the hysteresis crown, not the sorted top-1 (§6.1 order)", () => {
+    // y 0.68 is top-1; x 0.665 is the previous hero and sits inside the 0.02 crown, so hysteresis
+    // keeps x and the gate floors *x* (0.665 < T_image 0.68) -> no hero. Flooring the top-1 first
+    // would pass (0.68 is at the floor) and wrongly highlight y.
+    const ranked: RankedCandidate[] = [
+      { id: "y", raw: 0.68, smoothed: 0.68, done: false, order: 1, source: "image" },
+      { id: "x", raw: 0.665, smoothed: 0.665, done: false, order: 0, source: "image" },
+    ];
+    expect(decideTop(ranked, "x", new Set(["x", "y"]))).toBeNull();
+  });
+
+  it("requires accept-list confirmation for an image-driven hero only (§6.3)", () => {
+    expect(decideTop(imageCandidates(0.9, 0.8), null, new Set())).toBeNull();
+    expect(decideTop(imageCandidates(0.9, 0.8), null, new Set(["b"]))?.id).toBe("b");
+    // A text hero never needs confirmation, even with an empty accept list.
+    expect(decideTop(textCandidates(0.9, 0.8), null, new Set())?.id).toBe("b");
+  });
+
+  it("treats a missing source as text (the stricter gate)", () => {
+    const noSource: RankedCandidate[] = [
+      { id: "b", raw: 0.9, smoothed: 0.9, done: false, order: 1 },
+      { id: "a", raw: 0.84, smoothed: 0.84, done: false, order: 0 },
+    ];
+    expect(decideTop(noSource, null)?.id).toBe("b");
+    const imageOnlyMargin: RankedCandidate[] = [
+      { id: "b", raw: 0.9, smoothed: 0.9, done: false, order: 1 },
+      { id: "a", raw: 0.897, smoothed: 0.897, done: false, order: 0 },
+    ];
+    // 0.003 would clear M_image, but without a source it counts as text and is rejected.
+    expect(decideTop(imageOnlyMargin, null)).toBeNull();
+  });
+
+  it("falls back to hysteresis' candidate when the current top is not a candidate", () => {
+    expect(decideTop(textCandidates(0.9, 0.8), "gone")?.id).toBe("b");
     expect(decideTop([], "a")).toBeNull();
   });
 
-  it("falls back to the best if the current top is not a candidate", () => {
-    expect(decideTop(candidates(), "gone")?.id).toBe("b");
+  it("sorts candidates by smoothed desc then order asc", () => {
+    const sorted = sortCandidates(textCandidates(0.9, 0.8));
+    expect(sorted.map((entry) => entry.id)).toEqual(["b", "a"]);
+  });
+});
+
+describe("S10 highlight gates and image guard on golden.json (RANK.md §6.2/§6.3)", () => {
+  it("suppresses all 12 text 'not on the list' distractors (margin < 0.05)", () => {
+    const distractors = golden.queries.filter(
+      (query) => query.kind === "text" && query.expect === "nomatch",
+    );
+    expect(distractors).toHaveLength(12);
+
+    let suppressed = 0;
+    for (const query of distractors) {
+      const out = rank(
+        itemsWithVectors(query.list),
+        { text: [query.vector], image: [] },
+        null,
+        null,
+      );
+      expect(out.ranked).toBe(true);
+      expect(out.topId, query.id).toBeNull();
+      expect(out.state.topId, query.id).toBeNull();
+      // The full ranked order is still rendered; only the highlight is withheld.
+      const ranked = out.entries.filter((entry) => !entry.done);
+      expect(ranked.slice(0, 3).map((entry) => entry.id), query.id).toEqual(
+        query.expectedTop3,
+      );
+      suppressed += 1;
+    }
+    expect(suppressed).toBe(12);
   });
 
-  it("sorts candidates by smoothed desc then order asc", () => {
-    const sorted = sortCandidates(candidates());
-    expect(sorted.map((entry) => entry.id)).toEqual(["b", "a"]);
+  it("does not highlight cheese.jpg → Greek yoghurt (unconfirmed image winner)", () => {
+    const query = must(golden.queries.find((entry) => entry.id === "icheese"));
+    const out = rank(
+      itemsWithVectors(query.list),
+      { text: [], image: [query.vector] },
+      null,
+      must(query.product),
+    );
+    // The image gate passes (top-1 Greek yoghurt, 0.699416, margin 0.025021) but the accept-list
+    // guard does not: "Fromage Blanc Nature" matches no item name or alias.
+    expect(out.topId).toBeNull();
+    expect(out.entries[0]?.id).toBe(query.expectedTop3[0]);
+  });
+
+  it("honey.jpg: 0.752869 without a name, 0.902869 and highlighted with OFF name 'Honey'", () => {
+    const query = must(golden.queries.find((entry) => entry.id === "ihoney"));
+    const items = itemsWithVectors(query.list);
+    const queries = { text: [], image: [query.vector] };
+
+    const unnamed = rank(items, queries, null, null);
+    expect(unnamed.entries[0]?.raw).toBe(0.752869);
+    expect(unnamed.entries[0]?.id).toBe(query.expectedTop3[0]);
+    expect(unnamed.topId).toBeNull();
+
+    const confirmed = rank(items, queries, null, "Honey");
+    expect(confirmed.entries[0]?.raw).toBe(0.902869);
+    expect(confirmed.topId).toBe(query.expectedTop3[0]);
+    expect(confirmed.state.topId).toBe(query.expectedTop3[0]);
+  });
+
+  it("highlights no image tick without a confirmed OFF name, and only ihoney with one", () => {
+    const imageQueries = golden.queries.filter((query) => query.kind === "image");
+    expect(imageQueries).toHaveLength(15);
+
+    let unnamedNull = 0;
+    let namedHeroes = 0;
+    for (const query of imageQueries) {
+      const items = itemsWithVectors(query.list);
+      const queries = { text: [], image: [query.vector] };
+      expect(rank(items, queries, null, null).topId, `${query.id} without name`).toBeNull();
+      unnamedNull += 1;
+
+      const named = rank(items, queries, null, must(query.product));
+      if (named.topId !== null) {
+        expect(query.id).toBe("ihoney");
+        expect(named.topId).toBe(query.expectedTop3[0]);
+        namedHeroes += 1;
+      }
+    }
+    expect(unnamedNull).toBe(15);
+    expect(namedHeroes).toBe(1);
+  });
+});
+
+describe("Unicode full case folding (RANK.md §3.1, FLATTEN.md §5)", () => {
+  it("folds the spec's examples: ß → ss, İ → i̇, ﬁ → fi", () => {
+    expect(casefold("Straße")).toBe("strasse");
+    expect(casefold("ẞ")).toBe("ss");
+    expect(casefold("İstanbul")).toBe("i\u0307stanbul");
+    expect(casefold("ﬁle")).toBe("file");
+  });
+
+  it("folds final sigma, long s and the ǰ decomposition like Python", () => {
+    expect(casefold("Σςσ")).toBe("σσσ");
+    expect(casefold("ſ")).toBe("s");
+    expect(casefold("ǰ")).toBe("j\u030c");
+    expect(casefold("ǰ") === "ǰ").toBe(false);
+  });
+
+  it("matches barcode names and aliases exactly after full folding", () => {
+    expect(barcodeMatch({ name: "Straße", aliases: [] }, "STRASSE")).toBe(true);
+    expect(barcodeMatch({ name: "Milk", aliases: ["Straße"] }, "strasse")).toBe(true);
+    expect(barcodeMatch({ name: "İstanbul", aliases: [] }, "i\u0307stanbul")).toBe(true);
+    expect(barcodeMatch({ name: "ﬁle", aliases: [] }, "FILE")).toBe(true);
+    // Still exact: no substring or token matching.
+    expect(barcodeMatch({ name: "Oat milk", aliases: [] }, "Milk")).toBe(false);
+    expect(barcodeMatch({ name: "Straße", aliases: [] }, "strase")).toBe(false);
+  });
+
+  it("applies NFC before folding", () => {
+    expect(normBarcodeText("  Straße  ")).toBe("strasse");
+    expect(normBarcodeText("Mle\u0301ko")).toBe("mléko");
+    expect(barcodeMatch({ name: "Mle\u0301ko", aliases: [] }, "MLÉKO")).toBe(true);
   });
 });
 

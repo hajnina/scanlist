@@ -19,14 +19,18 @@ this document does that, and marks every number with the device and dtype it cam
 **Recommendation: keep embeddings on the server for now. Browser embedding is measurably fast for
 text (5× the server's cache-miss) but carries a 543–878 MB download plus a hard WebGPU gate, the
 dtype the model card recommends (q4, 284 MB) is unusable on this GPU, and the vision encoder never
-returned a vector in 10 minutes. Do not build the browser image path on this evidence.** The C4 seam
-(`sendJpeg` → server or `embedJpeg` → local) is the right place to leave the door open.
+returned a vector in 10 minutes. Do not build the browser image path on this evidence.** The C4 seam is
+the right place to leave the door open: `createFrameUploader({ embed })` in
+`src/scan/sources/uploader.ts` takes the image embedder as an injected `embed: (frame) =>
+Promise<ImageEmbedding>` behind its single-flight, newest-frame-wins queue — today that function POSTs
+to `/embed/image`, and a local C7 embedder would be a drop-in swap (no such local embedder exists yet;
+this spike's page is not wired into it).
 
 | Path | Where | Why |
 | --- | --- | --- |
 | Item docText vectors (44 per list, cached at import) | **server**, cached | Already built (C3): 44 texts ≈ 2–3.6 s once per list, then 0.04 ms. The browser cannot beat *cached* and costs 543 MB to try. |
 | OCR/barcode text queries (per 400 ms tick) | **server**, warm | C3: 110–155 ms warm. Browser fp16 measures 48–58 ms (§4.3) — 2–3× faster, but that only matters if the 400 ms tick is ever the bottleneck, which it is not. |
-| One-shot image embedding ("identify this product", photoless items) | **server** (unchanged) | Browser side is **not demonstrated**: with fp16 (the only dtype that runs here) the vision encoder did not finish the first call in **600 s**, twice (§4.4). Server is 6.4–11.9 s/JPEG on CPU. Until a phone run returns a real per-image number, the browser is not an option for images at all. |
+| One-shot image embedding ("identify this product", photoless items) | **server** (unchanged) | Browser side is **not demonstrated**: with fp16 (the only dtype that runs here) the vision encoder did not finish the first call in a single **600 s** run (§4.4; one 600,037 ms attempt, not a repeat). Server is 6.4–11.9 s/JPEG on CPU. Until a phone run returns a real per-image number, the browser is not an option for images at all. |
 | Live camera stream (2.5 fps) | **neither** | 280 tokens/image, a batch cap of 9 images, and an unmeasured (here: non-returning) vision pass. The C3 guidance stands: opportunistic single frames, barcode/OCR text in between. |
 
 Why not fully client-side: fp16 costs **878 MB** (text+vision) or 542 MB (text) versus the server's
@@ -200,8 +204,10 @@ And the end-to-end check that matters: ts-core `rank()` with these browser vecto
 expected top-1 for 12/12 text queries**. So fp16-in-the-browser is not merely "close in cosine"; it
 preserves the ranking the app actually uses.
 
-So on this GPU the browser beats the server's **warm** text path by ~6× on a single query and by ~5×
-on a list-sized batch (396 ms vs 1.9–3.6 s), and it beats the server's **cached** path never — 0.04 ms
+So on this GPU the browser beats the server's **warm** text path by ~6× on a single query and by ~3×
+per text on a batch (browser 22–39 ms/doc for its 10-doc batch vs the server's 44–83 ms/text for its
+44-text batch — the batches are different sizes, so only the per-text rates are comparable, not the
+396 ms vs 1.9–3.6 s totals), and it beats the server's **cached** path never — 0.04 ms
 is unbeatable. That is the whole argument for keeping cached document vectors server-side and using
 the browser only for inputs the server has not seen.
 
@@ -291,7 +297,7 @@ safetensors), 8 threads, not the LiteRT/GGUF path:
 Two costs that are easy to forget: the server's **GPU-host bill** for the image path (or 6–12 s/frame
 on CPU, which is what C3 measured), and the browser's **543–878 MB first run** plus the WebGPU gate,
 which a phone on shop Wi-Fi feels once and a phone on mobile data may never pay. The browser's win is
-narrow: ~5× the server on an *uncached* single text, and ~3× on a list-sized batch — against zero
+narrow: ~5× the server on an *uncached* single text, and ~3× per text on a batched list — against zero
 download and 0.04 ms on the cached path.
 
 ---
@@ -323,7 +329,8 @@ download and 0.04 ms on the cached path.
 4. **The dtype is fp16, not the model card's q4.** q4/q8 lose the WebGPU device here (§4.2), so every
    latency and parity number in §4.3–§4.4 is fp16. fp16 is *higher* precision than q4, so parity is
    not the weak spot; the 3× download is.
-5. **No image number exists.** The vision encoder's forward pass was given 600 s twice and never
+5. **No image number exists.** The vision encoder's forward pass was given **600 s once** (one
+   600,037 ms run; the other two attempts stopped earlier at 180 s and 150 s) and never
    returned (§4.4); preprocessing completes in 35 ms, so the hang is in the GPU forward pass. That is
    reported as a blocked measurement, not as a latency.
 6. **The text parity number is fp16-vs-fp32** cosine agreement on the golden inputs, not bit

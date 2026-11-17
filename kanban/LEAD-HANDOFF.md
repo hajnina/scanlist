@@ -13,6 +13,9 @@ delegate agents. Full rules in AGENTS.md; running decision log in kanban/lead-lo
   to the PARENT done card after merge. Builders stop after PR open; same reviewer re-verifies when reviewer≠builder.
 - Create the worktree AFTER `board.py claim` (B7's todo→doing rename conflict lesson).
 - Never merge your own PRs; never edit `.github/` except via lead-authorized delegate (direct-to-main precedent).
+- **SESSION PARENTAGE DIES WITH A RESTART**: subagent IDs from a previous lead session are NOT messageable ("not a child of
+  the current session"). After a restart, re-dispatch fresh sessions and carry the prior findings in the brief — do not
+  burn cycles trying to resume.
 - Heartbeat: background `sleep 600 && echo HEARTBEAT-FIRE`, re-armed FIRST on every wakeup, then
   `bash scripts/lead-watchdog.sh`. The timer dies with the session — RE-ARM NOW after restart.
 
@@ -23,25 +26,24 @@ delegate agents. Full rules in AGENTS.md; running decision log in kanban/lead-lo
 2. Re-arm heartbeat: background shell `sleep 600 && echo HEARTBEAT-FIRE`.
 3. Run `bash scripts/lead-watchdog.sh` and reconcile with the state below.
 
-## Board state
-- **31 of 34 cards done.** doing: A6, B7. todo: X2 (deps B7+A6), B0 (device-parked, parked with Martin).
+## Board state (ls-verified 2026-11-17 13:40Z — the old "31" tally was WRONG by one)
+- **30 of 34 cards done.** doing: A6, B7, **X2 (pre-fired, building — will show as doing once claimed)**. todo: B0 (device-parked, parked with Martin).
 - Kotlin main suite 296/0 · RN main 237 · web main 279 (29 files) · smoke 21/21 · ts-core 150 · server 130+1skip.
 - Rolling release pipeline WORKS ("ScanList (rolling)" refreshes on code pushes; refs/tags/main stays 0 —
   the release job now self-cleans legacy tags unconditionally).
 - CI runs real gates on every track (kotlin unit tests + summary, rn tsc+jest+APK, shared tsc+vitest, web).
 
-## ACTIVE LANES (sessionIDs — message, don't redispatch)
+## ACTIVE LANES (sessionIDs — these are POST-RESTART sessions, children of the current lead)
 | Lane | Session | State | Next action |
 |---|---|---|---|
-| **A6 fix round** (PR #36) | ses_e16c72cb8ffeB67tMx3QBcBi61 | Fix round pushed (modelMissing wiring + 1 s quiet interval + POLISH.md truth pass); rn CI run 44093111706 was pending; PR MERGEABLE | When CI green: message SAME reviewer **ses_e16678bb2ffeCnF8KCi9z8eOOu** to re-verify (its REQUEST-CHANGES verdict; reviewer≠builder). On APPROVE*: merge → `board.py move A6 done` → clean ../scanlist-wt/A6 + branch → fire A6-followup lane (below) + X2 check |
-| **B7 review** (PR #39) | ses_e164fb78effevtDfmQt4FF1VX1 | Reviewing; CI kotlin pass 1m50s on 739a84c; conflict (card rename) already resolved by builder | On APPROVE*: merge → move B7 done → clean ../scanlist-wt/B7 → **X2 check**. On REQUEST-CHANGES: fix round to builder **ses_e166dcf0dffeTF3L7GY3H5VHKo**, same reviewer re-verifies |
-| **C2-followup review** (PR #40) | ses_e164fb78affe1LxMG4LsnENN3H | Reviewing; web pass 42s; PR MERGEABLE | On APPROVE*: merge → NO card move → append evidence to done/C2.md → clean ../scanlist-wt/C2FU. On REQUEST-CHANGES: fix round to builder **ses_e165b4652ffesVWcEOI0tw72ZE** |
-| **Heartbeat** | (background sleep) | DIED with restart | Re-arm (above) |
+| **A6 re-review** (PR #36) | ses_e1644f1ceffeX6geWskfWSGy7J | Fresh adversarial reviewer (old session orphaned); head 3d6c68f; rn CI in_progress | On APPROVE*: merge (#36) → `gh pr view --json mergedAt` → `board.py move A6 done` → clean ../scanlist-wt/A6 + branch → **dispatch A6-followup** → fire X2 check |
+| **B7 review** (PR #39) | ses_e1644f1cdffef0SfOFkbX0bnEs | Fresh reviewer; kotlin pass on 739a84c; MERGEABLE/CLEAN | On APPROVE*: merge → verify mergedAt → move B7 done → clean ../scanlist-wt/B7 → X2 check |
+| **C2-followup review** (PR #40) | ses_e1644f1c6ffeRKiFvbtX1wbHlb | Fresh reviewer; web pass on 2bc52ef; MERGEABLE/CLEAN | On APPROVE*: merge → NO card move → evidence to done/C2.md → clean ../scanlist-wt/C2FU |
+| **X2 builder** (bench/COMPARISON.md) | ses_e1644f1c4ffe15SZAnuhPFy9xt | Pre-fired in parallel; claims X2 then worktree card/X2; must refresh numbers vs origin/main before PR-open | On PR open: dispatch fresh reviewer; on APPROVE*: merge → move X2 done → clean worktree/branch |
+| **Heartbeat** | (background sleep, armed 13:34Z) | ALIVE | Re-arm on every fire; run scripts/lead-watchdog.sh |
 
 ## QUEUED (dispatch on trigger)
-- **X2** (COMPARISON.md, final content card) — fires when **B7 AND A6 are merged**. Fresh session, worktree
-  `card/X2` off main. Evidence inputs pre-staged in lead-log entry "X2 dispatch checklist" (bench/results JSONs,
-  PERF.md, bundle sizes web 211 kB / APK 291 MB vs 142 MB, agent-cost ~parity, image-latency asymmetry headline).
+- **X2** (COMPARISON.md, final content card) — **IN FLIGHT** (pre-fired 13:40Z, session ses_e1644f1c4ffe15SZAnuhPFy9xt). Deps B7+A6 are landing in parallel; brief forbids citing them as merged and requires a number refresh vs origin/main before PR-open. Evidence inputs: bench/results/*.json + fragments, bench/README.md, apps/web/server/PERF.md, done cards X1/C4/C5/C7/A5/B5/B6, lead-log "X2 dispatch checklist" (bundle sizes web ~211 kB / APK 291 MB vs 142 MB, agent-cost ~parity, image-latency asymmetry headline).
 - **A6-followup** — fires when A6 merges: mount SettingsScreen (App.tsx disclosed wiring), startup application of
   the persisted backend choice, haptics setting read. Branch card/A6-followup + PR, evidence → done/A6.md.
 - **B0** — parked (no phone on adb; aarch64 adb is x86_64 binary). Parked with Martin: model-license ruling,

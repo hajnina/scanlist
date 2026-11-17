@@ -7,7 +7,7 @@
     "matryoshka": [512, 256, 128]
   },
   "imagePrefix": "",
-  "active": "modelcard",
+  "active": "mnemothera",
   "mnemothera": {
     "doc": "task: search result | text: ",
     "query": "task: search query | text: "
@@ -28,5 +28,18 @@
     "mnemothera": "references/embeddinggemma/RECIPE.md §5 (Therapy_local config/AppConfig.kt, litertlm path)",
     "modelcard": "EmbeddingGemma 2 model card (ai.google.dev/gemma/docs/embeddinggemma/model_card_2); title: none when absent; the one Google trains with"
   },
-  "decision": "Both sets are candidates. Card S3 runs the golden retrieval A/B and sets 'active' to the winner; until then 'active' is 'modelcard'. Consumers MUST read the prefixes from this file at runtime (or bundle it as an asset) and MUST NOT hard-code them."
+  "abTest": {
+    "card": "S3",
+    "date": "2026-11-17",
+    "report": "shared/fixtures/PREFIX_AB.md",
+    "stats": "shared/fixtures/ab_stats.json",
+    "fixture": "shared/fixtures/golden.json",
+    "textTop1": { "modelcard": 1.0, "mnemothera": 1.0 },
+    "textTop3": { "modelcard": 1.0, "mnemothera": 1.0 },
+    "imageTop1": { "modelcard": 0.769, "mnemothera": 0.923 },
+    "imageTop3": { "modelcard": 0.923, "mnemothera": 1.0 },
+    "winner": "mnemothera",
+    "why": "Text is a tie at the ceiling (31/31 top-1 for both sets). Images decide: 12/13 vs 10/13 top-1 and 13/13 vs 12/13 top-3, and every margin/score statistic favours mnemothera (image hit margin median 0.0281 vs 0.0242, text hit top-1 min 0.799 vs 0.738). n=13 photos, so treat the image gap as directional, not significant. See PREFIX_AB.md."
+  },
+  "decision": "Both sets are candidates; card S3 ran the golden retrieval A/B and set 'active' to the winner (mnemothera, 2026-11-17). Note this contradicts the model card's advice for titled documents only in appearance: our docText is 'name; aliases; section > path', not a titled document, and the model card's own note says the prefix matters less than the retrieval task family. Consumers MUST read the prefixes from this file at runtime (or bundle it as an asset) and MUST NOT hard-code them. Re-run shared/tools/make_golden.py to re-test; golden.json is built with whatever 'active' says and make_golden.py --verify fails if the two disagree."
 }

@@ -27,7 +27,7 @@ This file lists **every** local override and hack, and what is deliberately not 
 | Hermes | `hermesEnabled=true` | `android/gradle.properties` |
 | Gradle | 9.4.1 (wrapper) | `android/gradle/wrapper/gradle-wrapper.properties` |
 | AGP / Kotlin | whatever RN 0.88's Gradle plugin pins (9.x / 2.2) | resolved by `@react-native/gradle-plugin` |
-| compileSdk / targetSdk / minSdk | 37 / 36 / 24 | `android/build.gradle` |
+| compileSdk / targetSdk / minSdk | 37 / 36 / 31 | `android/build.gradle` — minSdk 31 since A3 (LiteRT-LM requires ≥31, same as the Kotlin app) |
 | build-tools | 37.0.0 | `android/build.gradle` |
 | NDK (CI) | 27.1.12297006 (RN default) | `android/build.gradle` |
 | NDK (laptop) | 30.0.16248370 (has linux-aarch64 prebuilts) | `-Pscanlist.ndkVersion` from `build.sh` |
@@ -143,6 +143,13 @@ package: name='dev.hajnina.scanlist.rn' versionCode='1' versionName='1.0'
 uses-permission: INTERNET, CAMERA, VIBRATE, SYSTEM_ALERT_WINDOW, ACCESS_LOCAL_NETWORK
 lib/arm64-v8a/libappmodules.so            439 800 B   # new-arch C++ glue, compiled here
 lib/arm64-v8a/libreactnative.so        24 062 944 B
+```
+
+A3 update (2026-11-17): the TurboModule card wired `shared/android-embed` into the app, so the
+APK grows 38M → 71M (the LiteRT-LM JNI lib `liblitertlm_jni.so` is packaged for all ABIs) and
+`minSdkVersion` is now `31`. CI `rn` job green on the A3 head in 2m42s. Dev screen:
+`apps/rn/src/dev/` (hidden dev affordance; shows backend/dims/latency or `E_NO_BACKEND` until
+card B0 provisions the model on device).
 lib/arm64-v8a/libhermesvm.so            4 021 008 B
 lib/arm64-v8a/libreact_codegen_safeareacontext.so
 ```

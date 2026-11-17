@@ -15,7 +15,9 @@ jest.mock('react-native/Libraries/Vibration/Vibration', () => ({
 // animation outlives the test (RN would touch the torn-down native module afterwards).
 jest.useFakeTimers();
 
-test('renders the skeleton home screen', async () => {
+// Card A2: the app now opens the lists screen (import / nested list / tick / persist / export)
+// instead of A1's static skeleton. The native modules it touches are mocked in jest.setup.js.
+test('renders the lists screen', async () => {
   let tree: ReactTestRenderer.ReactTestRenderer | undefined;
   await ReactTestRenderer.act(async () => {
     tree = ReactTestRenderer.create(<App />);
@@ -26,7 +28,8 @@ test('renders the skeleton home screen', async () => {
 
   const json = JSON.stringify(tree?.toJSON());
   expect(json).toContain('Shopping list');
-  expect(json).toContain('Magic scan');
+  expect(json).toContain('Import, tick, export.');
+  expect(json).toContain('No lists yet');
 
   await ReactTestRenderer.act(async () => {
     tree?.unmount();

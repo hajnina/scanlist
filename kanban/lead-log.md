@@ -32,6 +32,11 @@ Verdict: CONTINUE WITH CORRECTIONS. Triage by evidence:
 - Lead notes added to C3 (llama.cpp #30054 recipe + /embedding trap + TEI dead end + sentence-transformers shape), C4 (BarcodeDetector status + zxing-wasm + dual-target frame sampler), A4 (VisionCamera v5 + mlkit plugin + throttle + frame→JPEG routes). New card C7 (browser WebGPU embedding spike, depends C2).
 - Full notes (outside repo): /home/martin/projects/scanlist-research/research_notes/ScanList prior art and parallels/
 
+## 2026-11-17 — S10 fix round done (08366af); back to its reviewer for re-verification
+- Builder applied all three fixes: §9 `rest` line corrected (sibling-scan claims `top` only read in rest/entries-concat/state.topId — spot-check pending with reviewer), §6.3 fixture honesty (12/13 image hits get no hero even with recorded OFF names; imilk example; ihoney real numbers; cheese example marked hypothetical), §6.2 wording + test rename only.
+- Builder's own transcription harness: ORIGINAL line 56/116 divergent (38 empty-entry runs — counting difference vs reviewer's 55/37, immaterial), FIXED line **0/116, 0 empty**. pytest 158 passed; --verify 58/58.
+- Re-review dispatched to the same reviewer session (ses_e19154ad7ffexROd6R5JmxbL1e) — protocol: the reviewer who requested changes confirms the fix.
+
 ## 2026-11-17 — S8 delivered (PR #18, under review); CI ts-core step pre-existed (no violation)
 - S8 (ag-s8) reports PR #18 open: shared/ts-core (ESM, ZERO runtime deps, typescript as justified devDep — npx tsc otherwise resolves the bogus tsc@2.0.4 wrapper), parseList with Kotlin/B2-parity validation, flatten/docText byte-identical on 44/44 items, pure rank (cosine, max fusion, barcode boost, EMA 0.5, hysteresis 0.02, degraded states), dependency-free SHA-1, decideTop isolated with TODO(S10). Golden replay 58/58 incl. expectedScores/expectedMargin. 135 tests local + CI; tsc clean.
 - Verified the CI claim myself BEFORE dispatching review: `git diff origin/main...pr-18 -- .github/` is EMPTY — the "ts-core tests" step in the shared job pre-exists on main (conditional guard: package.json → npm ci+test; src-without-package.json → hard error). Builder added no CI. tsc --noEmit NOT in CI — lead gap, fold into the next .github/ touch.

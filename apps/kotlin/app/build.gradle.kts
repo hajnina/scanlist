@@ -96,7 +96,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
 
     // Card B4: ML Kit BUNDLED variants — the models ship inside the APK, so scanning works offline
-    // and without Google Play Services. That is the point of "bundled": no Play-services dependency.
+    // and without a Google Play SERVICES app on the device (B4 review: Google's POM still pulls
+    // play-services-basement + play-services-mlkit-* transitively; the FUNCTIONAL claim — offline,
+    // no GPS app required — is what holds).
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
 

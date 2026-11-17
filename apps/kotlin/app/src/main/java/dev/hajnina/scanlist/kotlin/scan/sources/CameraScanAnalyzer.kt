@@ -129,6 +129,10 @@ class CameraScanAnalyzer(
         val input = InputImage.fromMediaImage(media, image.imageInfo.rotationDegrees)
 
         // Image path is synchronous; the core gates it to ≤ 2.5 fps BEFORE the plane copy runs.
+        // NOTE (B4 review): the JPEG is SENSOR-oriented — rotationDegrees goes to ML Kit only,
+        // not into the JPEG bytes. IMAGE signals are therefore sideways (usually 90°) relative
+        // to what the user sees; B5 must rotate before embedding (or we wire rotation into the
+        // encoder once a device can verify the result).
         core.onFrame(clock.nowMs()) {
             runCatching { ImageProxyFrames.toYuv420(image) }.getOrNull()
         }?.let(onSignal)

@@ -110,9 +110,15 @@ fun CameraScanPreview(
         val executor = Executors.newSingleThreadExecutor()
         val providerFuture = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
+        // B4 review race: if onDispose wins against the providerFuture listener, provider is
+        // still null (no unbind) and the listener would bind a CLOSED analyzer to a SHUT-DOWN
+        // executor — leaked camera, possible RejectedExecutionException. The guard makes the
+        // listener a no-op in that case.
+        var disposed = false
 
         providerFuture.addListener(
             {
+                if (disposed) return@addListener
                 val cameraProvider = providerFuture.get()
                 provider = cameraProvider
 
@@ -151,6 +157,7 @@ fun CameraScanPreview(
         )
 
         onDispose {
+            disposed = true
             provider?.unbindAll()
             executor.shutdown()
             analyzer.close()

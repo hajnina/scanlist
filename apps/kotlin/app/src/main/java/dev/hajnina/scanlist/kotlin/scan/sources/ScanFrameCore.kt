@@ -30,7 +30,9 @@ fun interface JpegEncoder {
  * and a fake clock. Methods take `nowMs` explicitly (defaulting to the injected clock) so tests can
  * drive a synthetic timeline.
  *
- * Not thread-safe: CameraX calls it from one analysis executor.
+ * Not thread-safe in the sense that callers arrive from more than one thread: the analysis
+ * executor drives onFrame, but ML Kit's barcode/OCR callbacks land on the MAIN thread, so
+ * onSignal can fire concurrently — implementers must tolerate that (or synchronize).
  */
 class ScanFrameCore(
     private val clock: Clock = Clock.Default,

@@ -12,6 +12,7 @@
     "run-all": "bash scripts/run-all.sh"
   },
   "devDependencies": {
-    "esbuild": "^0.25.12"
+    "esbuild": "^0.25.12",
+    "puppeteer-core": "^24.43.1"
   }
 }

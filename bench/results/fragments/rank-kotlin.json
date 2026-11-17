@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-17T05:57:45.148935187Z",
+  "generatedAt": "2026-11-17T06:13:42.777925380Z",
   "implementation": "apps/kotlin rank (Kotlin/JVM port of RANK.md, scalar float64 loops)",
   "provenance": {
     "source": "apps/kotlin/app/src/main/java/dev/hajnina/scanlist/kotlin/rank/Rank.kt",
@@ -10,9 +10,9 @@
   },
   "environment": {"jvm": "17.0.21", "iterations": 300, "warmup": 50, "items": 200, "dims": 256},
   "measurements": {
-    "rank200": {"n": 300, "min": 0.644119, "p50": 0.662452, "p95": 0.865162, "max": 2.652465, "mean": 0.699877, "unit": "ms"},
-    "decideTop200": {"n": 300, "min": 0.000000, "p50": 0.000156, "p95": 0.000469, "max": 0.029844, "mean": 0.000362, "unit": "ms"},
-    "rank200.coldFirstTick": {"status": "measured", "ms": 20.717221}
+    "rank200": {"n": 300, "min": 0.637348, "p50": 0.658130, "p95": 0.796724, "max": 0.904798, "mean": 0.681135, "unit": "ms"},
+    "decideTop200": {"n": 300, "min": 0.000000, "p50": 0.000156, "p95": 0.000469, "max": 0.026563, "mean": 0.000360, "unit": "ms"},
+    "rank200.coldFirstTick": {"status": "measured", "ms": 21.475258}
   },
   "sanity": {"topId": "x1:0008", "entries": 200, "top3": [{"id": "x1:0008", "smoothed": 0.922101}, {"id": "x1:0096", "smoothed": 0.920626}, {"id": "x1:0184", "smoothed": 0.919466}]}
 }

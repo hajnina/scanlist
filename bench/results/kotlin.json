@@ -1,0 +1,202 @@
+{
+  "generatedAt": "2026-11-17T06:14:21.270Z",
+  "track": "kotlin",
+  "implementation": "apps/kotlin — Kotlin 2.0.21 + Jetpack Compose (M3 Expressive), on-device LiteRT EmbeddingGemma 2, pure-Kotlin ranker",
+  "provenance": [
+    "rank: bench/driver/Rank200.java against apps/kotlin/app/build/tmp/kotlin-classes/debug (JVM desktop, same code ART runs)",
+    "sizes: apps/kotlin/app/build/outputs/apk/debug + CI artifact scanlist-kotlin-apk (run 44026921235, card/B6)",
+    "build: ./gradlew via scripts/android-env.sh on this aarch64 laptop; CI job duration from gh api",
+    "loc: bench/scripts/loc.py over apps/kotlin (excludes build/)",
+    "cost: opencode session ledger + kanban/lead-log.md"
+  ],
+  "headline": "Smallest APK of the two native tracks (142 MB vs RN's 291 MB) and the fastest ranker (0.66 ms p50 for 200 items) — but every on-device latency number is still unmeasurable without the phone.",
+  "measurements": {
+    "coldStart.listVisible": {
+      "status": "n/a",
+      "reason": "no Android device on adb (card B0 is device-blocked), so nothing can be measured on ART/the NPU; the number only exists once a phone is plugged in. Not a harness limitation — a missing device."
+    },
+    "embed.text.p50": {
+      "status": "n/a",
+      "reason": "no Android device on adb (card B0 is device-blocked), so nothing can be measured on ART/the NPU; the number only exists once a phone is plugged in. Not a harness limitation — a missing device."
+    },
+    "embed.image.p50": {
+      "status": "n/a",
+      "reason": "no Android device on adb (card B0 is device-blocked), so nothing can be measured on ART/the NPU; the number only exists once a phone is plugged in. Not a harness limitation — a missing device."
+    },
+    "rank200": {
+      "n": 300,
+      "min": 0.637348,
+      "p50": 0.65813,
+      "p95": 0.796724,
+      "max": 0.904798,
+      "mean": 0.681135,
+      "unit": "ms"
+    },
+    "rank200.coldFirstTick": {
+      "status": "measured",
+      "ms": 21.475258
+    },
+    "decideTop200": {
+      "n": 300,
+      "min": 0,
+      "p50": 0.000156,
+      "p95": 0.000469,
+      "max": 0.026563,
+      "mean": 0.00036,
+      "unit": "ms"
+    },
+    "rank200.caveat": "JVM desktop timing of the same Kotlin source ART runs; treat it as a lower bound for on-device rank time (ART has no C2 JIT warmup plateau and the phone CPU is slower). The workload is identical to the ts-core and oracle runs.",
+    "apk": {
+      "apkLocal": {
+        "status": "measured",
+        "bytes": 149205160,
+        "path": "/home/martin/projects/scanlist-wt/X1/apps/kotlin/app/build/outputs/apk/debug/scanlistKotlin-debug.apk",
+        "source": "source scripts/android-env.sh && ./gradlew :scanlistKotlin:assembleDebug",
+        "entries": 588,
+        "byGroup": {
+          "meta": 52030,
+          "dex": 35763648,
+          "lib": 109955396,
+          "assets": 2396559,
+          "other": 882796,
+          "res": 278561
+        },
+        "byAbi": {
+          "arm64-v8a": 38210880,
+          "armeabi-v7a": 10057452,
+          "x86": 17734704,
+          "x86_64": 43952360
+        }
+      },
+      "apkCi": {
+        "status": "measured",
+        "bytes": 149319907,
+        "path": "/tmp/opencode/x1/apk-kotlin/ScanList-kotlin-debug.apk",
+        "source": "gh run download <run-id> -n scanlist-kotlin-apk -D dir && export X1_KOTLIN_CI_APK=dir/ScanList-kotlin-debug.apk",
+        "entries": 589,
+        "byGroup": {
+          "meta": 52030,
+          "dex": 35869096,
+          "lib": 109955396,
+          "assets": 2396559,
+          "other": 882796,
+          "res": 278561
+        },
+        "byAbi": {
+          "arm64-v8a": 38210880,
+          "armeabi-v7a": 10057452,
+          "x86": 17734704,
+          "x86_64": 43952360
+        }
+      }
+    },
+    "loc": {
+      "path": "apps/kotlin",
+      "what": "Kotlin/Compose app (track B)",
+      "files": 54,
+      "lines": 7179,
+      "code": 5448,
+      "source": {
+        "files": 34,
+        "code": 3347
+      },
+      "test": {
+        "files": 20,
+        "code": 2101
+      },
+      "byExt": {
+        ".kt": 5348,
+        ".kts": 63,
+        ".sh": 37
+      }
+    },
+    "buildTime": {
+      "status": "measured",
+      "gradleWarm": {
+        "status": "measured",
+        "wallMs": 799,
+        "exitCode": 0,
+        "command": "source scripts/android-env.sh && ./gradlew :scanlistKotlin:assembleDebug --console=plain",
+        "cwd": "/home/martin/projects/scanlist-wt/X1",
+        "tail": " | BUILD SUCCESSFUL in 612ms | 54 actionable tasks: 54 up-to-date"
+      },
+      "gradleCold": {
+        "status": "measured",
+        "wallMs": 6863,
+        "exitCode": 0,
+        "command": "source scripts/android-env.sh && ./gradlew clean :scanlistKotlin:assembleDebug --no-build-cache --console=plain",
+        "cwd": "/home/martin/projects/scanlist-wt/X1",
+        "tail": "qemu-x86_64: Could not open '/lib64/ld-linux-x86-64.so.2': No such file or directory |  | qemu-x86_64: Could not open '/lib64/ld-linux-x86-64.so.2': No such file or directory"
+      },
+      "unitTests": {
+        "status": "measured",
+        "wallMs": 1423,
+        "exitCode": 0,
+        "command": "source scripts/android-env.sh && ./gradlew :scanlistKotlin:testDebugUnitTest --rerun --console=plain",
+        "cwd": "/home/martin/projects/scanlist-wt/X1",
+        "tail": " | BUILD SUCCESSFUL in 1s | 36 actionable tasks: 4 executed, 2 from cache, 30 up-to-date"
+      },
+      "ciJob": {
+        "status": "measured",
+        "runId": "44026921235",
+        "job": "kotlin",
+        "conclusion": "success",
+        "seconds": 93,
+        "source": "gh api .../actions/runs/44026921235/jobs"
+      }
+    },
+    "agentCost": {
+      "status": "measured",
+      "sessions": 11,
+      "tokensOutput": 260743,
+      "tokensInput": 2111812,
+      "cacheRead": 46722780,
+      "costUsd": 0,
+      "cards": {
+        "total": 8,
+        "done": 4,
+        "doing": 1,
+        "todo": 3,
+        "syncRounds": 0,
+        "ids": [
+          "B1",
+          "B2",
+          "B3",
+          "B4",
+          "B6",
+          "B0",
+          "B5",
+          "B7"
+        ]
+      },
+      "mergedPrs": 5,
+      "requestChangesVerdicts": 1,
+      "tokensOutputPerMergedPr": 52149,
+      "method": "bench/scripts/agent-cost.py — opencode session ledger (tokens/cost, attributed by card id in the session title) + committed kanban/lead-log evidence (merged PRs, REQUEST-CHANGES verdicts, sync rounds, infra deaths).",
+      "honestLimits": [
+        "tokens measure agent output, not human wall-clock; cost 0.00 on the free tier makes tokens the only comparable unit",
+        "sessions without a card id in the title are reported as `unattributed` — project-wide cost, not one track's",
+        "the ledger is a lower bound: it only holds sessions this machine still has (see sessions.coverage)",
+        "lead-log counts are regex over prose; the log is the evidence, the numbers are an index into it"
+      ]
+    },
+    "sanity": {
+      "topId": "x1:0008",
+      "entries": 200,
+      "top3": [
+        {
+          "id": "x1:0008",
+          "smoothed": 0.922101
+        },
+        {
+          "id": "x1:0096",
+          "smoothed": 0.920626
+        },
+        {
+          "id": "x1:0184",
+          "smoothed": 0.919466
+        }
+      ]
+    }
+  }
+}

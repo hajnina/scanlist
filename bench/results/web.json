@@ -1,0 +1,333 @@
+{
+  "generatedAt": "2026-11-17T06:14:21.270Z",
+  "track": "web",
+  "implementation": "apps/web — Preact + @material/web PWA frontend on ts-core, Python/torch embedding server (EmbeddingGemma 2 fp32 CPU)",
+  "provenance": [
+    "embed latency: recorded, not re-run — apps/web/server/PERF.md (card C3, measured 2026-11-17 on this laptop, fp32 CPU torch path); re-running needs a ~2 GB torch venv that this laptop's disk quota does not have",
+    "cold start: measured now, real headless Chrome against apps/web/frontend/dist (bench/scripts/coldstart-web.mjs)",
+    "rank: shared/ts-core/src/rank.ts — the browser imports the same module via the tsconfig/vite alias",
+    "sizes: apps/web/frontend/dist from `npm run build` (tsc --noEmit && vite build), gzip level 9",
+    "build: local vite/vitest timings; CI job duration from gh api (run 44024925977, card/C2)",
+    "loc: bench/scripts/loc.py, frontend and server counted separately",
+    "cost: opencode session ledger + kanban/lead-log.md"
+  ],
+  "headline": "The only track with a real cold-start number (174 ms to list visible, real Chrome) and the smallest artifact (89 kB gzipped) — but image embedding costs 6.4–11.9 s per frame on the fp32 CPU path, ~4 orders of magnitude off the interactive 400 ms scan cadence.",
+  "measurements": {
+    "coldStart.listVisible": {
+      "n": 7,
+      "min": 165.027484,
+      "p50": 176.003292,
+      "p95": 184.195694,
+      "max": 184.195694,
+      "mean": 175.18779500000002,
+      "unit": "ms"
+    },
+    "coldStart.shellVisible": {
+      "n": 7,
+      "min": 106.691389,
+      "p50": 120.822116,
+      "p95": 130.439371,
+      "max": 130.439371,
+      "mean": 118.11317485714287,
+      "unit": "ms"
+    },
+    "coldStart.navigation": {
+      "status": "measured",
+      "p50": {
+        "ttfb": 3.6000000089406967,
+        "domContentLoaded": 40.3999999910593,
+        "load": 42
+      },
+      "unit": "ms"
+    },
+    "coldStart.caveat": "localhost, no network latency, headless Chrome on this laptop, fresh profile per run. A real phone over 4G is slower (download of ~89 kB gzipped + TLS). It is still the only track where the number exists at all.",
+    "embed": {
+      "status": "recorded",
+      "source": "apps/web/server/PERF.md (card C3, measured 2026-11-17 on this laptop, fp32 CPU torch path)",
+      "note": "host, in-process, model warm; the container caps at 4 threads and is slower. Re-run recipe is in PERF.md.",
+      "text": {
+        "1 text, cache miss": {
+          "p50Ms": 295,
+          "rangeMs": [
+            88,
+            573
+          ],
+          "n": 30
+        },
+        "1 text, cache hit": {
+          "p50Ms": 0.04,
+          "n": 1
+        },
+        "43 texts (batched)": {
+          "perTextMs": [
+            44,
+            83
+          ],
+          "requestMs": [
+            1900,
+            3600
+          ],
+          "n": 43
+        },
+        "model load": {
+          "ms": 2300,
+          "rangeMs": [
+            2100,
+            2800
+          ]
+        },
+        "load + first embed (cold process)": {
+          "ms": 4400,
+          "rangeMs": [
+            4100,
+            4700
+          ]
+        }
+      },
+      "image": {
+        "1 product JPEG, cache miss": {
+          "p50Ms": 7200,
+          "samplesMs": [
+            6400,
+            6700,
+            7700,
+            7900
+          ],
+          "secondRunMs": [
+            8300,
+            11900
+          ],
+          "n": 4
+        },
+        "HTTP /embed/image, cold": {
+          "rangeMs": [
+            6800,
+            8000
+          ],
+          "n": 2
+        },
+        "HTTP /embed/image in container": {
+          "ms": 10700,
+          "n": 1
+        }
+      },
+      "live": {
+        "status": "n/a",
+        "reason": "not re-run by X1: the embedding server needs torch + sentence-transformers (~2 GB) in a venv and the laptop's disk quota was already purged once for space (lead log, C2 closeout). PERF.md is the recorded measurement with its own reproduce section; re-running it is one command on a machine with the venv."
+      }
+    },
+    "rank200": {
+      "n": 300,
+      "min": 1.368916,
+      "p50": 1.378031,
+      "p95": 1.46975,
+      "max": 1.586418,
+      "mean": 1.3937163766666658,
+      "unit": "ms"
+    },
+    "rank200.coldFirstTick": {
+      "status": "measured",
+      "ms": 5.51207
+    },
+    "rank200.label": "ts-core numbers measured in node; the browser runs the same module in V8, which is a fairer match than Hermes. No embedder call is included — this is the pure ranker, which is what the card asks for.",
+    "bundle": {
+      "status": "measured",
+      "path": "apps/web/frontend/dist",
+      "source": "npm run build (tsc --noEmit && vite build)",
+      "files": 10,
+      "bytes": 723785,
+      "gzipBytes": 90716,
+      "sourceMapBytes": 493392,
+      "shipped": {
+        "bytes": 230393,
+        "gzipBytes": 90716
+      },
+      "assets": {
+        "bytes": 182447,
+        "gzipBytes": 45652
+      },
+      "perAsset": [
+        {
+          "file": "assets/index-DzAEBmS5.js.map",
+          "bytes": 493392,
+          "kind": "source-map"
+        },
+        {
+          "file": "assets/index-DzAEBmS5.js",
+          "bytes": 166931,
+          "gzip": 42094,
+          "kind": "text"
+        },
+        {
+          "file": "icon-512.png",
+          "bytes": 23031,
+          "kind": "binary"
+        },
+        {
+          "file": "assets/index-BXHSbch_.css",
+          "bytes": 15516,
+          "gzip": 3558,
+          "kind": "text"
+        },
+        {
+          "file": "icon-maskable-512.png",
+          "bytes": 11579,
+          "kind": "binary"
+        },
+        {
+          "file": "icon-192.png",
+          "bytes": 8035,
+          "kind": "binary"
+        },
+        {
+          "file": "sw.js",
+          "bytes": 2762,
+          "gzip": 1187,
+          "kind": "text"
+        },
+        {
+          "file": "index.html",
+          "bytes": 1205,
+          "gzip": 565,
+          "kind": "text"
+        },
+        {
+          "file": "manifest.webmanifest",
+          "bytes": 800,
+          "gzip": 383,
+          "kind": "text"
+        },
+        {
+          "file": "icon.svg",
+          "bytes": 534,
+          "gzip": 284,
+          "kind": "text"
+        }
+      ]
+    },
+    "loc": {
+      "frontend": {
+        "path": "apps/web/frontend",
+        "what": "Web frontend (track C, Preact + ts-core)",
+        "files": 26,
+        "lines": 3952,
+        "code": 3049,
+        "source": {
+          "files": 19,
+          "code": 2188
+        },
+        "test": {
+          "files": 7,
+          "code": 861
+        },
+        "byExt": {
+          ".ts": 1255,
+          ".tsx": 784,
+          ".css": 700,
+          ".mjs": 164,
+          ".js": 64,
+          ".py": 57,
+          ".html": 25
+        }
+      },
+      "server": {
+        "path": "apps/web/server",
+        "what": "Web embedding server (track C, Python/torch)",
+        "files": 13,
+        "lines": 3066,
+        "code": 2342,
+        "source": {
+          "files": 6,
+          "code": 1153
+        },
+        "test": {
+          "files": 7,
+          "code": 1189
+        },
+        "byExt": {
+          ".py": 2342
+        }
+      }
+    },
+    "buildTime": {
+      "status": "measured",
+      "viteBuild": {
+        "status": "measured",
+        "wallMs": 2365,
+        "exitCode": 0,
+        "command": "npm run build",
+        "cwd": "apps/web/frontend",
+        "tail": "dist/assets/index-DzAEBmS5.js   166.93 kB │ gzip: 42.52 kB │ map: 493.39 kB |  | ✓ built in 213ms"
+      },
+      "vitest": {
+        "status": "measured",
+        "wallMs": 2079,
+        "exitCode": 0,
+        "command": "npx vitest run --reporter=dot",
+        "cwd": "apps/web/frontend",
+        "tail": " | stderr | tests/app.test.ts | Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information."
+      },
+      "ciJob": {
+        "status": "measured",
+        "runId": "44024925977",
+        "job": "web",
+        "conclusion": "success",
+        "seconds": 23,
+        "source": "gh api .../actions/runs/44024925977/jobs"
+      }
+    },
+    "agentCost": {
+      "status": "measured",
+      "sessions": 16,
+      "tokensOutput": 275368,
+      "tokensInput": 1618487,
+      "cacheRead": 44044224,
+      "costUsd": 0,
+      "cards": {
+        "total": 8,
+        "done": 5,
+        "doing": 1,
+        "todo": 2,
+        "syncRounds": 0,
+        "ids": [
+          "C1",
+          "C2",
+          "C3",
+          "C6",
+          "C8",
+          "C4",
+          "C5",
+          "C7"
+        ]
+      },
+      "mergedPrs": 4,
+      "requestChangesVerdicts": 1,
+      "tokensOutputPerMergedPr": 68842,
+      "method": "bench/scripts/agent-cost.py — opencode session ledger (tokens/cost, attributed by card id in the session title) + committed kanban/lead-log evidence (merged PRs, REQUEST-CHANGES verdicts, sync rounds, infra deaths).",
+      "honestLimits": [
+        "tokens measure agent output, not human wall-clock; cost 0.00 on the free tier makes tokens the only comparable unit",
+        "sessions without a card id in the title are reported as `unattributed` — project-wide cost, not one track's",
+        "the ledger is a lower bound: it only holds sessions this machine still has (see sessions.coverage)",
+        "lead-log counts are regex over prose; the log is the evidence, the numbers are an index into it"
+      ]
+    },
+    "sanity": {
+      "topId": null,
+      "entries": 200,
+      "top3": [
+        {
+          "id": "x1:0008",
+          "smoothed": 0.922101
+        },
+        {
+          "id": "x1:0096",
+          "smoothed": 0.920626
+        },
+        {
+          "id": "x1:0184",
+          "smoothed": 0.919466
+        }
+      ]
+    }
+  }
+}

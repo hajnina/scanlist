@@ -1,0 +1,46 @@
+{
+  "generatedAt": "2026-11-17T06:13:46.546Z",
+  "implementation": "apps/web/frontend dist/ (Preact + @material/web + ts-core), served same-origin",
+  "provenance": {
+    "pattern": "reuses the headless-Chrome approach of apps/web/frontend/scripts/smoke-e2e.mjs (read-only; not edited)",
+    "browser": "/usr/bin/google-chrome (headless new), puppeteer-core",
+    "build": "apps/web/frontend/dist from `npm run build` (tsc --noEmit && vite build)",
+    "list": "shared/spec/samples/van-weekly.json seeded into the app's own localStorage keys",
+    "definition": "t0 = page.goto start; shell = .library-button on screen; list = first .item with height > 0 after opening the saved list"
+  },
+  "environment": {
+    "runs": 7,
+    "port": 8413,
+    "chrome": "/usr/bin/google-chrome",
+    "node": "v22.22.1"
+  },
+  "measurements": {
+    "coldStart.shellVisible": {
+      "n": 7,
+      "min": 106.691389,
+      "p50": 120.822116,
+      "p95": 130.439371,
+      "max": 130.439371,
+      "mean": 118.11317485714287,
+      "unit": "ms"
+    },
+    "coldStart.listVisible": {
+      "n": 7,
+      "min": 165.027484,
+      "p50": 176.003292,
+      "p95": 184.195694,
+      "max": 184.195694,
+      "mean": 175.18779500000002,
+      "unit": "ms"
+    },
+    "navigation": {
+      "status": "measured",
+      "p50": {
+        "ttfb": 3.6000000089406967,
+        "domContentLoaded": 40.3999999910593,
+        "load": 42
+      },
+      "unit": "ms"
+    }
+  }
+}

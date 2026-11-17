@@ -48,12 +48,20 @@ export {
   type BarcodeLike,
 } from './barcode';
 export {
-  buildOcrQuery,
+  createOcrLineDeduper,
+  DEFAULT_OCR_LINE_REPEAT_MS,
+  extractOcrLines,
+  lineConfidence,
+  MAX_OCR_LINES_PER_TICK,
+  NEUTRAL_OCR_CONFIDENCE,
   normalizeOcrText,
-  ocrSignal,
+  ocrLineSignals,
   type OcrBlockLike,
+  type OcrElementLike,
+  type OcrLine,
+  type OcrLineDeduper,
   type OcrLineLike,
-  type OcrQuery,
+  type OcrLineSignalsOptions,
   type OcrResultLike,
 } from './ocr';
 export {createFrameFeed, type FrameFeedSink} from './frames';
@@ -93,8 +101,12 @@ export interface CreateScanSourcesOptions {
   ocrIntervalMs?: number;
   /** Image query interval off the shared frames. Default: every frame. */
   imageIntervalMs?: number;
-  /** Ignore OCR results shorter than this. Default 3. */
+  /** Ignore OCR lines shorter than this. Default 3. */
   ocrMinChars?: number;
+  /** Max OCR line signals per batch (RANK.md's text-vector pool cap). Default 16. */
+  ocrMaxLines?: number;
+  /** Same-OCR-line repeat window. Default 4000 ms. */
+  ocrRepeatMs?: number;
   clock?: Clock;
   /** Any reader error (native reject, decode failure). Defaults to `console.warn`. */
   onError?: (error: unknown) => void;
@@ -124,6 +136,8 @@ export function createScanSources(
     ocrIntervalMs,
     imageIntervalMs,
     ocrMinChars,
+    ocrMaxLines,
+    ocrRepeatMs,
     clock = systemClock,
     onError = (error: unknown) => {
       console.warn('[scan] source error', error);
@@ -141,6 +155,8 @@ export function createScanSources(
     read: frame => readers.readText(frame),
     minIntervalMs: ocrIntervalMs,
     minChars: ocrMinChars,
+    maxLines: ocrMaxLines,
+    repeatMs: ocrRepeatMs,
     clock,
     onError,
   });

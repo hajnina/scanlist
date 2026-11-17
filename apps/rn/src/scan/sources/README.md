@@ -54,8 +54,8 @@ const pipeline = useMemo(() => createScanPipeline(sources), [sources]);
 useEffect(() => {
   pipeline.start(signal => {
     // signal.source: 'barcode' | 'ocr' | 'image'
-    // signal.text:     EAN digits / OCR words / IMAGE_QUERY_MARKER
-    // signal.confidence: 1 for exact product barcodes
+    // signal.text:     EAN digits / ONE OCR LINE (visible words) / IMAGE_QUERY_MARKER
+    // signal.confidence: 1 for exact product barcodes; per OCR line, that line's own confidence
   });
   return () => {
     pipeline.stop();
@@ -71,9 +71,25 @@ state) for a UI that owns its own `<Camera>`; `<ScanCamera>` renders the preview
 camera permission on first mount. Frames always travel through the feed (never a second
 `onFrame` callback), so a frame is processed exactly once.
 
+### OCR is per line (RANK.md §2.2)
+
+`shared/spec/RANK.md` mandates **one text query per OCR line** (`queryPrefix + trim(line)`, line =
+visible words in reading order, single spaces) and **max, never average**. The OCR source therefore
+emits a *batch* of signals: one per ML Kit line, in detection order, each carrying that line's own
+confidence (its `confidence`, else the mean of its element confidences, else 0.6 — never a
+cross-line mean). The A1 `ScanSource` callback is single-signal, so a batch arrives as consecutive
+`onSignal` calls.
+
+A batch is capped at **16 OCR line signals** (`MAX_OCR_LINES_PER_TICK`). A barcode signal is
+additional, so one frame can yield up to 17 text signals; the combined 16-text-vector pool cap is
+rank-side (S8's `rank`/`decideTop`, which drops extras in detection order — A5 does the wiring).
+Suppression runs **before** the cap, so repeated lines consume no slots. An identical line
+(case-insensitive) is suppressed for 4 s (`ocrRepeatMs`), like the barcode debounce.
+
 Per-source knobs: `barcodeDedupeMs` (default 4000), `barcodeIntervalMs` (0 = every frame),
-`ocrIntervalMs` (800), `ocrMinChars` (3), `imageIntervalMs` (0). Each source runs single-flight:
-while a read is in progress new frames are dropped, never queued.
+`ocrIntervalMs` (800), `ocrMinChars` (3), `ocrMaxLines` (16), `ocrRepeatMs` (4000),
+`imageIntervalMs` (0). Each source runs single-flight: while a read is in progress new frames are
+dropped, never queued.
 
 ## Behaviour that is unit-tested
 
@@ -83,7 +99,7 @@ while a read is in progress new frames are dropped, never queued.
 | rate gate primitive | `gate.ts` | `__tests__/gate.test.ts` |
 | same-barcode debounce inside N seconds | `dedupe.ts` | `__tests__/dedupe.test.ts` |
 | product vs QR selection, confidence | `barcode.ts` | `__tests__/barcode.test.ts` |
-| OCR lines → query text + confidence | `ocr.ts` | `__tests__/ocr.test.ts` |
+| OCR lines → one signal per line, per-line confidence, 16-line cap, repeat window | `ocr.ts` | `__tests__/ocr.test.ts` |
 | frame fan-out, listener isolation | `frames.ts` | `__tests__/frames.test.ts` |
 | source gating / single-flight / stop | `feedSource.ts`, `*Source.ts` | `__tests__/sources.test.ts` |
 | Photo → JPEG base64 frame (+ dispose) | `frameCapturer.ts` | `__tests__/frameCapturer.test.ts` |
@@ -105,8 +121,9 @@ running (`npm start`).
    `adb logcat` must not show a capture every frame. Expected: ~2.5 captures/s.
 4. **Barcode** — point at a product EAN: the barcode chip lights once with the digits and stays
    quiet for 4 s while the code stays in frame; move to another product → new digits immediately.
-5. **OCR** — point at a label with readable words: the OCR chip lights with the visible words
-   (max ~1.25/s because of the 800 ms OCR gate). A blank wall emits nothing.
+5. **OCR** — point at a label with readable words: the OCR chip lights once per *line* (each line
+   is its own query, ≤ 16 per batch, max ~1.25 batches/s because of the 800 ms gate). A blank wall
+   emits nothing; an unchanged label goes quiet for 4 s and then re-emits.
 6. **Image** — the image chip lights on every sampled frame; log the base64 length in `onImage`
    (expected ~100–200 KB for a 720p JPEG at quality 0.7).
 7. **Lifecycle** — leave the scan screen: captures stop (`feed.listenerCount() === 0`, no more
